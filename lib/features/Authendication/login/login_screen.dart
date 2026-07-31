@@ -1,5 +1,5 @@
 import 'package:dr_app/core/constant/app_color.dart';
-import 'package:flutter/cupertino.dart';
+import 'package:dr_app/features/Authendication/login/sign-up_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
@@ -52,7 +52,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
 
-                      SizedBox(height: AppSize.gap,),
+                      SizedBox(height: AppSize.gap),
 
                       SizedBox(
                         height: 40.h,
@@ -79,41 +79,52 @@ class _LoginScreenState extends State<LoginScreen> {
                 height: 134.h,
                 child: Column(
                   children: [
-                    Container(
-                      width: 400.w,
-                      height: 60.h,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(12.r),
-                        color: AppColor.buttoncolor,
+                    GestureDetector(
+                      onTap : (){
+                        print("naviagted to Sign-Up screen ");
+                        Navigator.push(context, MaterialPageRoute(builder: (context)=> SignupScreen()));
+                      },
+                      child: Container(
+                        width: 400.w,
+                        height: 60.h,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12.r),
+                          color: AppColor.buttoncolor,
+                        ),
+                                         child:  Center(
+                       child: SizedBox(
+                         height: 20.h,
+                         child: Text("Sign up with E.mail",style: TextStyle(
+                           fontWeight: FontWeight.w500,
+                           fontSize: 16.sp,
+                           letterSpacing: 0,
+                         ),),
+                       ),
+                                         ),
                       ),
-                   child:  Center(
-                     child: SizedBox(
-                       height: 20.h,
-                       child: Text("Sign up with E.mail",style: TextStyle(
-                         fontWeight: FontWeight.w500,
-                         fontSize: 16.sp,
-                         letterSpacing: 0,
-                       ),),
-                     ),
-                   ),
                     ),
                     SizedBox(height: 10.h,),
 
-                    Container(
-                      width: 400.w,
-                      height: 60.h,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(12.r),
-                        color: AppColor.buttoncolor,
-                      ),
-                      child: Center(
-                        child: SizedBox(
-                          height: 20.h,
-                          child: Text("Already have an account? Log in",style: TextStyle(
-                            fontWeight: FontWeight.w500,
-                            fontSize: 16.sp,
-                            letterSpacing: 0,
-                          ),),
+                    GestureDetector(
+                      onTap: (){
+                        print("Naviagted to sig-in screen");
+                      },
+                      child: Container(
+                        width: 400.w,
+                        height: 60.h,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12.r),
+                          color: AppColor.buttoncolor,
+                        ),
+                        child: Center(
+                          child: SizedBox(
+                            height: 20.h,
+                            child: Text("Already have an account? Log in",style: TextStyle(
+                              fontWeight: FontWeight.w500,
+                              fontSize: 16.sp,
+                              letterSpacing: 0,
+                            ),),
+                          ),
                         ),
                       ),
                     ),
@@ -131,8 +142,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   height: 1.5,
                 ),
               )
-
-
             ],
           ),
         ),

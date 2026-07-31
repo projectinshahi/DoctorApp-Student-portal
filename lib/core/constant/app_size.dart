@@ -23,6 +23,9 @@ class AppSize {
   // Gap
   static const double gap = 12;
 
+  // Icon sizes
+  static const double iconBackArrowWidth = 10;
+  static const double iconBackArrowHeight = 20;
 
 
 
