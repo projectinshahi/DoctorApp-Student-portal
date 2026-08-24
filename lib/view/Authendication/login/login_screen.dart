@@ -1,4 +1,4 @@
-import 'package:dr_app/core/constant/app_color.dart';
+import 'package:dr_app/core/theam%20/app_color.dart';
 import 'package:dr_app/view/Authendication/login/Sign_in_screen.dart';
 import 'package:dr_app/view/Authendication/login/sign-up_screen.dart';
 import 'package:flutter/material.dart';
@@ -90,7 +90,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         },
                         child: Text(
                           "Sign up with E.mail",
-                          style: TextStyle(fontSize: 16.sp, color: AppColor.Textcolor),
+                          style: TextStyle(fontSize: 16.sp, color: AppColor.Buttontextcolor),
                         ),
                       ),
                     ),
@@ -117,7 +117,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         },
                         child: Text(
                           "Already have an account? Log in",
-                          style: TextStyle(fontSize: 16.sp, color: AppColor.Textcolor),
+                          style: TextStyle(fontSize: 16.sp, color: AppColor.Buttontextcolor),
                         ),
                       ),
                     ),
@@ -132,7 +132,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 14.sp,
-                  color: Colors.grey,
+                  color: Colors.black38,
                   height: 1.5,
                 ),
               ),

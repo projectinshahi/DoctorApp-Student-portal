@@ -1,35 +1,2388 @@
-import 'package:dr_app/core/constant/app_color.dart';
-import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
+// //
+// // import 'package:dr_app/view/Home/profile/profile_screen.dart';
+// // import 'package:flutter/material.dart';
+// // import 'package:flutter_screenutil/flutter_screenutil.dart';
+// //
+// //
+// // class Homescreen extends StatefulWidget {
+// //   const Homescreen({super.key});
+// //
+// //   @override
+// //   State<Homescreen> createState() => _HomescreenState();
+// // }
+// //
+// // class _HomescreenState extends State<Homescreen> {
+// //   int _currentNavIndex = 0;
+// //
+// //   static const Color kPrimary = Color(0xFF87986B);
+// //   static const Color kBg = Color(0xFFEFF4E2);
+// //
+// //   @override
+// //   Widget build(BuildContext context) {
+// //     // final userName = widget.authResult.user.name ?? "Doctor";
+// //
+// //     return Scaffold(
+// //       extendBody: true,
+// //       backgroundColor: kBg,
+// //       body: Column(
+// //         children: [
+// //           Expanded(
+// //             child: SingleChildScrollView(
+// //               padding: EdgeInsets.only(bottom: 100.h),
+// //               child: Column(
+// //                 crossAxisAlignment: CrossAxisAlignment.start,
+// //                 children: [
+// //                   // ─────────────────────────────────────────────
+// // // Header
+// // // ─────────────────────────────────────────────
+// //                   Container(
+// //                     width: double.infinity,
+// //                     height: 250.h,
+// //                     padding: EdgeInsets.fromLTRB(
+// //                       20.w,
+// //                       16.h,
+// //                       20.w,
+// //                       24.h,
+// //                     ),
+// //                     decoration: BoxDecoration(
+// //                       color: kPrimary,
+// //                       borderRadius: BorderRadius.vertical(
+// //                         bottom: Radius.circular(35.r),
+// //                       ),
+// //                     ),
+// //                     child: Column(
+// //                       crossAxisAlignment: CrossAxisAlignment.center,
+// //                      mainAxisAlignment: MainAxisAlignment.center,
+// //                       mainAxisSize: MainAxisSize.min,
+// //                       children: [
+// //                         // ─────────────────────────────────────
+// //                         // Top Header Row
+// //                         // ─────────────────────────────────────
+// //                         Row(
+// //                           crossAxisAlignment: CrossAxisAlignment.center,
+// //                           children: [
+// //                             // Drawer button
+// //                             SizedBox(
+// //                               width: 32.w,
+// //                               height: 40.h,
+// //                               child: IconButton(
+// //                                 onPressed: () {
+// //                                   Navigator.push(
+// //                                     context,
+// //                                     MaterialPageRoute(
+// //                                       builder: (context) => const ProfileScreen(),
+// //                                     ),
+// //                                   );
+// //                                 },
+// //                                 icon: Image.asset(
+// //                                   'asset/icons/drawer_icon.png',
+// //                                   width: 23.33.w,
+// //                                   height: 16.67.h,
+// //                                   fit: BoxFit.contain,
+// //                                 ),
+// //                                 padding: EdgeInsets.zero,
+// //                                 constraints: const BoxConstraints(),
+// //                               ),
+// //                             ),
+// //
+// //                             SizedBox(width: 20.w),
+// //
+// //                             // Doctor name
+// //                             Expanded(
+// //                               child: Column(
+// //                                 mainAxisSize: MainAxisSize.min,
+// //                                 crossAxisAlignment: CrossAxisAlignment.start,
+// //                                 children: [
+// //                                   Text(
+// //                                     "Heyyy",
+// //                                     maxLines: 1,
+// //                                     overflow: TextOverflow.ellipsis,
+// //                                     style: TextStyle(
+// //                                       fontSize: 12.sp,
+// //                                       fontWeight: FontWeight.w400,
+// //                                       color: Colors.white.withOpacity(0.85),
+// //                                     ),
+// //                                   ),
+// //                                   Text(
+// //                                     "Dr. David Thomson",
+// //                                     maxLines: 1,
+// //                                     overflow: TextOverflow.ellipsis,
+// //                                     style: TextStyle(
+// //                                       fontSize: 16.sp,
+// //                                       fontWeight: FontWeight.w700,
+// //                                       color: Colors.white,
+// //                                     ),
+// //                                   ),
+// //                                 ],
+// //                               ),
+// //                             ),
+// //
+// //                             SizedBox(width: 10.w),
+// //
+// //                             // Bookmark
+// //                             _HeaderIconButton(
+// //                               icon: Icons.bookmark_border_rounded ,
+// //                             ),
+// //
+// //                             SizedBox(width: 10.w),
+// //
+// //                             // Notification
+// //                             _HeaderIconButton(
+// //                               icon: Icons.notifications_none_rounded,
+// //                             ),
+// //                           ],
+// //                         ),
+// //
+// //                         SizedBox(height: 32.h),
+// //
+// //                         // ─────────────────────────────────────
+// //                         // Search Bar
+// //                         // ─────────────────────────────────────
+// //                         Container(
+// //                           width: double.infinity,
+// //                           height: 50.h,
+// //                           padding: EdgeInsets.symmetric(
+// //                             horizontal: 20.w,
+// //                             vertical: 12.h,
+// //                           ),
+// //                           decoration: BoxDecoration(
+// //                             color: Colors.white,
+// //                             borderRadius: BorderRadius.circular(32.r),
+// //                           ),
+// //                           child: Row(
+// //                             children: [
+// //                               Icon(
+// //                                 Icons.search_rounded,
+// //                                 color: Colors.grey.shade500,
+// //                                 size: 20.sp,
+// //                               ),
+// //
+// //                               SizedBox(width: 6.w),
+// //
+// //                               Expanded(
+// //                                 child: Text(
+// //                                   "Search MCQ IDs, Pearl IDs, topics ....",
+// //                                   maxLines: 1,
+// //                                   overflow: TextOverflow.ellipsis,
+// //                                   style: TextStyle(
+// //                                     fontSize: 13.sp,
+// //                                     color: Colors.grey.shade500,
+// //                                   ),
+// //                                 ),
+// //                               ),
+// //                             ],
+// //                           ),
+// //                         ),
+// //                       ],
+// //                     ),
+// //                   ),
+// //
+// //                   SizedBox(height: 24.h,),
+// //
+// //                   Padding(
+// //                     padding: EdgeInsets.symmetric(horizontal: 20.w),
+// //                     child: Column(
+// //                       crossAxisAlignment: CrossAxisAlignment.start,
+// //                       children: [
+// //                         SizedBox(height: 20.h),
+// //
+// //                         // ── Welcome back card ──
+// //                         Container(
+// //                           width: double.infinity,
+// //                           height: 165.h,
+// //                           padding: EdgeInsets.all(18.w),
+// //                           decoration: BoxDecoration(
+// //                             color: const Color(0xFFE7E7E7),
+// //                             borderRadius: BorderRadius.circular(24.r),
+// //                             boxShadow: [
+// //                               BoxShadow(
+// //                                 color: Colors.black.withOpacity(0.05),
+// //                                 blurRadius: 12,
+// //                                 offset: const Offset(0, 4),
+// //                               ),
+// //                             ],
+// //                           ),
+// //                           child: Row(
+// //                             crossAxisAlignment: CrossAxisAlignment.start,
+// //                             children: [
+// //                               /// Left Side
+// //                               Expanded(
+// //                                 flex: 6,
+// //                                 child: Column(
+// //                                   crossAxisAlignment: CrossAxisAlignment.start,
+// //                                   children: [
+// //                                     /// Top Row
+// //                                     Row(
+// //                                       crossAxisAlignment: CrossAxisAlignment.start,
+// //                                       children: [
+// //
+// //                                         SizedBox(width: 12.w),
+// //
+// //                                         Expanded(
+// //                                           child: Column(
+// //                                             crossAxisAlignment: CrossAxisAlignment.start,
+// //                                             children: [
+// //                                               Text(
+// //                                                 "Welcome back Doctor",
+// //                                                 style: TextStyle(
+// //                                                   fontSize: 18.sp,
+// //                                                   fontWeight: FontWeight.w700,
+// //                                                   color: Colors.black,
+// //                                                 ),
+// //                                               ),
+// //
+// //                                               SizedBox(height: 8.h),
+// //
+// //                                               Text(
+// //                                                 "Consistency today, success\ntomorrow, Keep going!!",
+// //                                                 style: TextStyle(
+// //                                                   fontSize: 13.sp,
+// //                                                   color: Colors.grey.shade600,
+// //                                                   height: 1.5,
+// //                                                 ),
+// //                                               ),
+// //                                             ],
+// //                                           ),
+// //                                         ),
+// //                                       ],
+// //                                     ),
+// //
+// //                                    // const Spacer(),
+// //
+// //                                     Divider(
+// //                                       color: Colors.white,
+// //
+// //                                       thickness: 1,
+// //                                     ),
+// //
+// //                                     //SizedBox(height: 10.h),
+// //
+// //                                     Text(
+// //                                       "0 Modules completed",
+// //                                       style: TextStyle(
+// //                                         fontSize: 15.sp,
+// //                                         fontWeight: FontWeight.w700,
+// //                                         color: Colors.black,
+// //                                       ),
+// //                                     ),
+// //                                   ],
+// //                                 ),
+// //                               ),
+// //
+// //                               SizedBox(width: 12.w),
+// //
+// //                               /// Right Image
+// //                               Expanded(
+// //                                 flex: 3,
+// //                                 child: Align(
+// //                                   alignment: Alignment.topRight,
+// //                                   child: Image.asset(
+// //                                     'asset/icons/banner_icon.png',
+// //                                   )
+// //                                 ),
+// //                               ),
+// //                             ],
+// //                           ),
+// //                         ),
+// //
+// //                         SizedBox(height: 26.h),
+// //
+// //                         // ── Continue MCQs ──
+// //                         Text(
+// //                           "Continue MCQs",
+// //                           style: TextStyle(
+// //                             fontSize: 16.sp,
+// //                             fontWeight: FontWeight.w700,
+// //                             color: Colors.black87,
+// //                           ),
+// //                         ),
+// //                         SizedBox(height: 12.h),
+// //                         Container(
+// //                           width: double.infinity,
+// //                           padding: EdgeInsets.all(18.w),
+// //                           decoration: BoxDecoration(
+// //                             color: Colors.white,
+// //                             borderRadius: BorderRadius.circular(18.r),
+// //                             boxShadow: [
+// //                               BoxShadow(
+// //                                 color: Colors.black.withOpacity(0.03),
+// //                                 blurRadius: 12,
+// //                                 offset: const Offset(0, 4),
+// //                               ),
+// //                             ],
+// //                           ),
+// //                           child: Column(
+// //                             crossAxisAlignment: CrossAxisAlignment.start,
+// //                             children: [
+// //                               Text(
+// //                                 "A 6-month-old presented with a genetic disorder "
+// //                                     "attributed to multifactorial inheritance. This type "
+// //                                     "of inheritance is most likely to play a significant "
+// //                                     "role in which of the following disorder?",
+// //                                 style: TextStyle(
+// //                                   fontSize: 13.5.sp,
+// //                                   fontWeight: FontWeight.w500,
+// //                                   color: Colors.black87,
+// //                                   height: 1.4,
+// //                                 ),
+// //                               ),
+// //                               SizedBox(height: 16.h),
+// //                               _McqOption(label: "A", text: "Achondroplasia"),
+// //                               SizedBox(height: 10.h),
+// //                               _McqOption(label: "B", text: "Lysosomal storage disease"),
+// //                               SizedBox(height: 10.h),
+// //                               _McqOption(label: "c", text: "Lysosomal storage disease"),
+// //                               SizedBox(height: 10.h),
+// //                               _McqOption(label: "B", text: "Lysosomal storage disease"),
+// //                             ],
+// //                           ),
+// //                         ),
+// //
+// //                         SizedBox(height: 28.h),
+// //
+// //                         // ── Continue Learning ──
+// //                         Text(
+// //                           "Continue Learning",
+// //                           style: TextStyle(
+// //                             fontSize: 16.sp,
+// //                             fontWeight: FontWeight.w700,
+// //                             color: Colors.black87,
+// //                           ),
+// //                         ),
+// //                         SizedBox(height: 12.h),
+// //                         Row(
+// //                           children: [
+// //                             Expanded(
+// //                               child: _LearningCard(
+// //                                 title: "DHA Case : Chest pain inferior STEMI",
+// //                               ),
+// //                             ),
+// //                             SizedBox(width: 12.w),
+// //                             Expanded(
+// //                               child: _LearningCard(
+// //                                 title: "Cardiology – Ischemic Heart Disease",
+// //                                 icon: Icons.favorite_rounded,
+// //                               ),
+// //                             ),
+// //                           ],
+// //                         ),
+// //
+// //                         SizedBox(height: 28.h),
+// //
+// //                         // ── AI picks for you ──
+// //                         Row(
+// //                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
+// //                           children: [
+// //                             Text(
+// //                               "AI picks for you",
+// //                               style: TextStyle(
+// //                                 fontSize: 16.sp,
+// //                                 fontWeight: FontWeight.w700,
+// //                                 color: Colors.black87,
+// //                               ),
+// //                             ),
+// //                             Icon(Icons.chevron_right_rounded,
+// //                                 color: Colors.grey.shade500),
+// //                           ],
+// //                         ),
+// //                         SizedBox(height: 12.h),
+// //                         Row(
+// //                           children: [
+// //                             Expanded(
+// //                               child: _AiPickCard(
+// //                                 icon: Icons.play_arrow_rounded,
+// //                                 tagText: "Recommended video",
+// //                                 title: "Inferior STEMI walkthrough",
+// //                                 subtitle: "Cardiology",
+// //                               ),
+// //                             ),
+// //                             SizedBox(width: 12.w),
+// //                             Expanded(
+// //                               child: _AiPickCard(
+// //                                 icon: Icons.bloodtype_rounded,
+// //                                 tagText: "Weak area - practice",
+// //                                 title: "Hematology rapid fire MCQs",
+// //                                 subtitle: "Hematology",
+// //                               ),
+// //                             ),
+// //                           ],
+// //                         ),
+// //
+// //                         SizedBox(height: 20.h),
+// //                       ],
+// //                     ),
+// //                   ),
+// //                 ],
+// //               ),
+// //             ),
+// //           ),
+// //         ],
+// //       ),
+// //
+// //       // ── Floating bottom nav bar ──
+// //       bottomNavigationBar: Padding(
+// //         padding: EdgeInsets.fromLTRB(16.w, 0, 16.w, 16.h),
+// //         child: Container(
+// //           height: 75.h,
+// //           padding: EdgeInsets.symmetric(horizontal: 8.w),
+// //           decoration: BoxDecoration(
+// //             color: kPrimary,
+// //             borderRadius: BorderRadius.circular(30.r),
+// //             boxShadow: [
+// //               BoxShadow(
+// //                 color: Colors.black.withOpacity(0.15),
+// //                 blurRadius: 16,
+// //                 offset: const Offset(0, 6),
+// //               ),
+// //             ],
+// //           ),
+// //           child: Row(
+// //             mainAxisAlignment: MainAxisAlignment.spaceAround,
+// //             children: [
+// //               _NavItem(
+// //                 icon: Icons.home_rounded,
+// //                 label: "Home",
+// //                 isSelected: _currentNavIndex == 0,
+// //                 onTap: () => setState(() => _currentNavIndex = 0),
+// //               ),
+// //               _NavItem(
+// //                 icon: Icons.help_outline_rounded,
+// //                 label: "QBank",
+// //                 isSelected: _currentNavIndex == 1,
+// //                 onTap: () => setState(() => _currentNavIndex = 1),
+// //               ),
+// //               _NavItem(
+// //                 icon: Icons.description_outlined,
+// //                 label: "Tests",
+// //                 isSelected: _currentNavIndex == 2,
+// //                 onTap: () => setState(() => _currentNavIndex = 2),
+// //               ),
+// //               _NavItem(
+// //                 icon: Icons.play_circle_outline_rounded,
+// //                 label: "AI Videos",
+// //                 isSelected: _currentNavIndex == 3,
+// //                 onTap: () => setState(() => _currentNavIndex = 3),
+// //               ),
+// //               _NavItem(
+// //                 icon: Icons.person_outline_rounded,
+// //                 label: "Profile",
+// //                 isSelected: _currentNavIndex == 4,
+// //                 onTap: () => setState(() => _currentNavIndex = 4),
+// //               ),
+// //             ],
+// //           ),
+// //         ),
+// //       ),
+// //     );
+// //   }
+// // }
+// //
+// // // ── Header icon button (bookmark / bell) ──
+// // class _HeaderIconButton extends StatelessWidget {
+// //   final IconData icon;
+// //   const _HeaderIconButton({required this.icon});
+// //
+// //   @override
+// //   Widget build(BuildContext context) {
+// //     return Container(
+// //       width: 40.w,
+// //       height: 40.w,
+// //       decoration:  BoxDecoration(
+// //         color: Colors.white,
+// //         shape: BoxShape.circle,
+// //       ),
+// //       child: Icon(icon, size: 20.sp, color: const Color(0xFF87986B)),
+// //     );
+// //   }
+// // }
+// //
+// // // ── MCQ answer option row ──
+// // class _McqOption extends StatelessWidget {
+// //   final String label;
+// //   final String text;
+// //   const _McqOption({required this.label, required this.text});
+// //
+// //   @override
+// //   Widget build(BuildContext context) {
+// //     return Container(
+// //       width: double.infinity,
+// //       padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 12.h),
+// //       decoration: BoxDecoration(
+// //         color: const Color(0xFFF6F6F1),
+// //         borderRadius: BorderRadius.circular(30.r),
+// //       ),
+// //       child: Row(
+// //         children: [
+// //           CircleAvatar(
+// //             radius: 13.r,
+// //             backgroundColor: Colors.white,
+// //             child: Text(
+// //               label,
+// //               style: TextStyle(
+// //                 fontSize: 12.sp,
+// //                 fontWeight: FontWeight.w700,
+// //                 color: Colors.black87,
+// //               ),
+// //             ),
+// //           ),
+// //           SizedBox(width: 12.w),
+// //           Expanded(
+// //             child: Text(
+// //               text,
+// //               style: TextStyle(
+// //                 fontSize: 13.sp,
+// //                 fontWeight: FontWeight.w500,
+// //                 color: Colors.black87,
+// //               ),
+// //             ),
+// //           ),
+// //         ],
+// //       ),
+// //     );
+// //   }
+// // }
+// //
+// // // ── Continue Learning card ──
+// // class _LearningCard extends StatelessWidget {
+// //   final String title;
+// //   final IconData icon;
+// //   const _LearningCard({required this.title, this.icon = Icons.play_arrow_rounded});
+// //
+// //   @override
+// //   Widget build(BuildContext context) {
+// //     return Container(
+// //       height: 130.h,
+// //       padding: EdgeInsets.all(14.w),
+// //       decoration: BoxDecoration(
+// //         color: const Color(0xFF87986B),
+// //         borderRadius: BorderRadius.circular(16.r),
+// //       ),
+// //       child: Column(
+// //         crossAxisAlignment: CrossAxisAlignment.start,
+// //         children: [
+// //           Container(
+// //             width: 32.w,
+// //             height: 32.w,
+// //             decoration: const BoxDecoration(
+// //               color: Colors.white,
+// //               shape: BoxShape.circle,
+// //             ),
+// //             child: Icon(icon, size: 16.sp, color: const Color(0xFF87986B)),
+// //           ),
+// //           const Spacer(),
+// //           Text(
+// //             title,
+// //             maxLines: 2,
+// //             overflow: TextOverflow.ellipsis,
+// //             style: TextStyle(
+// //               fontSize: 13.sp,
+// //               fontWeight: FontWeight.w600,
+// //               color: Colors.white,
+// //               height: 1.3,
+// //             ),
+// //           ),
+// //         ],
+// //       ),
+// //     );
+// //   }
+// // }
+// //
+// // // ── AI picks card ──
+// // class _AiPickCard extends StatelessWidget {
+// //   final IconData icon;
+// //   final String tagText;
+// //   final String title;
+// //   final String subtitle;
+// //
+// //   const _AiPickCard({
+// //     required this.icon,
+// //     required this.tagText,
+// //     required this.title,
+// //     required this.subtitle,
+// //   });
+// //
+// //   @override
+// //   Widget build(BuildContext context) {
+// //     return Container(
+// //       padding: EdgeInsets.all(14.w),
+// //       decoration: BoxDecoration(
+// //         color: const Color(0xFF87986B),
+// //         borderRadius: BorderRadius.circular(16.r),
+// //       ),
+// //       child: Column(
+// //         crossAxisAlignment: CrossAxisAlignment.start,
+// //         children: [
+// //           Row(
+// //             children: [
+// //               Container(
+// //                 width: 30.w,
+// //                 height: 30.w,
+// //                 decoration: const BoxDecoration(
+// //                   color: Colors.white,
+// //                   shape: BoxShape.circle,
+// //                 ),
+// //                 child: Icon(icon, size: 15.sp, color: const Color(0xFF87986B)),
+// //               ),
+// //               SizedBox(width: 6.w),
+// //               Container(
+// //                 padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 3.h),
+// //                 decoration: BoxDecoration(
+// //                   color: Colors.white.withOpacity(0.2),
+// //                   borderRadius: BorderRadius.circular(8.r),
+// //                 ),
+// //                 child: Row(
+// //                   children: [
+// //                     Icon(Icons.auto_awesome, size: 10.sp, color: Colors.white),
+// //                     SizedBox(width: 2.w),
+// //                     Text(
+// //                       "AI",
+// //                       style: TextStyle(
+// //                         fontSize: 10.sp,
+// //                         fontWeight: FontWeight.w600,
+// //                         color: Colors.white,
+// //                       ),
+// //                     ),
+// //                   ],
+// //                 ),
+// //               ),
+// //             ],
+// //           ),
+// //           SizedBox(height: 14.h),
+// //           Text(
+// //             tagText,
+// //             style: TextStyle(
+// //               fontSize: 10.5.sp,
+// //               color: Colors.white.withOpacity(0.75),
+// //             ),
+// //           ),
+// //           SizedBox(height: 4.h),
+// //           Text(
+// //             title,
+// //             maxLines: 2,
+// //             overflow: TextOverflow.ellipsis,
+// //             style: TextStyle(
+// //               fontSize: 13.sp,
+// //               fontWeight: FontWeight.w700,
+// //               color: Colors.white,
+// //               height: 1.3,
+// //             ),
+// //           ),
+// //           SizedBox(height: 4.h),
+// //           Text(
+// //             subtitle,
+// //             style: TextStyle(
+// //               fontSize: 11.sp,
+// //               color: Colors.white.withOpacity(0.7),
+// //             ),
+// //           ),
+// //         ],
+// //       ),
+// //     );
+// //   }
+// // }
+// //
+// // // ── Bottom nav item ──
+// // class _NavItem extends StatelessWidget {
+// //   final IconData icon;
+// //   final String label;
+// //   final bool isSelected;
+// //   final VoidCallback onTap;
+// //
+// //   const _NavItem({
+// //     required this.icon,
+// //     required this.label,
+// //     required this.isSelected,
+// //     required this.onTap,
+// //   });
+// //
+// //   @override
+// //   Widget build(BuildContext context) {
+// //     return GestureDetector(
+// //       onTap: onTap,
+// //       behavior: HitTestBehavior.opaque,
+// //       child: Column(
+// //         mainAxisSize: MainAxisSize.min,
+// //         mainAxisAlignment: MainAxisAlignment.center,
+// //         children: [
+// //           Icon(
+// //             icon,
+// //             size: 25.sp,
+// //             color: isSelected ? Colors.white : Colors.white.withOpacity(0.55),
+// //           ),
+// //           SizedBox(height: 3.h),
+// //           Text(
+// //             label,
+// //             style: TextStyle(
+// //               fontSize: 18.sp,
+// //               fontWeight: isSelected ? FontWeight.w700 : FontWeight.w400,
+// //               color: isSelected ? Colors.white : Colors.white.withOpacity(0.55),
+// //             ),
+// //           ),
+// //         ],
+// //       ),
+// //     );
+// //   }
+// // }
+// //
+//
+// import 'package:dr_app/view/Home/profile/profile_screen.dart';
+// import 'package:flutter/material.dart';
+// import 'package:flutter_screenutil/flutter_screenutil.dart';
+// import 'package:provider/provider.dart';
+//
+// import '../../../models/selection_content_model.dart';
+// import '../../../repository/selection_content_provider.dart';
+// import 'dashbord/qbank_tab.dart';
+// import 'lessons/student_lesson_detail_screen.dart';
+//
+// // If you still keep a separate "AI Videos list" screen, import it too.
+// // import 'ai_videos_screen.dart';
+// // import '../profile/profile_screen.dart';
+//
+// class Homescreen extends StatefulWidget {
+//   const Homescreen({super.key});
+//
+//   @override
+//   State<Homescreen> createState() => _HomescreenState();
+// }
+//
+// class _HomescreenState extends State<Homescreen> {
+//   int _currentNavIndex = 0;
+//
+//   static const Color kPrimary = Color(0xFF87986B);
+//   static const Color kBg = Color(0xFFEFF4E2);
+//
+//   void _pushScreen(Widget screen) {
+//     Navigator.push(
+//       context,
+//       MaterialPageRoute(builder: (_) => screen),
+//     ).then((_) {
+//       if (mounted) setState(() => _currentNavIndex = 0);
+//     });
+//   }
+//
+//   // ── Handles nav bar taps: some tabs just update the selected visual
+//   // state, others (like AI Videos) actually navigate to a real screen. ──
+//   void _handleNavTap(int index) {
+//     setState(() => _currentNavIndex = index);
+//
+//     switch (index) {
+//       case 1:
+//         _pushScreen(const QbankTab());
+//         break;
+//
+//       case 2:
+//         _pushScreen(const TestsTab());
+//         break;
+//
+//       case 3: // AI Videos
+//         final provider = context.read<SelectionContentProvider>();
+//         final lesson = _firstVideoLesson(provider.content);
+//
+//         if (lesson == null) {
+//           ScaffoldMessenger.of(context).showSnackBar(
+//             const SnackBar(
+//               content: Text('No lesson video is available for your selected course yet.'),
+//               backgroundColor: Colors.orange,
+//             ),
+//           );
+//           setState(() => _currentNavIndex = 0);
+//           break;
+//         }
+//
+//         _pushScreen(StudentLessonDetailScreen(lesson: lesson));
+//         break;
+//
+//       case 4:
+//         _pushScreen(const ProfileScreen());
+//         break;
+//
+//       default:
+//       // Home (index 0) — nothing to navigate, already on this screen.
+//         break;
+//     }
+//   }
+//
+//   // ── Also called when the user taps the "AI picks for you" video card,
+//   // so it opens the same detail screen with that specific lesson. ──
+//   void _openAiPickVideo() {
+//     final StudentLessonModel pickedLesson = StudentLessonModel(
+//       id: 102,
+//       title: "Inferior STEMI walkthrough",
+//       description: "Cardiology",
+//       type: "video",
+//       content: null,
+//       videoUrl: "https://your-cdn.com/videos/inferior_stemi.mp4",
+//       thumbnailUrl: "https://your-cdn.com/thumbs/inferior_stemi.jpg",
+//       noteUrl: null,
+//       noteFileType: null,
+//       displayOrder: 1,
+//       isFreePreview: true,
+//       accessType: "free",
+//       locked: false,
+//     );
+//
+//     _pushScreen(StudentLessonDetailScreen(lesson: pickedLesson));
+//   }
+//
+//   @override
+//   void initState() {
+//     super.initState();
+//     WidgetsBinding.instance.addPostFrameCallback((_) {
+//       context.read<SelectionContentProvider>().loadContent();
+//     });
+//   }
+//
+//   StudentLessonModel? _firstVideoLesson(SelectionContentModel? content) {
+//     if (content == null) return null;
+//
+//     for (final chapter in content.chapters) {
+//       for (final lesson in chapter.lessons) {
+//         if (lesson.hasVideo) return lesson;
+//       }
+//     }
+//
+//     return null;
+//   }
+//
+//   @override
+//   Widget build(BuildContext context) {
+//     return Scaffold(
+//       extendBody: true,
+//       backgroundColor: kBg,
+//       body: Column(
+//         children: [
+//           Expanded(
+//             child: SingleChildScrollView(
+//               padding: EdgeInsets.only(bottom: 100.h),
+//               child: Column(
+//                 crossAxisAlignment: CrossAxisAlignment.start,
+//                 children: [
+//                   // ─────────────────────────────────────────────
+//                   // Header
+//                   // ─────────────────────────────────────────────
+//                   Container(
+//                     width: double.infinity,
+//                     height: 250.h,
+//                     padding: EdgeInsets.fromLTRB(20.w, 16.h, 20.w, 24.h),
+//                     decoration: BoxDecoration(
+//                       color: kPrimary,
+//                       borderRadius: BorderRadius.vertical(bottom: Radius.circular(35.r)),
+//                     ),
+//                     child: Column(
+//                       crossAxisAlignment: CrossAxisAlignment.center,
+//                       mainAxisAlignment: MainAxisAlignment.center,
+//                       mainAxisSize: MainAxisSize.min,
+//                       children: [
+//                         Row(
+//                           crossAxisAlignment: CrossAxisAlignment.center,
+//                           children: [
+//                             SizedBox(
+//                               width: 32.w,
+//                               height: 40.h,
+//                               child: IconButton(
+//                                 onPressed: () {
+//                                   Navigator.push(
+//                                     context,
+//                                     MaterialPageRoute(builder: (context) => const ProfileScreen()),
+//                                   );
+//                                 },
+//                                 icon: Image.asset(
+//                                   'asset/icons/drawer_icon.png',
+//                                   width: 23.33.w,
+//                                   height: 16.67.h,
+//                                   fit: BoxFit.contain,
+//                                 ),
+//                                 padding: EdgeInsets.zero,
+//                                 constraints: const BoxConstraints(),
+//                               ),
+//                             ),
+//                             SizedBox(width: 20.w),
+//                             Expanded(
+//                               child: Column(
+//                                 mainAxisSize: MainAxisSize.min,
+//                                 crossAxisAlignment: CrossAxisAlignment.start,
+//                                 children: [
+//                                   Text(
+//                                     "Heyyy",
+//                                     maxLines: 1,
+//                                     overflow: TextOverflow.ellipsis,
+//                                     style: TextStyle(
+//                                       fontSize: 12.sp,
+//                                       fontWeight: FontWeight.w400,
+//                                       color: Colors.white.withOpacity(0.85),
+//                                     ),
+//                                   ),
+//                                   Text(
+//                                     "Dr. David Thomson",
+//                                     maxLines: 1,
+//                                     overflow: TextOverflow.ellipsis,
+//                                     style: TextStyle(
+//                                       fontSize: 16.sp,
+//                                       fontWeight: FontWeight.w700,
+//                                       color: Colors.white,
+//                                     ),
+//                                   ),
+//                                 ],
+//                               ),
+//                             ),
+//                             SizedBox(width: 10.w),
+//                             _HeaderIconButton(icon: Icons.bookmark_border_rounded),
+//                             SizedBox(width: 10.w),
+//                             _HeaderIconButton(icon: Icons.notifications_none_rounded),
+//                           ],
+//                         ),
+//                         SizedBox(height: 32.h),
+//                         Container(
+//                           width: double.infinity,
+//                           height: 50.h,
+//                           padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 12.h),
+//                           decoration: BoxDecoration(
+//                             color: Colors.white,
+//                             borderRadius: BorderRadius.circular(32.r),
+//                           ),
+//                           child: Row(
+//                             children: [
+//                               Icon(Icons.search_rounded, color: Colors.grey.shade500, size: 20.sp),
+//                               SizedBox(width: 6.w),
+//                               Expanded(
+//                                 child: Text(
+//                                   "Search MCQ IDs, Pearl IDs, topics ....",
+//                                   maxLines: 1,
+//                                   overflow: TextOverflow.ellipsis,
+//                                   style: TextStyle(fontSize: 13.sp, color: Colors.grey.shade500),
+//                                 ),
+//                               ),
+//                             ],
+//                           ),
+//                         ),
+//                       ],
+//                     ),
+//                   ),
+//
+//                   SizedBox(height: 24.h),
+//
+//                   Padding(
+//                     padding: EdgeInsets.symmetric(horizontal: 20.w),
+//                     child: Column(
+//                       crossAxisAlignment: CrossAxisAlignment.start,
+//                       children: [
+//                         SizedBox(height: 20.h),
+//
+//                         // ── Welcome back card ──
+//                         Container(
+//                           width: double.infinity,
+//                           height: 165.h,
+//                           padding: EdgeInsets.all(18.w),
+//                           decoration: BoxDecoration(
+//                             color: const Color(0xFFE7E7E7),
+//                             borderRadius: BorderRadius.circular(24.r),
+//                             boxShadow: [
+//                               BoxShadow(
+//                                 color: Colors.black.withOpacity(0.05),
+//                                 blurRadius: 12,
+//                                 offset: const Offset(0, 4),
+//                               ),
+//                             ],
+//                           ),
+//                           child: Row(
+//                             crossAxisAlignment: CrossAxisAlignment.start,
+//                             children: [
+//                               Expanded(
+//                                 flex: 6,
+//                                 child: Column(
+//                                   crossAxisAlignment: CrossAxisAlignment.start,
+//                                   children: [
+//                                     Row(
+//                                       crossAxisAlignment: CrossAxisAlignment.start,
+//                                       children: [
+//                                         SizedBox(width: 12.w),
+//                                         Expanded(
+//                                           child: Column(
+//                                             crossAxisAlignment: CrossAxisAlignment.start,
+//                                             children: [
+//                                               Text(
+//                                                 "Welcome back Doctor",
+//                                                 style: TextStyle(
+//                                                   fontSize: 18.sp,
+//                                                   fontWeight: FontWeight.w700,
+//                                                   color: Colors.black,
+//                                                 ),
+//                                               ),
+//                                               SizedBox(height: 8.h),
+//                                               Text(
+//                                                 "Consistency today, success\ntomorrow, Keep going!!",
+//                                                 style: TextStyle(
+//                                                   fontSize: 13.sp,
+//                                                   color: Colors.grey.shade600,
+//                                                   height: 1.5,
+//                                                 ),
+//                                               ),
+//                                             ],
+//                                           ),
+//                                         ),
+//                                       ],
+//                                     ),
+//                                     Divider(color: Colors.white, thickness: 1),
+//                                     Text(
+//                                       "0 Modules completed",
+//                                       style: TextStyle(
+//                                         fontSize: 15.sp,
+//                                         fontWeight: FontWeight.w700,
+//                                         color: Colors.black,
+//                                       ),
+//                                     ),
+//                                   ],
+//                                 ),
+//                               ),
+//                               SizedBox(width: 12.w),
+//                               Expanded(
+//                                 flex: 3,
+//                                 child: Align(
+//                                   alignment: Alignment.topRight,
+//                                   child: Image.asset('asset/icons/banner_icon.png'),
+//                                 ),
+//                               ),
+//                             ],
+//                           ),
+//                         ),
+//
+//                         SizedBox(height: 26.h),
+//
+//                         // ── Continue MCQs ──
+//                         Text(
+//                           "Continue MCQs",
+//                           style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700, color: Colors.black87),
+//                         ),
+//                         SizedBox(height: 12.h),
+//                         Container(
+//                           width: double.infinity,
+//                           padding: EdgeInsets.all(18.w),
+//                           decoration: BoxDecoration(
+//                             color: Colors.white,
+//                             borderRadius: BorderRadius.circular(18.r),
+//                             boxShadow: [
+//                               BoxShadow(
+//                                 color: Colors.black.withOpacity(0.03),
+//                                 blurRadius: 12,
+//                                 offset: const Offset(0, 4),
+//                               ),
+//                             ],
+//                           ),
+//                           child: Column(
+//                             crossAxisAlignment: CrossAxisAlignment.start,
+//                             children: [
+//                               Text(
+//                                 "A 6-month-old presented with a genetic disorder "
+//                                     "attributed to multifactorial inheritance. This type "
+//                                     "of inheritance is most likely to play a significant "
+//                                     "role in which of the following disorder?",
+//                                 style: TextStyle(
+//                                   fontSize: 13.5.sp,
+//                                   fontWeight: FontWeight.w500,
+//                                   color: Colors.black87,
+//                                   height: 1.4,
+//                                 ),
+//                               ),
+//                               SizedBox(height: 16.h),
+//                               _McqOption(label: "A", text: "Achondroplasia"),
+//                               SizedBox(height: 10.h),
+//                               _McqOption(label: "B", text: "Lysosomal storage disease"),
+//                               SizedBox(height: 10.h),
+//                               _McqOption(label: "c", text: "Lysosomal storage disease"),
+//                               SizedBox(height: 10.h),
+//                               _McqOption(label: "B", text: "Lysosomal storage disease"),
+//                             ],
+//                           ),
+//                         ),
+//
+//                         SizedBox(height: 28.h),
+//
+//                         Consumer<SelectionContentProvider>(
+//                           builder: (context, provider, _) {
+//                             if (provider.isLoading) {
+//                               return const Padding(
+//                                 padding: EdgeInsets.symmetric(vertical: 12),
+//                                 child: Center(child: CircularProgressIndicator()),
+//                               );
+//                             }
+//
+//                             final lessons = <StudentLessonModel>[];
+//                             for (final chapter in provider.content?.chapters ?? const <StudentChapterModel>[]) {
+//                               lessons.addAll(chapter.lessons);
+//                             }
+//
+//                             if (provider.errorMessage != null && lessons.isEmpty) {
+//                               return Padding(
+//                                 padding: const EdgeInsets.symmetric(vertical: 12),
+//                                 child: Text(
+//                                   provider.errorMessage!,
+//                                   style: const TextStyle(color: Colors.red),
+//                                 ),
+//                               );
+//                             }
+//
+//                             if (lessons.isEmpty) {
+//                               return const SizedBox.shrink();
+//                             }
+//
+//                             return Column(
+//                               crossAxisAlignment: CrossAxisAlignment.start,
+//                               children: [
+//                                 Text(
+//                                   "Your selected course lessons",
+//                                   style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700, color: Colors.black87),
+//                                 ),
+//                                 SizedBox(height: 12.h),
+//                                 GridView.builder(
+//                                   shrinkWrap: true,
+//                                   physics: const NeverScrollableScrollPhysics(),
+//                                   itemCount: lessons.length,
+//                                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+//                                     crossAxisCount: 2,
+//                                     crossAxisSpacing: 12,
+//                                     mainAxisSpacing: 12,
+//                                     childAspectRatio: 0.82,
+//                                   ),
+//                                   itemBuilder: (context, index) {
+//                                     final lesson = lessons[index];
+//                                     return GestureDetector(
+//                                       onTap: () {
+//                                         Navigator.push(
+//                                           context,
+//                                           MaterialPageRoute(
+//                                             builder: (_) => StudentLessonDetailScreen(lesson: lesson),
+//                                           ),
+//                                         );
+//                                       },
+//                                       child: Container(
+//                                         decoration: BoxDecoration(
+//                                           color: Colors.white,
+//                                           borderRadius: BorderRadius.circular(16.r),
+//                                           boxShadow: [
+//                                             BoxShadow(
+//                                               color: Colors.black.withOpacity(0.04),
+//                                               blurRadius: 10,
+//                                               offset: const Offset(0, 4),
+//                                             ),
+//                                           ],
+//                                         ),
+//                                         padding: EdgeInsets.all(10.w),
+//                                         child: Column(
+//                                           crossAxisAlignment: CrossAxisAlignment.start,
+//                                           children: [
+//                                             if (lesson.thumbnailUrl != null)
+//                                               ClipRRect(
+//                                                 borderRadius: BorderRadius.circular(12.r),
+//                                                 child: Image.network(
+//                                                   lesson.thumbnailUrl!,
+//                                                   height: 90.h,
+//                                                   width: double.infinity,
+//                                                   fit: BoxFit.cover,
+//                                                 ),
+//                                               )
+//                                             else
+//                                               Container(
+//                                                 height: 90.h,
+//                                                 width: double.infinity,
+//                                                 decoration: BoxDecoration(
+//                                                   color: const Color(0xFF87986B),
+//                                                   borderRadius: BorderRadius.circular(12.r),
+//                                                 ),
+//                                                 child: const Icon(Icons.play_circle_fill_rounded, color: Colors.white),
+//                                               ),
+//                                             SizedBox(height: 10.h),
+//                                             Text(
+//                                               lesson.title,
+//                                               maxLines: 2,
+//                                               overflow: TextOverflow.ellipsis,
+//                                               style: TextStyle(fontSize: 12.5.sp, fontWeight: FontWeight.w700),
+//                                             ),
+//                                             const Spacer(),
+//                                             Row(
+//                                               children: [
+//                                                 if (lesson.hasVideo)
+//                                                   const Icon(Icons.videocam_outlined, size: 14, color: Colors.green),
+//                                                 if (lesson.hasNote)
+//                                                   const Icon(Icons.description_outlined, size: 14, color: Colors.orange),
+//                                                 const Spacer(),
+//                                                 if (lesson.locked)
+//                                                   const Icon(Icons.lock_rounded, size: 14, color: Colors.grey),
+//                                               ],
+//                                             )
+//                                           ],
+//                                         ),
+//                                       ),
+//                                     );
+//                                   },
+//                                 ),
+//                                 SizedBox(height: 28.h),
+//                               ],
+//                             );
+//                           },
+//                         ),
+//
+//                         // ── Continue Learning ──
+//                         Text(
+//                           "Continue Learning",
+//                           style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700, color: Colors.black87),
+//                         ),
+//                         SizedBox(height: 12.h),
+//                         Row(
+//                           children: [
+//                             Expanded(child: _LearningCard(title: "DHA Case : Chest pain inferior STEMI")),
+//                             SizedBox(width: 12.w),
+//                             Expanded(
+//                               child: _LearningCard(
+//                                 title: "Cardiology – Ischemic Heart Disease",
+//                                 icon: Icons.favorite_rounded,
+//                               ),
+//                             ),
+//                           ],
+//                         ),
+//
+//                         SizedBox(height: 28.h),
+//
+//                         // ── AI picks for you ──
+//                         Row(
+//                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
+//                           children: [
+//                             Text(
+//                               "AI picks for you",
+//                               style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700, color: Colors.black87),
+//                             ),
+//                             Icon(Icons.chevron_right_rounded, color: Colors.grey.shade500),
+//                           ],
+//                         ),
+//                         SizedBox(height: 12.h),
+//                         Row(
+//                           children: [
+//                             Expanded(
+//                               child: GestureDetector(
+//                                 onTap: _openAiPickVideo, // 👈 opens StudentLessonDetailScreen
+//                                 child: _AiPickCard(
+//                                   icon: Icons.play_arrow_rounded,
+//                                   tagText: "Recommended video",
+//                                   title: "Inferior STEMI walkthrough",
+//                                   subtitle: "Cardiology",
+//                                 ),
+//                               ),
+//                             ),
+//                             SizedBox(width: 12.w),
+//                             Expanded(
+//                               child: _AiPickCard(
+//                                 icon: Icons.bloodtype_rounded,
+//                                 tagText: "Weak area - practice",
+//                                 title: "Hematology rapid fire MCQs",
+//                                 subtitle: "Hematology",
+//                               ),
+//                             ),
+//                           ],
+//                         ),
+//
+//                         SizedBox(height: 20.h),
+//                       ],
+//                     ),
+//                   ),
+//                 ],
+//               ),
+//             ),
+//           ),
+//         ],
+//       ),
+//
+//       // ── Floating bottom nav bar ──
+//       bottomNavigationBar: Padding(
+//         padding: EdgeInsets.fromLTRB(16.w, 0, 16.w, 16.h),
+//         child: Container(
+//           height: 75.h,
+//           padding: EdgeInsets.symmetric(horizontal: 8.w),
+//           decoration: BoxDecoration(
+//             color: kPrimary,
+//             borderRadius: BorderRadius.circular(30.r),
+//             boxShadow: [
+//               BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 16, offset: const Offset(0, 6)),
+//             ],
+//           ),
+//           child: Row(
+//             mainAxisAlignment: MainAxisAlignment.spaceAround,
+//             children: [
+//               _NavItem(
+//                 icon: Icons.home_rounded,
+//                 label: "Home",
+//                 isSelected: _currentNavIndex == 0,
+//                 onTap: () => _handleNavTap(0),
+//               ),
+//               _NavItem(
+//                 icon: Icons.help_outline_rounded,
+//                 label: "QBank",
+//                 isSelected: _currentNavIndex == 1,
+//                 onTap: () => _handleNavTap(1),
+//               ),
+//               _NavItem(
+//                 icon: Icons.description_outlined,
+//                 label: "Tests",
+//                 isSelected: _currentNavIndex == 2,
+//                 onTap: () => _handleNavTap(2),
+//               ),
+//               _NavItem(
+//                 icon: Icons.play_circle_outline_rounded,
+//                 label: "AI Videos",
+//                 isSelected: _currentNavIndex == 3,
+//                 onTap: () => _handleNavTap(3),
+//               ),
+//               _NavItem(
+//                 icon: Icons.person_outline_rounded,
+//                 label: "Profile",
+//                 isSelected: _currentNavIndex == 4,
+//                 onTap: () => _handleNavTap(4),
+//               ),
+//             ],
+//           ),
+//         ),
+//       ),
+//     );
+//   }
+// }
+//
+// // ── Header icon button (bookmark / bell) ──
+// class _HeaderIconButton extends StatelessWidget {
+//   final IconData icon;
+//   const _HeaderIconButton({required this.icon});
+//
+//   @override
+//   Widget build(BuildContext context) {
+//     return Container(
+//       width: 40.w,
+//       height: 40.w,
+//       decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+//       child: Icon(icon, size: 20.sp, color: const Color(0xFF87986B)),
+//     );
+//   }
+// }
+//
+// // ── MCQ answer option row ──
+// class _McqOption extends StatelessWidget {
+//   final String label;
+//   final String text;
+//   const _McqOption({required this.label, required this.text});
+//
+//   @override
+//   Widget build(BuildContext context) {
+//     return Container(
+//       width: double.infinity,
+//       padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 12.h),
+//       decoration: BoxDecoration(
+//         color: const Color(0xFFF6F6F1),
+//         borderRadius: BorderRadius.circular(30.r),
+//       ),
+//       child: Row(
+//         children: [
+//           CircleAvatar(
+//             radius: 13.r,
+//             backgroundColor: Colors.white,
+//             child: Text(
+//               label,
+//               style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: Colors.black87),
+//             ),
+//           ),
+//           SizedBox(width: 12.w),
+//           Expanded(
+//             child: Text(
+//               text,
+//               style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500, color: Colors.black87),
+//             ),
+//           ),
+//         ],
+//       ),
+//     );
+//   }
+// }
+//
+// // ── Continue Learning card ──
+// class _LearningCard extends StatelessWidget {
+//   final String title;
+//   final IconData icon;
+//   const _LearningCard({required this.title, this.icon = Icons.play_arrow_rounded});
+//
+//   @override
+//   Widget build(BuildContext context) {
+//     return Container(
+//       height: 130.h,
+//       padding: EdgeInsets.all(14.w),
+//       decoration: BoxDecoration(
+//         color: const Color(0xFF87986B),
+//         borderRadius: BorderRadius.circular(16.r),
+//       ),
+//       child: Column(
+//         crossAxisAlignment: CrossAxisAlignment.start,
+//         children: [
+//           Container(
+//             width: 32.w,
+//             height: 32.w,
+//             decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+//             child: Icon(icon, size: 16.sp, color: const Color(0xFF87986B)),
+//           ),
+//           const Spacer(),
+//           Text(
+//             title,
+//             maxLines: 2,
+//             overflow: TextOverflow.ellipsis,
+//             style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: Colors.white, height: 1.3),
+//           ),
+//         ],
+//       ),
+//     );
+//   }
+// }
+//
+// // ── AI picks card ──
+// class _AiPickCard extends StatelessWidget {
+//   final IconData icon;
+//   final String tagText;
+//   final String title;
+//   final String subtitle;
+//
+//   const _AiPickCard({
+//     required this.icon,
+//     required this.tagText,
+//     required this.title,
+//     required this.subtitle,
+//   });
+//
+//   @override
+//   Widget build(BuildContext context) {
+//     return Container(
+//       padding: EdgeInsets.all(14.w),
+//       decoration: BoxDecoration(
+//         color: const Color(0xFF87986B),
+//         borderRadius: BorderRadius.circular(16.r),
+//       ),
+//       child: Column(
+//         crossAxisAlignment: CrossAxisAlignment.start,
+//         children: [
+//           Row(
+//             children: [
+//               Container(
+//                 width: 30.w,
+//                 height: 30.w,
+//                 decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+//                 child: Icon(icon, size: 15.sp, color: const Color(0xFF87986B)),
+//               ),
+//               SizedBox(width: 6.w),
+//               Container(
+//                 padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 3.h),
+//                 decoration: BoxDecoration(
+//                   color: Colors.white.withOpacity(0.2),
+//                   borderRadius: BorderRadius.circular(8.r),
+//                 ),
+//                 child: Row(
+//                   children: [
+//                     Icon(Icons.auto_awesome, size: 10.sp, color: Colors.white),
+//                     SizedBox(width: 2.w),
+//                     Text(
+//                       "AI",
+//                       style: TextStyle(fontSize: 10.sp, fontWeight: FontWeight.w600, color: Colors.white),
+//                     ),
+//                   ],
+//                 ),
+//               ),
+//             ],
+//           ),
+//           SizedBox(height: 14.h),
+//           Text(
+//             tagText,
+//             style: TextStyle(fontSize: 10.5.sp, color: Colors.white.withOpacity(0.75)),
+//           ),
+//           SizedBox(height: 4.h),
+//           Text(
+//             title,
+//             maxLines: 2,
+//             overflow: TextOverflow.ellipsis,
+//             style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white, height: 1.3),
+//           ),
+//           SizedBox(height: 4.h),
+//           Text(
+//             subtitle,
+//             style: TextStyle(fontSize: 11.sp, color: Colors.white.withOpacity(0.7)),
+//           ),
+//         ],
+//       ),
+//     );
+//   }
+// }
+//
+// // ── Bottom nav item ──
+// class _NavItem extends StatelessWidget {
+//   final IconData icon;
+//   final String label;
+//   final bool isSelected;
+//   final VoidCallback onTap;
+//
+//   const _NavItem({
+//     required this.icon,
+//     required this.label,
+//     required this.isSelected,
+//     required this.onTap,
+//   });
+//
+//   @override
+//   Widget build(BuildContext context) {
+//     return GestureDetector(
+//       onTap: onTap,
+//       behavior: HitTestBehavior.opaque,
+//       child: Column(
+//         mainAxisSize: MainAxisSize.min,
+//         mainAxisAlignment: MainAxisAlignment.center,
+//         children: [
+//           Icon(icon, size: 25.sp, color: isSelected ? Colors.white : Colors.white.withOpacity(0.55)),
+//           SizedBox(height: 3.h),
+//           Text(
+//             label,
+//             style: TextStyle(
+//               fontSize: 18.sp,
+//               fontWeight: isSelected ? FontWeight.w700 : FontWeight.w400,
+//               color: isSelected ? Colors.white : Colors.white.withOpacity(0.55),
+//             ),
+//           ),
+//         ],
+//       ),
+//     );
+//   }
+// }
 
-import '../../View_model/auth_result_model.dart';
+
+import 'package:dr_app/view/Home/profile/profile_screen.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:provider/provider.dart';
+
+import '../../../models/selection_content_model.dart';
+import '../../../repository/selection_content_provider.dart';
+import '../../repository/profile_provider.dart';
+import 'Qbank/qbank_tab.dart';
+import 'dashbord/ai_video_tab.dart';
+import 'lessons/student_lesson_detail_screen.dart';
+
+// If you still keep a separate "AI Videos list" screen, import it too.
+// import 'ai_videos_screen.dart';
 
 class Homescreen extends StatefulWidget {
-  final AuthResultModel authResult;
-  const Homescreen({super.key, required this.authResult});
+  const Homescreen({super.key});
 
   @override
   State<Homescreen> createState() => _HomescreenState();
 }
 
 class _HomescreenState extends State<Homescreen> {
+  int _currentNavIndex = 0;
+
+  static const Color kPrimary = Color(0xFF87986B);
+  static const Color kBg = Color(0xFFEFF4E2);
+
+  void _pushScreen(Widget screen) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => screen),
+    ).then((_) {
+      if (mounted) setState(() => _currentNavIndex = 0);
+    });
+  }
+
+  // ── Handles nav bar taps: some tabs just update the selected visual
+  // state, others (like AI Videos) actually navigate to a real screen. ──
+  void _handleNavTap(int index) {
+    setState(() => _currentNavIndex = index);
+
+    switch (index) {
+      case 1: // QBank — now shows the selected-course details
+        _pushScreen(const QbankTab());
+        break;
+
+      case 2:
+        _pushScreen(const TestsTab());
+        break;
+
+      case 3: // AI Videos
+        _pushScreen(const AiVideoTab());
+        break;
+
+      case 4:
+        _pushScreen(const ProfileScreen());
+        break;
+
+      default:
+      // Home (index 0) — nothing to navigate, already on this screen.
+        break;
+    }
+  }
+
+  // ── Also called when the user taps the "AI picks for you" video card,
+  // so it opens the same detail screen with that specific lesson. ──
+  void _openAiPickVideo() {
+    final StudentLessonModel pickedLesson = StudentLessonModel(
+      id: 102,
+      title: "Inferior STEMI walkthrough",
+      description: "Cardiology",
+      type: "video",
+      content: null,
+      videoUrl: "https://your-cdn.com/videos/inferior_stemi.mp4",
+      thumbnailUrl: "https://your-cdn.com/thumbs/inferior_stemi.jpg",
+      noteUrl: null,
+      noteFileType: null,
+      displayOrder: 1,
+      isFreePreview: true,
+      accessType: "free",
+      locked: false,
+    );
+
+    _pushScreen(StudentLessonDetailScreen(lesson: pickedLesson));
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<SelectionContentProvider>().loadContent();
+      // Load the logged-in user's profile so the header can show their name.
+      context.read<ProfileProvider>().loadProfile();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        height: double.infinity,
-        width: double.infinity,
-        color: AppColor.Screenbackground,
+      extendBody: true,
+      backgroundColor: kBg,
+      body: Column(
+        children: [
+          Expanded(
+            child: SingleChildScrollView(
+              padding: EdgeInsets.only(bottom: 100.h),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // ─────────────────────────────────────────────
+                  // Header
+                  // ─────────────────────────────────────────────
+                  Container(
+                    width: double.infinity,
+                    height: 250.h,
+                    padding: EdgeInsets.fromLTRB(20.w, 16.h, 20.w, 24.h),
+                    decoration: BoxDecoration(
+                      color: kPrimary,
+                      borderRadius: BorderRadius.vertical(bottom: Radius.circular(35.r)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            SizedBox(
+                              width: 32.w,
+                              height: 40.h,
+                              child: IconButton(
+                                onPressed: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(builder: (context) => const ProfileScreen()),
+                                  );
+                                },
+                                icon: Image.asset(
+                                  'asset/icons/drawer_icon.png',
+                                  width: 23.33.w,
+                                  height: 16.67.h,
+                                  fit: BoxFit.contain,
+                                ),
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(),
+                              ),
+                            ),
+                            SizedBox(width: 20.w),
+
+                            // 👇 Name now comes from ProfileProvider instead of
+                            // being hardcoded as "Dr. David Thomson".
+                            Expanded(
+                              child: Consumer<ProfileProvider>(
+                                builder: (context, profileProvider, _) {
+                                  final profile = profileProvider.profile;
+
+                                  final displayName = profile?.name?.isNotEmpty == true
+                                      ? profile!.name!
+                                      : "Doctor";
+
+                                  return Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        "Heyyy",
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          fontSize: 12.sp,
+                                          fontWeight: FontWeight.w400,
+                                          color: Colors.white.withOpacity(0.85),
+                                        ),
+                                      ),
+                                      if (profileProvider.isLoading && profile == null)
+                                        SizedBox(
+                                          height: 16.h,
+                                          width: 90.w,
+                                          child: LinearProgressIndicator(
+                                            backgroundColor: Colors.white.withOpacity(0.2),
+                                            valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+                                          ),
+                                        )
+                                      else
+                                        Text(
+                                          displayName,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            fontSize: 16.sp,
+                                            fontWeight: FontWeight.w700,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                    ],
+                                  );
+                                },
+                              ),
+                            ),
+
+                            SizedBox(width: 10.w),
+                            _HeaderIconButton(icon: Icons.bookmark_border_rounded),
+                            SizedBox(width: 10.w),
+                            _HeaderIconButton(icon: Icons.notifications_none_rounded),
+                          ],
+                        ),
+                        SizedBox(height: 32.h),
+                        Container(
+                          width: double.infinity,
+                          height: 50.h,
+                          padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 12.h),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(32.r),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(Icons.search_rounded, color: Colors.grey.shade500, size: 20.sp),
+                              SizedBox(width: 6.w),
+                              Expanded(
+                                child: Text(
+                                  "Search MCQ IDs, Pearl IDs, topics ....",
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(fontSize: 13.sp, color: Colors.grey.shade500),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  SizedBox(height: 24.h),
+
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 20.w),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        SizedBox(height: 20.h),
+
+                        // ── Welcome back card ──
+                        Consumer<ProfileProvider>(
+                          builder: (context, profileProvider, _) {
+                            final profile = profileProvider.profile;
+                            final firstName = profile?.name?.isNotEmpty == true
+                                ? profile!.name!.split(' ').first
+                                : "Doctor";
+
+                            return Container(
+                              width: double.infinity,
+                              height: 165.h,
+                              padding: EdgeInsets.all(18.w),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFE7E7E7),
+                                borderRadius: BorderRadius.circular(24.r),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.05),
+                                    blurRadius: 12,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
+                              ),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Expanded(
+                                    flex: 6,
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            SizedBox(width: 12.w),
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    "Welcome back $firstName",
+                                                    style: TextStyle(
+                                                      fontSize: 18.sp,
+                                                      fontWeight: FontWeight.w700,
+                                                      color: Colors.black,
+                                                    ),
+                                                  ),
+                                                  SizedBox(height: 8.h),
+                                                  Text(
+                                                    "Consistency today, success\ntomorrow, Keep going!!",
+                                                    style: TextStyle(
+                                                      fontSize: 13.sp,
+                                                      color: Colors.grey.shade600,
+                                                      height: 1.5,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        Divider(color: Colors.white, thickness: 1),
+                                        Text(
+                                          "0 Modules completed",
+                                          style: TextStyle(
+                                            fontSize: 15.sp,
+                                            fontWeight: FontWeight.w700,
+                                            color: Colors.black,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  SizedBox(width: 12.w),
+                                  Expanded(
+                                    flex: 3,
+                                    child: Align(
+                                      alignment: Alignment.topRight,
+                                      child: Image.asset('asset/icons/banner_icon.png'),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+
+                        SizedBox(height: 26.h),
+
+                        // ── Continue MCQs ──
+                        Text(
+                          "Continue MCQs",
+                          style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700, color: Colors.black87),
+                        ),
+                        SizedBox(height: 12.h),
+                        Container(
+                          width: double.infinity,
+                          padding: EdgeInsets.all(18.w),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(18.r),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.03),
+                                blurRadius: 12,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                "A 6-month-old presented with a genetic disorder "
+                                    "attributed to multifactorial inheritance. This type "
+                                    "of inheritance is most likely to play a significant "
+                                    "role in which of the following disorder?",
+                                style: TextStyle(
+                                  fontSize: 13.5.sp,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.black87,
+                                  height: 1.4,
+                                ),
+                              ),
+                              SizedBox(height: 16.h),
+                              _McqOption(label: "A", text: "Achondroplasia"),
+                              SizedBox(height: 10.h),
+                              _McqOption(label: "B", text: "Lysosomal storage disease"),
+                              SizedBox(height: 10.h),
+                              _McqOption(label: "c", text: "Lysosomal storage disease"),
+                              SizedBox(height: 10.h),
+                              _McqOption(label: "B", text: "Lysosomal storage disease"),
+                            ],
+                          ),
+                        ),
+
+                        SizedBox(height: 28.h),
+
+                        Consumer<SelectionContentProvider>(
+                          builder: (context, provider, _) {
+                            if (provider.isLoading) {
+                              return const Padding(
+                                padding: EdgeInsets.symmetric(vertical: 12),
+                                child: Center(child: CircularProgressIndicator()),
+                              );
+                            }
+
+                            final lessons = <StudentLessonModel>[];
+                            for (final chapter in provider.content?.chapters ?? const <StudentChapterModel>[]) {
+                              lessons.addAll(chapter.lessons);
+                            }
+
+                            if (provider.errorMessage != null && lessons.isEmpty) {
+                              return Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                child: Text(
+                                  provider.errorMessage!,
+                                  style: const TextStyle(color: Colors.red),
+                                ),
+                              );
+                            }
+
+                            if (lessons.isEmpty) {
+                              return const SizedBox.shrink();
+                            }
+
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  "Your selected course lessons",
+                                  style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700, color: Colors.black87),
+                                ),
+                                SizedBox(height: 12.h),
+                                GridView.builder(
+                                  shrinkWrap: true,
+                                  physics: const NeverScrollableScrollPhysics(),
+                                  itemCount: lessons.length,
+                                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                                    crossAxisCount: 2,
+                                    crossAxisSpacing: 12,
+                                    mainAxisSpacing: 12,
+                                    childAspectRatio: 0.82,
+                                  ),
+                                  itemBuilder: (context, index) {
+                                    final lesson = lessons[index];
+                                    return GestureDetector(
+                                      onTap: () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (_) => StudentLessonDetailScreen(lesson: lesson),
+                                          ),
+                                        );
+                                      },
+                                      child: Container(
+                                        decoration: BoxDecoration(
+                                          color: Colors.white,
+                                          borderRadius: BorderRadius.circular(16.r),
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: Colors.black.withOpacity(0.04),
+                                              blurRadius: 10,
+                                              offset: const Offset(0, 4),
+                                            ),
+                                          ],
+                                        ),
+                                        padding: EdgeInsets.all(10.w),
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            if (lesson.thumbnailUrl != null)
+                                              ClipRRect(
+                                                borderRadius: BorderRadius.circular(12.r),
+                                                child: Image.network(
+                                                  lesson.thumbnailUrl!,
+                                                  height: 90.h,
+                                                  width: double.infinity,
+                                                  fit: BoxFit.cover,
+                                                ),
+                                              )
+                                            else
+                                              Container(
+                                                height: 90.h,
+                                                width: double.infinity,
+                                                decoration: BoxDecoration(
+                                                  color: const Color(0xFF87986B),
+                                                  borderRadius: BorderRadius.circular(12.r),
+                                                ),
+                                                child: const Icon(Icons.play_circle_fill_rounded, color: Colors.white),
+                                              ),
+                                            SizedBox(height: 10.h),
+                                            Text(
+                                              lesson.title,
+                                              maxLines: 2,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: TextStyle(fontSize: 12.5.sp, fontWeight: FontWeight.w700),
+                                            ),
+                                            const Spacer(),
+                                            Row(
+                                              children: [
+                                                if (lesson.hasVideo)
+                                                  const Icon(Icons.videocam_outlined, size: 14, color: Colors.green),
+                                                if (lesson.hasNote)
+                                                  const Icon(Icons.description_outlined, size: 14, color: Colors.orange),
+                                                const Spacer(),
+                                                if (lesson.locked)
+                                                  const Icon(Icons.lock_rounded, size: 14, color: Colors.grey),
+                                              ],
+                                            )
+                                          ],
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                                SizedBox(height: 28.h),
+                              ],
+                            );
+                          },
+                        ),
+
+                        // ── Continue Learning ──
+                        Text(
+                          "Continue Learning",
+                          style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700, color: Colors.black87),
+                        ),
+                        SizedBox(height: 12.h),
+                        Row(
+                          children: [
+                            Expanded(child: _LearningCard(title: "DHA Case : Chest pain inferior STEMI")),
+                            SizedBox(width: 12.w),
+                            Expanded(
+                              child: _LearningCard(
+                                title: "Cardiology – Ischemic Heart Disease",
+                                icon: Icons.favorite_rounded,
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        SizedBox(height: 28.h),
+
+                        // ── AI picks for you ──
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              "AI picks for you",
+                              style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700, color: Colors.black87),
+                            ),
+                            Icon(Icons.chevron_right_rounded, color: Colors.grey.shade500),
+                          ],
+                        ),
+                        SizedBox(height: 12.h),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: GestureDetector(
+                                onTap: _openAiPickVideo, // 👈 opens StudentLessonDetailScreen
+                                child: _AiPickCard(
+                                  icon: Icons.play_arrow_rounded,
+                                  tagText: "Recommended video",
+                                  title: "Inferior STEMI walkthrough",
+                                  subtitle: "Cardiology",
+                                ),
+                              ),
+                            ),
+                            SizedBox(width: 12.w),
+                            Expanded(
+                              child: _AiPickCard(
+                                icon: Icons.bloodtype_rounded,
+                                tagText: "Weak area - practice",
+                                title: "Hematology rapid fire MCQs",
+                                subtitle: "Hematology",
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        SizedBox(height: 20.h),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+
+      // ── Floating bottom nav bar ──
+      bottomNavigationBar: Padding(
+        padding: EdgeInsets.fromLTRB(16.w, 0, 16.w, 16.h),
         child: Container(
-          height: double.infinity,
-          width: double.infinity,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+          height: 75.h,
+          padding: EdgeInsets.symmetric(horizontal: 8.w),
+          decoration: BoxDecoration(
+            color: kPrimary,
+            borderRadius: BorderRadius.circular(30.r),
+            boxShadow: [
+              BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 16, offset: const Offset(0, 6)),
+            ],
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              Text("Home screen")
+              _NavItem(
+                icon: Icons.home_rounded,
+                label: "Home",
+                isSelected: _currentNavIndex == 0,
+                onTap: () => _handleNavTap(0),
+              ),
+              _NavItem(
+                icon: Icons.help_outline_rounded,
+                label: "QBank",
+                isSelected: _currentNavIndex == 1,
+                onTap: () => _handleNavTap(1),
+              ),
+              _NavItem(
+                icon: Icons.description_outlined,
+                label: "Tests",
+                isSelected: _currentNavIndex == 2,
+                onTap: () => _handleNavTap(2),
+              ),
+              _NavItem(
+                icon: Icons.play_circle_outline_rounded,
+                label: "AI Videos",
+                isSelected: _currentNavIndex == 3,
+                onTap: () => _handleNavTap(3),
+              ),
+              _NavItem(
+                icon: Icons.person_outline_rounded,
+                label: "Profile",
+                isSelected: _currentNavIndex == 4,
+                onTap: () => _handleNavTap(4),
+              ),
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+// ── Header icon button (bookmark / bell) ──
+class _HeaderIconButton extends StatelessWidget {
+  final IconData icon;
+  const _HeaderIconButton({required this.icon});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 40.w,
+      height: 40.w,
+      decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+      child: Icon(icon, size: 20.sp, color: const Color(0xFF87986B)),
+    );
+  }
+}
+
+// ── MCQ answer option row ──
+class _McqOption extends StatelessWidget {
+  final String label;
+  final String text;
+  const _McqOption({required this.label, required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 12.h),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF6F6F1),
+        borderRadius: BorderRadius.circular(30.r),
+      ),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 13.r,
+            backgroundColor: Colors.white,
+            child: Text(
+              label,
+              style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: Colors.black87),
+            ),
+          ),
+          SizedBox(width: 12.w),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500, color: Colors.black87),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Continue Learning card ──
+class _LearningCard extends StatelessWidget {
+  final String title;
+  final IconData icon;
+  const _LearningCard({required this.title, this.icon = Icons.play_arrow_rounded});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 130.h,
+      padding: EdgeInsets.all(14.w),
+      decoration: BoxDecoration(
+        color: const Color(0xFF87986B),
+        borderRadius: BorderRadius.circular(16.r),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 32.w,
+            height: 32.w,
+            decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+            child: Icon(icon, size: 16.sp, color: const Color(0xFF87986B)),
+          ),
+          const Spacer(),
+          Text(
+            title,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: Colors.white, height: 1.3),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── AI picks card ──
+class _AiPickCard extends StatelessWidget {
+  final IconData icon;
+  final String tagText;
+  final String title;
+  final String subtitle;
+
+  const _AiPickCard({
+    required this.icon,
+    required this.tagText,
+    required this.title,
+    required this.subtitle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.all(14.w),
+      decoration: BoxDecoration(
+        color: const Color(0xFF87986B),
+        borderRadius: BorderRadius.circular(16.r),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 30.w,
+                height: 30.w,
+                decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                child: Icon(icon, size: 15.sp, color: const Color(0xFF87986B)),
+              ),
+              SizedBox(width: 6.w),
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 3.h),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(8.r),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.auto_awesome, size: 10.sp, color: Colors.white),
+                    SizedBox(width: 2.w),
+                    Text(
+                      "AI",
+                      style: TextStyle(fontSize: 10.sp, fontWeight: FontWeight.w600, color: Colors.white),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 14.h),
+          Text(
+            tagText,
+            style: TextStyle(fontSize: 10.5.sp, color: Colors.white.withOpacity(0.75)),
+          ),
+          SizedBox(height: 4.h),
+          Text(
+            title,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white, height: 1.3),
+          ),
+          SizedBox(height: 4.h),
+          Text(
+            subtitle,
+            style: TextStyle(fontSize: 11.sp, color: Colors.white.withOpacity(0.7)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Bottom nav item ──
+class _NavItem extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _NavItem({
+    required this.icon,
+    required this.label,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, size: 25.sp, color: isSelected ? Colors.white : Colors.white.withOpacity(0.55)),
+          SizedBox(height: 3.h),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 18.sp,
+              fontWeight: isSelected ? FontWeight.w700 : FontWeight.w400,
+              color: isSelected ? Colors.white : Colors.white.withOpacity(0.55),
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 
-import '../../../core/constant/app_color.dart';
+import '../../../core/theam /app_color.dart';
 import '../../../core/constant/app_size.dart';
 import '../../../repository/google_sign_in_provider.dart';
 
@@ -61,7 +61,7 @@ class _SignInScreenState extends State<SignInScreen> {
                         borderRadius: BorderRadius.circular(12.r),
                         color: AppColor.Screenbackground,
                         border: Border.all(
-                          color: Colors.grey.shade300,
+                          color: Colors.grey,
                           width: 1,
                         ),
                       ),
@@ -114,6 +114,7 @@ class _SignInScreenState extends State<SignInScreen> {
                           child: Text(
                             "Login",
                             style: TextStyle(
+                              color: AppColor.Buttontextcolor,
                               fontWeight: FontWeight.w500,
                               fontSize: 20.sp,
                               letterSpacing: 0,
@@ -196,7 +197,7 @@ class _SignInScreenState extends State<SignInScreen> {
                                 context,
                                 MaterialPageRoute(
                                   builder: (_) => Homescreen(
-                                    authResult: result,
+                                    //authResult: result,
                                   ),
                                 ),
                               );
@@ -230,7 +231,7 @@ class _SignInScreenState extends State<SignInScreen> {
                                   Text(
                                     "Google",
                                     style: TextStyle(
-                                      color: AppColor.Textcolor,
+                                      color: AppColor.Buttontextcolor,
                                       fontSize: 16.sp,
                                       fontWeight: FontWeight.w500,
                                     ),

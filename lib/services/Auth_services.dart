@@ -1,50 +1,95 @@
 import 'dart:convert';
-import 'package:http/http.dart' as http;
+
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:http/http.dart' as http;
+
 import '../../../../core/constant/api_constant.dart';
+import '../../../../core/utils/device_id_helper.dart';
 import '../View_model/auth_result_model.dart';
+import '../core/constant/local_storage.dart';
 
 class AuthService {
-  final GoogleSignIn _googleSignIn = GoogleSignIn.instance;
-  bool _isInitialized = false;
+  AuthService();
 
-  Future<void> _ensureInitialized() async {
-    if (!_isInitialized) {
-      await _googleSignIn.initialize(
-        serverClientId: '236824315945-s15s7dnqlr4d0emu5tcj7g5h9ci858tv.apps.googleusercontent.com',
+  final GoogleSignIn _googleSignIn = GoogleSignIn(
+    scopes: [
+      'email',
+      'profile',
+      'openid',
+    ],
+    serverClientId:
+    '125167391971-djufjjsm3gp8vms4id65rdb3bg72hciv.apps.googleusercontent.com',
+  );
+
+  Future<AuthResultModel> signInWithGoogle() async {
+    try {
+      print("========== GOOGLE SIGN IN ==========");
+
+      // Optional: clear previous Google session
+      await _googleSignIn.signOut();
+
+      final GoogleSignInAccount? googleUser =
+      await _googleSignIn.signIn();
+
+      if (googleUser == null) {
+        throw Exception("User cancelled Google Sign-In");
+      }
+
+      print("User Email : ${googleUser.email}");
+
+      final GoogleSignInAuthentication googleAuth =
+      await googleUser.authentication;
+
+      final String? idToken = googleAuth.idToken;
+
+      if (idToken == null || idToken.isEmpty) {
+        throw Exception("Google ID Token is null");
+      }
+
+      final String deviceId = await DeviceIdHelper.getDeviceId();
+
+      final response = await http.post(
+        Uri.parse(ApiConstant.googleSignIn),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: jsonEncode({
+          "idToken": idToken,
+          "deviceId": deviceId,
+        }),
       );
-      _isInitialized = true;
+
+      print("Status Code : ${response.statusCode}");
+      print("Response : ${response.body}");
+
+      if (response.statusCode == 200) {
+        final AuthResultModel authResult =
+        AuthResultModel.fromJson(jsonDecode(response.body));
+
+        // Save Tokens
+        await LocalStorage.saveAccessToken(authResult.accessToken);
+        await LocalStorage.saveRefreshToken(authResult.refreshToken);
+
+        print("Access Token Saved");
+        print("Refresh Token Saved");
+
+        return authResult;
+      }
+
+      final error = jsonDecode(response.body);
+
+      throw Exception(
+        error["error"]?["message"] ?? "Google Sign-In Failed",
+      );
+    } catch (e, stackTrace) {
+      print("Google Sign-In Error : $e");
+      print(stackTrace);
+      rethrow;
     }
   }
 
-  Future<AuthResultModel> signInWithGoogle() async {
-    await _ensureInitialized();
-
-    final GoogleSignInAccount googleUser = await _googleSignIn.authenticate();
-
-    final GoogleSignInAuthentication googleAuth = googleUser.authentication;
-    final String? idToken = googleAuth.idToken;
-
-    if (idToken == null) {
-      throw Exception('Failed to get Google ID token');
-    }
-
-    final response = await http.post(
-      Uri.parse(ApiConstant.googleSignIn),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'idToken': idToken}),
-    );
-
-    // 👇 print status code and raw response body
-    print('Status code: ${response.statusCode}');
-    print('Response body: ${response.body}');
-
-    if (response.statusCode == 200) {
-      return AuthResultModel.fromJson(jsonDecode(response.body));
-
-    } else {
-      final error = jsonDecode(response.body);
-      throw Exception(error['error']?['message'] ?? 'Google sign-in failed');
-    }
+  Future<void> signOut() async {
+    await _googleSignIn.signOut();
+    await LocalStorage.clearAll();
   }
 }
