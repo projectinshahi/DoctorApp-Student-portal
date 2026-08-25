@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../../../models/selection_content_model.dart';
 import '../../../repository/selection_content_provider.dart';
+import '../../../widget/app_shimmer.dart';
 import '../lessons/student_lesson_detail_screen.dart';
 
 class AiVideoTab extends StatefulWidget {
@@ -57,6 +58,9 @@ class _AiVideoTabState extends State<AiVideoTab> {
       lessons = chapters.expand((c) => c.lessons).toList();
     }
 
+    // Videos and notes only — quiz lessons belong in QBank, not here.
+    lessons = lessons.where((l) => l.isWatchable).toList();
+
     if (_searchQuery.isEmpty) return lessons;
 
     return lessons.where((l) => l.title.toLowerCase().contains(_searchQuery)).toList();
@@ -89,7 +93,7 @@ class _AiVideoTabState extends State<AiVideoTab> {
       body: Consumer<SelectionContentProvider>(
         builder: (context, provider, _) {
           if (provider.isLoading && provider.content == null) {
-            return const Center(child: CircularProgressIndicator());
+            return const ScreenShimmer(layout: ShimmerLayout.rows);
           }
 
           if (provider.errorMessage != null && provider.content == null) {

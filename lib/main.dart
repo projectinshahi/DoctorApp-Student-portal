@@ -39,7 +39,7 @@ class MyApp extends StatelessWidget {
           splitScreenMode: true,
         builder: (context, child){
           return MaterialApp(
-              title: 'Flutter Demo',
+              title: "Dr. SKM's Academy",
               debugShowCheckedModeBanner: false,
               home: AuthGate()
           );

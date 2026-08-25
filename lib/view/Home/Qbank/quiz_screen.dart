@@ -7,6 +7,8 @@ import '../../../core/constant/local_storage.dart';
 import '../../../models/quiz_model.dart';
 import '../../../repository/quiz_provider.dart';
 import '../../subjectSelection/select_exam_screen.dart';
+import '../../../widget/app_shimmer.dart';
+import '../../../widget/pro_plan_dialog.dart';
 
 const Color _kPrimary = Color(0xFF87986B);
 const Color _kBg = Color(0xFFEFF4E2);
@@ -86,7 +88,7 @@ class _QuizView extends StatelessWidget {
 
   Widget _body(BuildContext context, QuizProvider provider) {
     if (provider.isLoading) {
-      return const Center(child: CircularProgressIndicator(color: _kPrimary));
+      return const ScreenShimmer(layout: ShimmerLayout.quiz);
     }
 
     if (provider.failure != null) {
@@ -945,7 +947,13 @@ class _FailureView extends StatelessWidget {
   Widget build(BuildContext context) {
     switch (failure.kind) {
       case QuizErrorKind.locked:
-        return _PaywallView(failure: failure);
+        // Same paywall the video player shows — PRO badge, View Plan, Go back.
+        // Subscribing reloads the lesson so the questions appear straight away.
+        return ProPlanPaywall(
+          message: 'This quiz is available for pro users of this course. '
+              'Want to check Pro plans?',
+          onSubscribed: onRetry,
+        );
 
       case QuizErrorKind.noCourseSelected:
         return _EmptyState(
@@ -1020,109 +1028,6 @@ class _FailureView extends StatelessWidget {
           onAction: onRetry,
         );
     }
-  }
-}
-
-/// 403 + requiredPlans — the plans arrive with the error, so no second call.
-class _PaywallView extends StatelessWidget {
-  final QuizException failure;
-
-  const _PaywallView({required this.failure});
-
-  @override
-  Widget build(BuildContext context) {
-    final plans = failure.requiredPlans;
-
-    return SingleChildScrollView(
-      padding: EdgeInsets.fromLTRB(20.w, 24.h, 20.w, 24.h),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Center(
-            child: Container(
-              width: 64.w,
-              height: 64.w,
-              decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-              child: Icon(Icons.lock_outline_rounded, size: 28.sp, color: _kPrimary),
-            ),
-          ),
-          SizedBox(height: 16.h),
-          Center(
-            child: Text(
-              "This quiz is locked",
-              style: TextStyle(fontSize: 17.sp, fontWeight: FontWeight.w700, color: Colors.black87),
-            ),
-          ),
-          SizedBox(height: 6.h),
-          Center(
-            child: Text(
-              failure.message,
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 12.5.sp, color: Colors.grey.shade700, height: 1.4),
-            ),
-          ),
-          SizedBox(height: 24.h),
-
-          if (plans.isEmpty)
-            Text(
-              "Subscribe to unlock it.",
-              style: TextStyle(fontSize: 13.sp, color: Colors.grey.shade700),
-            )
-          else ...[
-            Text(
-              "Plans that unlock it",
-              style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w700, color: Colors.black87),
-            ),
-            SizedBox(height: 12.h),
-            ...plans.map(
-              (plan) => Padding(
-                padding: EdgeInsets.only(bottom: 12.h),
-                child: Container(
-                  padding: EdgeInsets.all(16.w),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16.r),
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              plan.title,
-                              style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700, color: Colors.black87),
-                            ),
-                            if (plan.description != null && plan.description!.isNotEmpty) ...[
-                              SizedBox(height: 4.h),
-                              Text(
-                                plan.description!,
-                                style: TextStyle(fontSize: 11.5.sp, color: Colors.grey.shade600),
-                              ),
-                            ],
-                            if (plan.durationDays > 0) ...[
-                              SizedBox(height: 4.h),
-                              Text(
-                                "${plan.durationDays} days",
-                                style: TextStyle(fontSize: 11.sp, color: Colors.grey.shade600),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                      Text(
-                        _trimNumber(plan.price),
-                        style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w700, color: _kPrimary),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
   }
 }
 

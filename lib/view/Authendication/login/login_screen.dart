@@ -52,7 +52,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
                     SizedBox(height: 20.h),
                     Text(
-                      "Educational LMS",
+                      "Dr. SKM's Academy",
                       style: TextStyle(
                         fontSize: 31.sp,
                         fontWeight: FontWeight.w400,

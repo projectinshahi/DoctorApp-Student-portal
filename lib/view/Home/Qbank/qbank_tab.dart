@@ -9,6 +9,7 @@ import 'package:provider/provider.dart';
 import '../../../models/selection_content_model.dart';
 import '../../../repository/selection_content_provider.dart';
 import 'qbank_subjects_screen.dart';
+import '../../../widget/app_shimmer.dart';
 
 const Color _kPrimary = Color(0xFF87986B);
 const Color _kBg = Color(0xFFEFF4E2);
@@ -97,7 +98,7 @@ class _QbankTabState extends State<QbankTab> {
       body: Consumer<SelectionContentProvider>(
         builder: (context, provider, _) {
           if (provider.isLoading && provider.content == null) {
-            return const Center(child: CircularProgressIndicator(color: _kPrimary));
+            return const ScreenShimmer(layout: ShimmerLayout.rows);
           }
 
           if (provider.errorMessage != null && provider.content == null) {

@@ -10,6 +10,7 @@ import '../../../core/constant/app_size.dart';
 import '../../../core/theam /app_color.dart';
 import '../../../repository/profile_provider.dart';
 import '../../../repository/refresh_api_provider.dart';
+import '../../../widget/profile_shimmer.dart';
 import '../../Authendication/login/login_screen.dart';
 
 
@@ -213,7 +214,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         child: Consumer<ProfileProvider>(
           builder: (context, provider, child) {
             if (provider.isLoading && provider.profile == null) {
-              return const Center(child: CircularProgressIndicator());
+              return const ProfileShimmer();
             }
 
             if (provider.profile == null) {

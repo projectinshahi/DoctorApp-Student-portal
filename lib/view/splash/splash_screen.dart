@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import '../../widget/app_shimmer.dart';
 
 import '../../core/constant/local_storage.dart';
 import '../Authendication/login/login_screen.dart';
@@ -74,9 +75,7 @@ class _SplashScreenState extends State<SplashScreen> {
   Widget build(BuildContext context) {
     return const Scaffold(
       backgroundColor: Colors.white,
-      body: Center(
-        child: CircularProgressIndicator(),
-      ),
+      body: ScreenShimmer(layout: ShimmerLayout.splash),
     );
   }
 }

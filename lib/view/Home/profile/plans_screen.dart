@@ -8,16 +8,13 @@ import '../../../core/theam /app_color.dart';
 import '../../../repository/plan_provider.dart';
 import '../../../repository/profile_provider.dart';
 import '../../../repository/selection_content_provider.dart';
+import '../../../widget/app_shimmer.dart';
 
 class PlansScreen extends StatefulWidget {
   final int courseId;
   final String courseTitle;
 
-  const PlansScreen({
-    super.key,
-    required this.courseId,
-    required this.courseTitle,
-  });
+  const PlansScreen({super.key, required this.courseId, required this.courseTitle});
 
   @override
   State<PlansScreen> createState() => _PlansScreenState();
@@ -46,9 +43,9 @@ class _PlansScreenState extends State<PlansScreen> {
     if (!mounted) return;
 
     if (!success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(planProvider.subscribeErrorMessage ?? 'Failed to subscribe')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(planProvider.subscribeErrorMessage ?? 'Failed to subscribe')));
       return;
     }
 
@@ -59,9 +56,7 @@ class _PlansScreenState extends State<PlansScreen> {
     ]);
     if (!mounted) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Subscribed successfully!')),
-    );
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Subscribed successfully!')));
     Navigator.pop(context, true);
   }
 
@@ -85,7 +80,7 @@ class _PlansScreenState extends State<PlansScreen> {
       body: Consumer<PlanProvider>(
         builder: (context, planProvider, _) {
           if (planProvider.isLoadingPlans) {
-            return const Center(child: CircularProgressIndicator());
+            return const ScreenShimmer(layout: ShimmerLayout.cards);
           }
           if (planProvider.plansErrorMessage != null && planProvider.plans.isEmpty) {
             return Center(child: Text(planProvider.plansErrorMessage!));
@@ -104,7 +99,9 @@ class _PlansScreenState extends State<PlansScreen> {
                   controller: _pageController,
                   itemCount: plans.length,
                   onPageChanged: (i) => setState(() => _currentPage = i),
-                  itemBuilder: (context, index) => Padding(
+                  // Scrollable so the card hugs its content and still copes
+                  // with a long feature list.
+                  itemBuilder: (context, index) => SingleChildScrollView(
                     padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 8.h),
                     child: _PlanCard(plan: plans[index]),
                   ),
@@ -153,8 +150,10 @@ class _PlansScreenState extends State<PlansScreen> {
                                 height: 20.w,
                                 child: const CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                               )
-                            : Text('Subscribe',
-                                style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700)),
+                            : Text(
+                                'Subscribe',
+                                style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700),
+                              ),
                       ),
                     ),
                     SizedBox(height: 12.h),
@@ -169,8 +168,10 @@ class _PlansScreenState extends State<PlansScreen> {
                           side: BorderSide(color: Colors.grey.shade300),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.r)),
                         ),
-                        child: Text('Cancel Anytime',
-                            style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w700)),
+                        child: Text(
+                          'Cancel Anytime',
+                          style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w700),
+                        ),
                       ),
                     ),
                   ],
@@ -197,111 +198,99 @@ class _PlanCard extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            AppColor.buttoncolor,
-            AppColor.buttoncolor.withOpacity(0.25),
-            const Color(0xFF7BB8F5),
-          ],
+          colors: [AppColor.buttoncolor, AppColor.buttoncolor.withOpacity(0.25), const Color(0xFF7BB8F5)],
         ),
       ),
       child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(23.r),
-        ),
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(23.r)),
         padding: EdgeInsets.fromLTRB(18.w, 20.h, 18.w, 18.h),
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'AED ${plan.price.toStringAsFixed(0)}',
-                    style: TextStyle(
-                      fontSize: 34.sp,
-                      fontWeight: FontWeight.w800,
-                      color: AppColor.Textcolor,
-                      height: 1.1,
-                    ),
-                  ),
-                  SizedBox(width: 4.w),
-                  Padding(
-                    padding: EdgeInsets.only(top: 14.h),
-                    child: Text(
-                      '/${plan.periodLabel}',
-                      style: TextStyle(fontSize: 13.sp, color: Colors.grey.shade600),
-                    ),
-                  ),
-                  const Spacer(),
-                  Container(
-                    padding: EdgeInsets.all(10.w),
-                    decoration: BoxDecoration(
-                      color: AppColor.buttoncolor,
-                      borderRadius: BorderRadius.circular(14.r),
-                    ),
-                    child: Icon(Icons.workspace_premium_rounded, size: 22.sp, color: Colors.white),
-                  ),
-                ],
-              ),
-              SizedBox(height: 16.h),
-              Text(
-                plan.title,
-                style: TextStyle(
-                  fontSize: 15.sp,
-                  fontWeight: FontWeight.w700,
-                  color: AppColor.buttoncolor,
-                ),
-              ),
-              if (plan.description != null && plan.description!.trim().isNotEmpty) ...[
-                SizedBox(height: 6.h),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
                 Text(
-                  plan.description!.trim(),
-                  style: TextStyle(fontSize: 12.5.sp, color: Colors.grey.shade600, height: 1.4),
+                  'AED ${plan.price.toStringAsFixed(0)}',
+                  style: TextStyle(
+                    fontSize: 34.sp,
+                    fontWeight: FontWeight.w800,
+                    color: AppColor.Textcolor,
+                    height: 1.1,
+                  ),
                 ),
-              ],
-              if (plan.features.isNotEmpty) ...[
-                SizedBox(height: 18.h),
-                Text(
-                  'What you get',
-                  style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700, color: AppColor.Textcolor),
+                SizedBox(width: 4.w),
+                Padding(
+                  padding: EdgeInsets.only(top: 14.h),
+                  child: Text(
+                    '/${plan.periodLabel}',
+                    style: TextStyle(fontSize: 13.sp, color: Colors.grey.shade600),
+                  ),
                 ),
-                SizedBox(height: 10.h),
+                const Spacer(),
                 Container(
-                  width: double.infinity,
-                  padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 12.h),
+                  padding: EdgeInsets.all(10.w),
                   decoration: BoxDecoration(
-                    color: AppColor.Screenbackground.withOpacity(0.5),
-                    borderRadius: BorderRadius.circular(16.r),
-                    border: Border.all(color: Colors.grey.shade200),
+                    color: AppColor.buttoncolor,
+                    borderRadius: BorderRadius.circular(14.r),
                   ),
-                  child: Column(
-                    children: [
-                      for (final feature in plan.features)
-                        Padding(
-                          padding: EdgeInsets.symmetric(vertical: 5.h),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Icon(Icons.check_circle_rounded, size: 16.sp, color: AppColor.buttoncolor),
-                              SizedBox(width: 8.w),
-                              Expanded(
-                                child: Text(
-                                  feature,
-                                  style: TextStyle(fontSize: 12.5.sp, color: AppColor.Textcolor, height: 1.35),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                    ],
-                  ),
+                  child: Icon(Icons.workspace_premium_rounded, size: 22.sp, color: Colors.white),
                 ),
               ],
-              SizedBox(height: 8.h),
+            ),
+            SizedBox(height: 16.h),
+            Text(
+              plan.title,
+              style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w700, color: AppColor.buttoncolor),
+            ),
+            if (plan.description != null && plan.description!.trim().isNotEmpty) ...[
+              SizedBox(height: 6.h),
+              Text(
+                plan.description!.trim(),
+                style: TextStyle(fontSize: 12.5.sp, color: Colors.grey.shade600, height: 1.4),
+              ),
             ],
-          ),
+            if (plan.features.isNotEmpty) ...[
+              SizedBox(height: 18.h),
+              Text(
+                'What you get',
+                style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700, color: AppColor.Textcolor),
+              ),
+              SizedBox(height: 10.h),
+              Container(
+                width: double.infinity,
+                padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 12.h),
+                decoration: BoxDecoration(
+                  color: AppColor.Screenbackground.withOpacity(0.5),
+                  borderRadius: BorderRadius.circular(16.r),
+                  border: Border.all(color: Colors.grey.shade200),
+                ),
+                child: Column(
+                  children: [
+                    for (final feature in plan.features)
+                      Padding(
+                        padding: EdgeInsets.symmetric(vertical: 5.h),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(Icons.check_circle_rounded, size: 16.sp, color: AppColor.buttoncolor),
+                            SizedBox(width: 8.w),
+                            Expanded(
+                              child: Text(
+                                feature,
+                                style: TextStyle(fontSize: 12.5.sp, color: AppColor.Textcolor, height: 1.35),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+            SizedBox(height: 8.h),
+          ],
         ),
       ),
     );

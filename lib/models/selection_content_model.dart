@@ -247,5 +247,13 @@ class StudentLessonModel {
 
   bool get hasVideo => videoUrl != null && videoUrl!.isNotEmpty;
   bool get hasNote => noteUrl != null && noteUrl!.isNotEmpty;
+  bool get hasMedia => hasVideo || hasNote;
+
+  /// Belongs in the video/notes lists. Quizzes live in QBank, never here.
+  /// `locked` is kept in: the server strips videoUrl/noteUrl on locked
+  /// lessons, so filtering on media alone would hide exactly the paid
+  /// content these lists exist to advertise.
+  bool get isWatchable => !isQuiz && (hasMedia || locked);
+
   bool get isPremium => accessType == 'premium';
 }

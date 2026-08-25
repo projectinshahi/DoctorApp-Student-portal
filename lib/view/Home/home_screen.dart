@@ -734,6 +734,7 @@
 // import '../../../repository/selection_content_provider.dart';
 // import 'dashbord/qbank_tab.dart';
 // import 'lessons/student_lesson_detail_screen.dart';
+import '../../widget/app_shimmer.dart';
 //
 // // If you still keep a separate "AI Videos list" screen, import it too.
 // // import 'ai_videos_screen.dart';
@@ -1940,13 +1941,14 @@ class _HomescreenState extends State<Homescreen> {
                             if (provider.isLoading) {
                               return const Padding(
                                 padding: EdgeInsets.symmetric(vertical: 12),
-                                child: Center(child: CircularProgressIndicator()),
+                                child: ScreenShimmer(layout: ShimmerLayout.grid),
                               );
                             }
 
+                            // Videos and notes only — quiz lessons belong in QBank.
                             final lessons = <StudentLessonModel>[];
                             for (final chapter in provider.content?.chapters ?? const <StudentChapterModel>[]) {
-                              lessons.addAll(chapter.lessons);
+                              lessons.addAll(chapter.lessons.where((l) => l.isWatchable));
                             }
 
                             if (provider.errorMessage != null && lessons.isEmpty) {
@@ -2008,26 +2010,29 @@ class _HomescreenState extends State<Homescreen> {
                                         child: Column(
                                           crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
-                                            if (lesson.thumbnailUrl != null)
-                                              ClipRRect(
-                                                borderRadius: BorderRadius.circular(12.r),
-                                                child: Image.network(
-                                                  lesson.thumbnailUrl!,
-                                                  height: 90.h,
-                                                  width: double.infinity,
-                                                  fit: BoxFit.cover,
-                                                ),
-                                              )
-                                            else
-                                              Container(
-                                                height: 90.h,
-                                                width: double.infinity,
-                                                decoration: BoxDecoration(
-                                                  color: const Color(0xFF87986B),
-                                                  borderRadius: BorderRadius.circular(12.r),
-                                                ),
-                                                child: const Icon(Icons.play_circle_fill_rounded, color: Colors.white),
-                                              ),
+                                            // The tile's height comes from the grid's childAspectRatio,
+                                            // which doesn't track ScreenUtil's .h scaling — a fixed 90.h
+                                            // thumbnail overflowed the column on wide/short viewports.
+                                            // Letting the thumbnail take whatever is left can't overflow.
+                                            Expanded(
+                                              child: lesson.thumbnailUrl != null
+                                                  ? ClipRRect(
+                                                      borderRadius: BorderRadius.circular(12.r),
+                                                      child: Image.network(
+                                                        lesson.thumbnailUrl!,
+                                                        width: double.infinity,
+                                                        fit: BoxFit.cover,
+                                                      ),
+                                                    )
+                                                  : Container(
+                                                      width: double.infinity,
+                                                      decoration: BoxDecoration(
+                                                        color: const Color(0xFF87986B),
+                                                        borderRadius: BorderRadius.circular(12.r),
+                                                      ),
+                                                      child: const Icon(Icons.play_circle_fill_rounded, color: Colors.white),
+                                                    ),
+                                            ),
                                             SizedBox(height: 10.h),
                                             Text(
                                               lesson.title,
@@ -2035,7 +2040,7 @@ class _HomescreenState extends State<Homescreen> {
                                               overflow: TextOverflow.ellipsis,
                                               style: TextStyle(fontSize: 12.5.sp, fontWeight: FontWeight.w700),
                                             ),
-                                            const Spacer(),
+                                            SizedBox(height: 6.h),
                                             Row(
                                               children: [
                                                 if (lesson.hasVideo)
