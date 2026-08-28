@@ -1,8 +1,9 @@
 // lib/widget/pro_plan_dialog.dart
 //
 // The single paywall used everywhere a locked lesson is opened: PRO badge,
-// the ask, "View Plan" → the plans screen, "Go back". Rendered as a dialog
-// over the video player and full-screen inside the quiz.
+// the ask, "View Plan" → the plans screen, "Go back". Rendered full-screen —
+// video lessons and quizzes both hand the whole screen over to it, so a
+// student sees the same paywall whichever kind of locked lesson they open.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -32,36 +33,8 @@ Future<bool> openPlans(BuildContext context) async {
   return subscribed == true;
 }
 
-/// Paywall shown when a locked (pro-only) lesson is opened.
-/// Returns true when the user came back from the plans screen subscribed.
-Future<bool> showProPlanDialog(
-  BuildContext context, {
-  String message = 'This video is available for pro users of this course. '
-      'Want to check Pro plans?',
-}) async {
-  final wantsPlans = await showDialog<bool>(
-    context: context,
-    builder: (_) => Dialog(
-      backgroundColor: Colors.white,
-      insetPadding: EdgeInsets.symmetric(horizontal: 24.w),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28.r)),
-      child: Padding(
-        padding: EdgeInsets.fromLTRB(20.w, 28.h, 20.w, 22.h),
-        child: ProPlanPrompt(
-          message: message,
-          onViewPlan: () => Navigator.pop(context, true),
-          onGoBack: () => Navigator.pop(context, false),
-        ),
-      ),
-    ),
-  );
-
-  if (wantsPlans != true || !context.mounted) return false;
-  return openPlans(context);
-}
-
-/// The card body: PRO badge, the ask, and the two buttons. Shared by the
-/// dialog and the full-screen quiz paywall so they can't drift apart.
+/// The card body: PRO badge, the ask, and the two buttons. Every paywall in
+/// the app is this one widget, so they can't drift apart.
 class ProPlanPrompt extends StatelessWidget {
   final String message;
   final VoidCallback onViewPlan;
@@ -151,8 +124,9 @@ class ProPlanPrompt extends StatelessWidget {
   }
 }
 
-/// Full-screen version of the same card — for screens (like the quiz) where
-/// there's nothing behind the paywall worth showing.
+/// The card centred on a full screen. Used by every locked lesson — quiz or
+/// video — because there is nothing behind the paywall worth showing: the
+/// server strips the video URL and the questions from a locked lesson.
 class ProPlanPaywall extends StatelessWidget {
   final String message;
 

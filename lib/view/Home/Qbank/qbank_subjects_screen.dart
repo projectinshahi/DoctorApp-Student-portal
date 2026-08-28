@@ -1,8 +1,10 @@
 // lib/view/Home/Qbank/qbank_subjects_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:provider/provider.dart';
 
 import '../../../models/selection_content_model.dart';
+import '../../../repository/selection_content_provider.dart';
 import 'quiz_screen.dart';
 
 const Color _kPrimary = Color(0xFF87986B);
@@ -10,14 +12,68 @@ const Color _kBg = Color(0xFFEFF4E2);
 
 /// Subjects inside one topic. Only quiz lessons are listed — this is the
 /// MCQ section, so anything without a quiz has no place here.
-class QbankSubjectsScreen extends StatelessWidget {
+///
+/// Each row's state comes from `lesson.attempt`, which the content tree
+/// already carries. This screen used to fire one history call per quiz to
+/// work that out; the tree made that N+1 unnecessary.
+class QbankSubjectsScreen extends StatefulWidget {
   final StudentChapterModel chapter;
 
   const QbankSubjectsScreen({super.key, required this.chapter});
 
   @override
+  State<QbankSubjectsScreen> createState() => _QbankSubjectsScreenState();
+}
+
+class _QbankSubjectsScreenState extends State<QbankSubjectsScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _refresh());
+  }
+
+  /// Refetches the tree every time this screen is entered.
+  ///
+  /// Scores and attempt state change while the student is off in a quiz — or
+  /// on another device — and `lesson.attempt` from the tree is the only thing
+  /// these rows render from. Silent: the shimmer shows only on a cold load, so
+  /// this swaps the data underneath instead of flashing the list away.
+  void _refresh() {
+    if (!mounted) return;
+    final provider = context.read<SelectionContentProvider>();
+    if (!provider.isLoading) provider.loadContent();
+  }
+
+  /// The chapter as the provider currently holds it. `widget.chapter` was
+  /// captured when this route was pushed, so after a quiz is finished and the
+  /// tree reloads, that copy still carries the old `attempt` objects.
+  StudentChapterModel _liveChapter(BuildContext context) {
+    final chapters = context.watch<SelectionContentProvider>().content?.chapters;
+    if (chapters == null) return widget.chapter;
+
+    for (final candidate in chapters) {
+      if (candidate.id == widget.chapter.id) return candidate;
+    }
+    return widget.chapter;
+  }
+
+  Future<void> _openQuiz(BuildContext context, StudentLessonModel lesson) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => QuizScreen(lessonId: lesson.id, lessonTitle: lesson.title),
+      ),
+    );
+
+    // They may have answered some questions or finished the attempt. Either
+    // changes `attempt`, and the tree is where this screen reads it from.
+    _refresh();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final subjects = chapter.lessons.where((l) => l.isQuiz).toList();
+    final live = _liveChapter(context);
+    final subjects = live.lessons.where((l) => l.isQuiz).toList();
 
     return Scaffold(
       backgroundColor: _kBg,
@@ -31,7 +87,7 @@ class QbankSubjectsScreen extends StatelessWidget {
           icon: Icon(Icons.chevron_left_rounded, size: 30.sp, color: Colors.black),
         ),
         title: Text(
-          chapter.title,
+          live.title,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: TextStyle(fontSize: 17.sp, fontWeight: FontWeight.w700, color: Colors.black),
@@ -52,28 +108,21 @@ class QbankSubjectsScreen extends StatelessWidget {
               padding: EdgeInsets.fromLTRB(20.w, 8.h, 20.w, 24.h),
               itemCount: subjects.length,
               separatorBuilder: (_, __) => SizedBox(height: 12.h),
-              itemBuilder: (context, index) => QbankRowTile(
-                icon: Icons.help_outline_rounded,
-                title: subjects[index].title,
-                subtitle: _mcqLabel(subjects[index]),
-                locked: subjects[index].locked,
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => QuizScreen(
-                      lessonId: subjects[index].id,
-                      lessonTitle: subjects[index].title,
-                    ),
-                  ),
-                ),
-              ),
+              itemBuilder: (context, index) {
+                final lesson = subjects[index];
+                return QbankRowTile(
+                  icon: Icons.help_outline_rounded,
+                  title: lesson.title,
+                  subtitle: lesson.quizQuestionCount == null
+                      ? "MCQs"
+                      : "${lesson.quizQuestionCount} MCQs",
+                  locked: lesson.locked,
+                  attempt: lesson.attempt,
+                  onTap: () => _openQuiz(context, lesson),
+                );
+              },
             ),
     );
-  }
-
-  String _mcqLabel(StudentLessonModel lesson) {
-    final count = lesson.quizQuestionCount;
-    return count == null ? "MCQs" : "$count MCQs";
   }
 }
 
@@ -83,6 +132,11 @@ class QbankRowTile extends StatelessWidget {
   final String title;
   final String subtitle;
   final bool locked;
+
+  /// This student's latest attempt, straight off the content tree. Null on a
+  /// quiz never started and on every non-quiz row, so it stays nullable.
+  final LessonAttemptInfo? attempt;
+
   final VoidCallback onTap;
 
   const QbankRowTile({
@@ -92,10 +146,15 @@ class QbankRowTile extends StatelessWidget {
     required this.subtitle,
     required this.onTap,
     this.locked = false,
+    this.attempt,
   });
 
   @override
   Widget build(BuildContext context) {
+    final latest = attempt;
+    final resuming = latest != null && latest.isInProgress;
+    final completed = latest != null && latest.completed;
+
     return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
@@ -104,6 +163,7 @@ class QbankRowTile extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(20.r),
+          border: resuming ? Border.all(color: _kPrimary, width: 1.2) : null,
         ),
         child: Row(
           children: [
@@ -127,8 +187,17 @@ class QbankRowTile extends StatelessWidget {
                   ),
                   SizedBox(height: 3.h),
                   Text(
-                    subtitle,
-                    style: TextStyle(fontSize: 12.sp, color: Colors.grey.shade600),
+                    resuming
+                        ? "${latest.remainingCount} left of ${latest.answeredCount + latest.remainingCount}"
+                        : completed
+                            ? "Best ${_trimMarks(latest.score)} · "
+                                "${latest.attemptCount} attempt${latest.attemptCount == 1 ? '' : 's'}"
+                            : subtitle,
+                    style: TextStyle(
+                      fontSize: 12.sp,
+                      fontWeight: latest == null ? FontWeight.w400 : FontWeight.w600,
+                      color: latest == null ? Colors.grey.shade600 : _kPrimary,
+                    ),
                   ),
                 ],
               ),
@@ -137,10 +206,51 @@ class QbankRowTile extends StatelessWidget {
               Icon(Icons.lock_outline_rounded, size: 16.sp, color: Colors.grey.shade500),
               SizedBox(width: 6.w),
             ],
-            Icon(Icons.chevron_right_rounded, size: 24.sp, color: Colors.grey.shade500),
+            // Three states, one row: never started, half-done, already scored.
+            // A finished quiz reopens read-only, so this says Review: there
+            // is no second attempt to offer.
+            if (resuming)
+              _Pill(label: "Continue", filled: true)
+            else if (completed)
+              _Pill(label: "Review", filled: false)
+            else
+              Icon(Icons.chevron_right_rounded, size: 24.sp, color: Colors.grey.shade500),
           ],
         ),
       ),
     );
   }
+}
+
+class _Pill extends StatelessWidget {
+  final String label;
+  final bool filled;
+
+  const _Pill({required this.label, required this.filled});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 7.h),
+      decoration: BoxDecoration(
+        color: filled ? _kPrimary : Colors.transparent,
+        borderRadius: BorderRadius.circular(20.r),
+        border: filled ? null : Border.all(color: _kPrimary, width: 1.2),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 11.5.sp,
+          fontWeight: FontWeight.w700,
+          color: filled ? Colors.white : _kPrimary,
+        ),
+      ),
+    );
+  }
+}
+
+/// 2.0 -> "2", -0.5 -> "-0.5". Never touches the sign.
+String _trimMarks(double value) {
+  final text = value.toStringAsFixed(2);
+  return text.replaceFirst(RegExp(r'\.?0+$'), '');
 }

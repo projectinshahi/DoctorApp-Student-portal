@@ -3,11 +3,14 @@ import 'package:dr_app/view/Home/lessons/videoplay/FullscreenVideoPage.dart';
 import 'package:dr_app/view/Home/lessons/videoplay/PdfViewerModal.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:provider/provider.dart';
 import 'package:video_player/video_player.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 
 import '../../../core/utils/youtube_utils.dart';
 import '../../../models/selection_content_model.dart';
+import '../../../repository/saved_provider.dart';
+import '../../../repository/selection_content_provider.dart';
 import '../../../widget/pro_plan_dialog.dart';
 import '../Qbank/quiz_screen.dart';    // adjust path to wherever you place this file
 
@@ -53,28 +56,37 @@ class _StudentLessonDetailScreenState extends State<StudentLessonDetailScreen> {
   bool _isYoutube = false;
 
   late StudentLessonModel _lesson;
-  bool _isBookmarked = false;
 
   @override
   void initState() {
     super.initState();
     _lesson = widget.lesson;
-    if (_lesson.locked) {
-      // Pro-only lesson: never touch the player, show the paywall instead.
-      WidgetsBinding.instance.addPostFrameCallback((_) => _showPaywall(popOnDecline: true));
-      return;
-    }
+    // A locked lesson never touches the player: build() hands the whole screen
+    // to the paywall instead, the same way the quiz screen does.
+    if (_lesson.locked) return;
     if (_lesson.hasVideo && _lesson.videoUrl != null && _lesson.videoUrl!.isNotEmpty) {
       _setupVideo();
     }
   }
 
-  Future<void> _showPaywall({bool popOnDecline = false}) async {
-    final subscribed = await showProPlanDialog(context);
+  /// Called after a successful subscribe. The plans screen already awaits a
+  /// full SelectionContentProvider reload before it pops, so the unlocked
+  /// lesson — videoUrl and all — is already in the tree; the copy this screen
+  /// holds is the stale, stripped one. Swap it in instead of re-fetching.
+  void _reloadUnlockedLesson() {
     if (!mounted) return;
-    // On subscribe we leave too: the list reloads with the unlocked video URL,
-    // which this stale lesson object doesn't carry.
-    if (subscribed || popOnDecline) Navigator.pop(context, subscribed);
+    final lessons = context.read<SelectionContentProvider>().content?.allLessons ??
+        const <StudentLessonModel>[];
+    final index = lessons.indexWhere((l) => l.id == _lesson.id);
+
+    // Still locked (or gone) means the plan they bought doesn't cover this
+    // lesson. Leave, so the list behind re-renders with the access that is
+    // now real rather than stranding them on a paywall they just paid past.
+    if (index == -1 || lessons[index].locked) {
+      Navigator.pop(context, true);
+      return;
+    }
+    _switchToLesson(lessons[index]);
   }
 
   void _setupVideo() {
@@ -559,55 +571,7 @@ class _StudentLessonDetailScreenState extends State<StudentLessonDetailScreen> {
     return content;
   }
 
-  Widget _buildLockedPoster() {
-    final hasThumb = _lesson.thumbnailUrl != null && _lesson.thumbnailUrl!.isNotEmpty;
-
-    return AspectRatio(
-      aspectRatio: 16 / 9,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          if (hasThumb) Image.network(_lesson.thumbnailUrl!, fit: BoxFit.cover) else Container(color: Colors.black),
-          Container(color: Colors.black.withOpacity(0.55)),
-          Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.lock_rounded, color: Colors.white, size: 26.sp),
-                SizedBox(height: 12.h),
-                ElevatedButton(
-                  onPressed: _showPaywall,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: kPrimary,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20.r)),
-                  ),
-                  child: Text('View Plan', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700)),
-                ),
-              ],
-            ),
-          ),
-          Positioned(
-            top: MediaQuery.of(context).padding.top + 8.h,
-            left: 12.w,
-            child: GestureDetector(
-              onTap: () => Navigator.pop(context),
-              child: Container(
-                padding: EdgeInsets.all(8.w),
-                decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
-                child: Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 16.sp),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildVideoPlayer() {
-    if (_lesson.locked) return _buildLockedPoster();
-
     final hasValidVideoUrl = _lesson.videoUrl != null && _lesson.videoUrl!.isNotEmpty;
     if (!_lesson.hasVideo || !hasValidVideoUrl) {
       return const SizedBox.shrink();
@@ -791,13 +755,9 @@ class _StudentLessonDetailScreenState extends State<StudentLessonDetailScreen> {
               itemBuilder: (context, index) {
                 final item = related[index];
                 return GestureDetector(
-                  onTap: () {
-                    if (item.locked) {
-                      _showPaywall();
-                      return;
-                    }
-                    _switchToLesson(item);
-                  },
+                  // Locked ones switch in too — build() shows them the
+                  // paywall, so there is one locked-lesson screen, not two.
+                  onTap: () => _switchToLesson(item),
                   child: SizedBox(
                     width: 160.w,
                     child: Column(
@@ -852,8 +812,45 @@ class _StudentLessonDetailScreenState extends State<StudentLessonDetailScreen> {
     );
   }
 
+  /// The locked state, built the same way the quiz screen builds its own:
+  /// a plain app bar over a full-screen [ProPlanPaywall], not a dialog thrown
+  /// on top of a player that was never allowed to load. Subscribing reloads
+  /// the lesson in place, so the video starts here rather than sending them
+  /// back to the list to find it again.
+  Widget _buildPaywallScreen() {
+    return Scaffold(
+      backgroundColor: kBg,
+      appBar: AppBar(
+        backgroundColor: kBg,
+        elevation: 0,
+        foregroundColor: Colors.black87,
+        titleSpacing: 0,
+        leading: IconButton(
+          onPressed: () => Navigator.maybePop(context),
+          icon: Icon(Icons.chevron_left_rounded, size: 30.sp, color: Colors.black87),
+        ),
+        title: Text(
+          _lesson.title,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(fontSize: 17.sp, fontWeight: FontWeight.w700, color: Colors.black87),
+        ),
+      ),
+      body: SafeArea(
+        child: ProPlanPaywall(
+          message: 'This video is available for pro users of this course. '
+              'Want to check Pro plans?',
+          onSubscribed: _reloadUnlockedLesson,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    // Locked lesson → the paywall owns the screen, same model as the quiz.
+    if (_lesson.locked) return _buildPaywallScreen();
+
     final hasValidVideoUrl = _lesson.videoUrl != null && _lesson.videoUrl!.isNotEmpty;
     final isVideoAvailable = _lesson.hasVideo && hasValidVideoUrl;
 
@@ -898,10 +895,16 @@ class _StudentLessonDetailScreenState extends State<StudentLessonDetailScreen> {
                     Container(
                       padding: EdgeInsets.all(8.w),
                       decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                      // Was a local setState that died with the screen.
+                      // Now /saved-lessons, so it survives the app closing
+                      // and follows the account to another device.
                       child: GestureDetector(
-                        onTap: () => setState(() => _isBookmarked = !_isBookmarked),
+                        onTap: () =>
+                            context.read<SavedProvider>().toggleLesson(_lesson.id),
                         child: Icon(
-                          _isBookmarked ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
+                          context.watch<SavedProvider>().isLessonSaved(_lesson.id)
+                              ? Icons.bookmark_rounded
+                              : Icons.bookmark_border_rounded,
                           color: kPrimary,
                           size: 20.sp,
                         ),

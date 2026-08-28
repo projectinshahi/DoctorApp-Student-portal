@@ -11,8 +11,11 @@ class SelectionContentProvider extends ChangeNotifier {
   bool sessionExpired = false;
   SelectionContentModel? content;
 
+  /// Refetches the whole tree. Callers can fire this on every screen entry:
+  /// the shimmer only shows on a cold load, so a refresh over content that is
+  /// already on screen swaps it silently instead of flashing.
   Future<void> loadContent() async {
-    isLoading = true;
+    isLoading = content == null;
     errorMessage = null;
     sessionExpired = false;
     notifyListeners();

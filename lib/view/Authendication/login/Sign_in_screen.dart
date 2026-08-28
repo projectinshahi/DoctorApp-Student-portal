@@ -180,7 +180,6 @@ class _SignInScreenState extends State<SignInScreen> {
                             if (!context.mounted) return;
 
                             if (success) {
-                              final resposn ;
                               final result = viewModel.authResult!;
 
                               ScaffoldMessenger.of(context).showSnackBar(

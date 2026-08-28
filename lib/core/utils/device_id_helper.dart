@@ -12,7 +12,6 @@ class DeviceIdHelper {
       deviceId = const Uuid().v4();
       await prefs.setString(_key, deviceId);
     }
-
     return deviceId;
   }
 }

@@ -165,6 +165,13 @@ class StudentLessonModel {
   final List<RequiredPlanModel> plans;
   final List<int> planIds;
 
+  /// This student's latest attempt on this lesson's quiz, embedded in the
+  /// content tree so the QBank listing needs no per-lesson call.
+  ///
+  /// Null on every non-quiz lesson AND on a quiz never started — nullable
+  /// everywhere, not just on video lessons.
+  final LessonAttemptInfo? attempt;
+
   StudentLessonModel({
     required this.id,
     required this.title,
@@ -184,6 +191,7 @@ class StudentLessonModel {
     this.quizQuestionCount,
     this.plans = const [],
     this.planIds = const [],
+    this.attempt,
   });
 
   static List<RequiredPlanModel> _readPlans(dynamic raw) {
@@ -236,6 +244,9 @@ class StudentLessonModel {
       quizQuestionCount: json['questionCount'] ?? quizValue?.questionCount,
       plans: plansValue,
       planIds: _readPlanIds(json['planIds'], plansValue),
+      attempt: json['attempt'] is Map
+          ? LessonAttemptInfo.fromJson(Map<String, dynamic>.from(json['attempt'] as Map))
+          : null,
     );
   }
 
@@ -256,4 +267,50 @@ class StudentLessonModel {
   bool get isWatchable => !isQuiz && (hasMedia || locked);
 
   bool get isPremium => accessType == 'premium';
+}
+
+/// The `attempt` object the content tree carries on each quiz lesson. Enough
+/// to label the row — Start / Continue / Review — with no second call.
+class LessonAttemptInfo {
+  final int attemptId;
+  final bool completed;
+  final int answeredCount;
+  final int remainingCount;
+  final int correctCount;
+
+  /// Genuinely negative when negative marking bites. Render as sent.
+  final double score;
+
+  /// How many attempts this student has made. The app allows one, but the
+  /// API does not enforce that, so this can legitimately be more than 1.
+  final int attemptCount;
+
+  LessonAttemptInfo({
+    required this.attemptId,
+    required this.completed,
+    required this.answeredCount,
+    required this.remainingCount,
+    required this.correctCount,
+    required this.score,
+    required this.attemptCount,
+  });
+
+  /// Half-finished and actually worth resuming. An attempt with nothing
+  /// answered reads as "Start", because that is what continuing it would be.
+  bool get isInProgress => !completed && answeredCount > 0;
+
+  factory LessonAttemptInfo.fromJson(Map<String, dynamic> json) {
+    double toDouble(dynamic v) => v is num ? v.toDouble() : double.tryParse('$v') ?? 0;
+    int toInt(dynamic v) => v is num ? v.toInt() : int.tryParse('$v') ?? 0;
+
+    return LessonAttemptInfo(
+      attemptId: toInt(json['attemptId']),
+      completed: json['completed'] == true,
+      answeredCount: toInt(json['answeredCount']),
+      remainingCount: toInt(json['remainingCount']),
+      correctCount: toInt(json['correctCount']),
+      score: toDouble(json['score']),
+      attemptCount: toInt(json['attemptCount']),
+    );
+  }
 }

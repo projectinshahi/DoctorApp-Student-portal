@@ -7,8 +7,11 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 
 import '../../../models/selection_content_model.dart';
+import '../../../repository/saved_provider.dart';
 import '../../../repository/selection_content_provider.dart';
+import 'continue_mcqs_screen.dart';
 import 'qbank_subjects_screen.dart';
+import 'saved_questions_screen.dart';
 import '../../../widget/app_shimmer.dart';
 
 const Color _kPrimary = Color(0xFF87986B);
@@ -29,12 +32,7 @@ class _QbankTabState extends State<QbankTab> {
   void initState() {
     super.initState();
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final provider = context.read<SelectionContentProvider>();
-      if (provider.content == null && !provider.isLoading) {
-        provider.loadContent();
-      }
-    });
+    WidgetsBinding.instance.addPostFrameCallback((_) => _refresh());
 
     _searchController.addListener(
       () => setState(() => _query = _searchController.text.trim().toLowerCase()),
@@ -45,6 +43,28 @@ class _QbankTabState extends State<QbankTab> {
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  /// Refetch on every entry, not just the first: attempts, scores and
+  /// bookmarks all change while the student is off in a quiz, and the tree is
+  /// what this screen renders them from. Silent — the shimmer only shows on a
+  /// cold load, so this swaps the data underneath rather than flashing.
+  void _refresh() {
+    if (!mounted) return;
+    final content = context.read<SelectionContentProvider>();
+    if (!content.isLoading) content.loadContent();
+    context.read<SavedProvider>().loadQuestions();
+  }
+
+  /// Every push from this screen goes through here so returning from one
+  /// refreshes. `initState` alone is not enough: popping back does not
+  /// re-create the state, so a quiz finished two screens down would leave
+  /// this one showing yesterday's numbers.
+  void _open(Widget screen) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => screen),
+    ).then((_) => _refresh());
   }
 
   /// A topic only belongs in QBank if at least one of its lessons is a quiz.
@@ -167,21 +187,26 @@ class _QbankTabState extends State<QbankTab> {
 
                   SizedBox(height: 18.h),
 
-                  // ── Bookmarks / Continue MCQs (UI only — no endpoint yet) ──
+                  // ── Bookmarks / Continue MCQs ──
                   Row(
                     children: [
-                      const Expanded(
+                      Expanded(
                         child: _ShortcutCard(
                           icon: Icons.bookmark_border_rounded,
                           title: "Bookmarks",
-                          subtitle: "0 Bookmarks",
+                          // Straight off the provider — every save response
+                          // carries `count`, so this needs no call of its own.
+                          subtitle:
+                              "${context.watch<SavedProvider>().questionCount} saved",
+                          onTap: () => _open(const SavedQuestionsScreen()),
                         ),
                       ),
                       SizedBox(width: 14.w),
-                      const Expanded(
+                      Expanded(
                         child: _ShortcutCard(
                           icon: Icons.assignment_outlined,
                           title: "Continue\nMCQs",
+                          onTap: () => _open(const ContinueMcqsScreen()),
                         ),
                       ),
                     ],
@@ -219,12 +244,7 @@ class _QbankTabState extends State<QbankTab> {
                           icon: Icons.menu_book_rounded,
                           title: topic.title,
                           subtitle: "$subjectCount ${subjectCount == 1 ? 'Subject' : 'Subjects'}",
-                          onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => QbankSubjectsScreen(chapter: topic),
-                            ),
-                          ),
+                          onTap: () => _open(QbankSubjectsScreen(chapter: topic)),
                         );
                       },
                     ),
@@ -242,11 +262,25 @@ class _ShortcutCard extends StatelessWidget {
   final IconData icon;
   final String title;
   final String? subtitle;
+  final VoidCallback? onTap;
 
-  const _ShortcutCard({required this.icon, required this.title, this.subtitle});
+  const _ShortcutCard({
+    required this.icon,
+    required this.title,
+    this.subtitle,
+    this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: _card(),
+    );
+  }
+
+  Widget _card() {
     return Container(
       height: 165.h,
       padding: EdgeInsets.all(18.w),

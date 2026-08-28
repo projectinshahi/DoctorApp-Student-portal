@@ -7,77 +7,113 @@ import '../core/constant/api_constant.dart';
 import '../models/quiz_model.dart';
 import 'refresh_api_services.dart'; // ApiClient + SessionExpiredException
 
+/// The five attempt endpoints. Nothing here computes a mark — every number
+/// the student sees comes back from the server, because the answer key is
+/// never in a response they could read before committing.
 class QuizService {
-  static String _lessonUrl(int lessonId) =>
-      '${ApiConstant.baseUrl}/users/me/lessons/$lessonId';
+  static String _attemptsUrl(int lessonId) =>
+      '${ApiConstant.baseUrl}/users/me/lessons/$lessonId/quiz-attempts';
 
-  static String _questionsUrl(int lessonId) =>
-      '${ApiConstant.baseUrl}/users/me/lessons/$lessonId/quiz-questions';
+  static String _attemptUrl(int attemptId) =>
+      '${ApiConstant.baseUrl}/users/me/quiz-attempts/$attemptId';
 
-  /// Step 1 — detect a quiz lesson. Also carries `locked` / `requiredPlans`.
-  Future<QuizLessonDetail> fetchLesson(int lessonId) async {
-    return QuizLessonDetail.fromJson(await _get(_lessonUrl(lessonId)));
+  static String _answersUrl(int attemptId) => '${_attemptUrl(attemptId)}/answers';
+
+  static String _finishUrl(int attemptId) => '${_attemptUrl(attemptId)}/finish';
+
+  /// 1 — Start, or pick up an unfinished attempt. No body.
+  /// 201 = fresh, 200 = resumed; both are success, and `resumed` on the
+  /// response says which. This call also runs every lesson gate, so there is
+  /// no separate lesson fetch to make first.
+  Future<QuizAttempt> startAttempt(int lessonId) async {
+    final json = await _post(_attemptsUrl(lessonId), const {});
+    _dumpAttempt(lessonId, json);
+    return QuizAttempt.fromJson(json);
   }
 
-  /// Step 2 — the questions. Never call this for a locked lesson.
-  Future<QuizQuestionsModel> fetchQuestions(int lessonId) async {
-    final json = await _get(_questionsUrl(lessonId));
-    _dumpQuestions(lessonId, json);
-    return QuizQuestionsModel.fromJson(json);
+  /// 2 — Answer one question. Returns that question's key and explanation
+  /// straight away. Re-posting the same questionId overwrites the earlier
+  /// pick; it is not an error and does not duplicate.
+  Future<QuizAnswerResponse> answerQuestion(
+    int attemptId, {
+    required int questionId,
+    required int optionId,
+  }) async {
+    final json = await _post(
+      _answersUrl(attemptId),
+      {'questionId': questionId, 'optionId': optionId},
+    );
+    return QuizAnswerResponse.fromJson(json);
   }
 
-  /// Debug-only dump of exactly what the API returned: every question, its
-  /// options, and which fields were actually sent. `fields sent` is the tell —
-  /// if `correctOptionId` / `explanation` aren't in that list, the app was
-  /// never given the answer key and cannot reveal or score anything.
-  static void _dumpQuestions(int lessonId, Map<String, dynamic> json) {
+  /// 3 — Score the attempt. Safe to call twice: the second call returns the
+  /// same review with the original completedAt.
+  Future<QuizAttemptResult> finishAttempt(int attemptId) async {
+    return QuizAttemptResult.fromJson(await _post(_finishUrl(attemptId), const {}));
+  }
+
+  /// 4 — Resume or review. Branch on `completed`: false gives questions and
+  /// the answers so far with no key, true gives the full review.
+  Future<QuizAttempt> fetchAttempt(int attemptId) async {
+    return QuizAttempt.fromJson(await _get(_attemptUrl(attemptId)));
+  }
+
+  /// 5 — Past attempts for this lesson, newest first. Summary rows only.
+  Future<List<QuizAttemptSummary>> fetchHistory(int lessonId) async {
+    return QuizAttemptSummary.listFromJson(await _get(_attemptsUrl(lessonId)));
+  }
+
+  /// 6 — Attempts across the whole course, for the QBank "Continue MCQs"
+  /// card. Per-lesson history can't answer "what did they leave half-done
+  /// anywhere?" without walking every lesson.
+  Future<List<InProgressAttempt>> fetchAttemptsByStatus({
+    String status = 'in_progress',
+  }) async {
+    final json = await _get(
+      '${ApiConstant.baseUrl}/users/me/quiz-attempts?status=$status',
+    );
+    return InProgressAttempt.listFromJson(json);
+  }
+
+  /// Debug-only dump of the attempt the server handed back: every question,
+  /// its options, and which fields actually arrived. `fields sent` is the
+  /// tell — `correctOptionId` and `explanation` are absent here by design,
+  /// and only appear once a question is answered.
+  static void _dumpAttempt(int lessonId, Map<String, dynamic> json) {
     if (!kDebugMode) return;
 
     final quiz = json['quiz'];
     final questions = (json['questions'] as List?) ?? const [];
 
-    debugPrint('════════ QUIZ API RESPONSE — lesson $lessonId ════════');
-    debugPrint('url            : ${_questionsUrl(lessonId)}');
+    debugPrint('════════ QUIZ ATTEMPT — lesson $lessonId ════════');
+    debugPrint('url            : ${_attemptsUrl(lessonId)}');
+    debugPrint('attemptId      : ${json['attemptId']}');
+    debugPrint('resumed        : ${json['resumed']}');
+    debugPrint('answered       : ${json['answered']}');
     debugPrint('quiz           : ${quiz is Map ? quiz['title'] : '—'}');
     debugPrint('totalQuestions : ${json['totalQuestions'] ?? questions.length}');
     debugPrint('totalMarks     : ${json['totalMarks']}');
     debugPrint('top-level keys : ${json.keys.toList()}');
 
-    var withKey = 0;
-
     for (var i = 0; i < questions.length; i++) {
       final q = Map<String, dynamic>.from(questions[i] as Map);
       final options = (q['options'] as List?) ?? const [];
-      final hasKey = q['correctOptionId'] != null ||
-          options.any((o) => o is Map && o['isCorrect'] == true);
-      if (hasKey) withKey++;
 
       debugPrint('');
       debugPrint('── Q${i + 1}  (id ${q['id']}) ──────────────────────────');
       debugPrint('   question       : ${q['questionText']}');
       debugPrint('   difficulty     : ${q['difficulty'] ?? '—'}');
       debugPrint('   marks          : +${q['marksCorrect']} / ${q['marksIncorrect']}');
-      debugPrint('   correctOptionId: ${q['correctOptionId'] ?? '✗ NOT SENT'}');
-      debugPrint('   explanation    : ${q['explanation'] ?? '✗ NOT SENT'}');
       debugPrint('   image          : ${q['questionImageUrl'] ?? '—'}');
       debugPrint('   fields sent    : ${q.keys.toList()}');
       debugPrint('   options (${options.length}):');
 
       for (var j = 0; j < options.length; j++) {
         final o = Map<String, dynamic>.from(options[j] as Map);
-        final letter = String.fromCharCode(65 + j);
-        final flag = o['isCorrect'] == true ? '   ← CORRECT' : '';
-        debugPrint('     $letter. [id ${o['id']}] ${o['optionText']}$flag');
-      }
-
-      if (options.isNotEmpty) {
-        final first = Map<String, dynamic>.from(options.first as Map);
-        debugPrint('   option fields  : ${first.keys.toList()}');
+        debugPrint('     ${String.fromCharCode(65 + j)}. [id ${o['id']}] ${o['optionText']}');
       }
     }
 
-    debugPrint('');
-    debugPrint('answer key present on $withKey of ${questions.length} questions');
     debugPrint('═════════════════════════════════════════════════════');
   }
 
@@ -104,6 +140,33 @@ class QuizService {
     }
 
     debugPrint('└── ${body.length} chars');
+  }
+
+  Future<Map<String, dynamic>> _post(String url, Map<String, dynamic> body) async {
+    dynamic decoded;
+    int status;
+
+    try {
+      final response = await ApiClient.post(url, body: body);
+      status = response.statusCode;
+      _dumpResponse(url, response.statusCode, response.body);
+      decoded = response.body.isNotEmpty ? jsonDecode(response.body) : <String, dynamic>{};
+    } on SessionExpiredException catch (e) {
+      throw QuizException(QuizErrorKind.sessionExpired, e.message);
+    } catch (_) {
+      throw QuizException(
+        QuizErrorKind.network,
+        'Could not reach the server. Check your connection and try again.',
+      );
+    }
+
+    // 201 is a fresh attempt, 200 a resumed one. Accepting only 200 here
+    // would fail every first-time start.
+    if ((status == 200 || status == 201) && decoded is Map) {
+      return Map<String, dynamic>.from(decoded);
+    }
+
+    throw mapError(status, decoded);
   }
 
   Future<Map<String, dynamic>> _get(String url) async {
@@ -145,6 +208,14 @@ class QuizService {
         : const <RequiredPlanModel>[];
 
     if (status == 404) {
+      // "Attempt not found" is also what another student's attempt returns —
+      // same response, deliberately, so ids can't be probed.
+      if (lower.contains('attempt')) {
+        return QuizException(
+          QuizErrorKind.attemptNotFound,
+          message.isEmpty ? 'Attempt not found' : message,
+        );
+      }
       return QuizException(
         QuizErrorKind.lessonNotFound,
         message.isEmpty ? 'Lesson not found' : message,
@@ -169,12 +240,30 @@ class QuizService {
       if (lower.contains('select a course')) {
         return QuizException(QuizErrorKind.noCourseSelected, message);
       }
+      // Order matters: "This quiz has no questions yet" also contains "no
+      // quiz" once lowercased in some phrasings, so test the narrower one
+      // first or an empty quiz reads as an unlinked one.
+      if (lower.contains('no questions')) {
+        return QuizException(QuizErrorKind.noQuestions, message);
+      }
       if (lower.contains('no quiz')) {
         return QuizException(QuizErrorKind.noQuizLinked, message);
+      }
+      if (lower.contains('already finished')) {
+        return QuizException(QuizErrorKind.attemptFinished, message);
       }
       if (lower.contains('inactive')) {
         return QuizException(QuizErrorKind.quizInactive, message);
       }
+    }
+
+    // 400: bad ids. Not recoverable by retrying the same call, but not a
+    // dead end either — the screen offers a reload.
+    if (status == 400) {
+      return QuizException(
+        QuizErrorKind.network,
+        message.isEmpty ? 'That answer could not be recorded.' : message,
+      );
     }
 
     // 5xx: nothing wrong with the request or the connection — the server

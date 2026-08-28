@@ -3,11 +3,12 @@ import 'package:dr_app/repository/course_get_provider.dart';
 import 'package:dr_app/repository/google_sign_in_provider.dart';
 import 'package:dr_app/repository/plan_provider.dart';
 import 'package:dr_app/repository/profile_provider.dart';
+import 'package:dr_app/repository/saved_provider.dart';
 import 'package:dr_app/repository/refresh_api_provider.dart';
 import 'package:dr_app/repository/selection_content_provider.dart';
 import 'package:dr_app/repository/selection_provider.dart';
 import 'package:dr_app/view/refresh_gate/auth_gate.dart';
-import 'package:dr_app/view/splash/splash_screen.dart';
+import 'package:dr_app/widget/screenshot_guard.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
@@ -31,7 +32,11 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => AuthProvider()),
        ChangeNotifierProvider(create: (_) => ProfileProvider()),
         ChangeNotifierProvider(create: (_) => PlanProvider()),
-        ChangeNotifierProvider(create: (_) => SelectionContentProvider())
+        ChangeNotifierProvider(create: (_) => SelectionContentProvider()),
+        // App-wide: the QBank badge, the toggle inside a quiz and the saved
+        // list all read the same counts, so there is one instance, not three.
+        // Primed from HomeScreen, which is the first place a token exists.
+        ChangeNotifierProvider(create: (_) => SavedProvider())
       ],
       child: ScreenUtilInit(
           designSize: const Size(440, 956), // Figma design size
@@ -41,6 +46,10 @@ class MyApp extends StatelessWidget {
           return MaterialApp(
               title: "Dr. SKM's Academy",
               debugShowCheckedModeBanner: false,
+              // Wrapped here, not per screen: `builder` sits above the
+              // Navigator, so every route — dialogs, the video player and the
+              // quiz included — is blocked by this one switch.
+              builder: (context, child) => ScreenshotGuard(child: child!),
               home: AuthGate()
           );
         }

@@ -196,18 +196,3 @@ class ScreenShimmer extends StatelessWidget {
     );
   }
 }
-
-/// Shimmer that keeps the screen's own background behind it — used where the
-/// loader replaces a whole Scaffold body.
-class ShimmerScaffoldBody extends StatelessWidget {
-  final ShimmerLayout layout;
-  const ShimmerScaffoldBody({super.key, this.layout = ShimmerLayout.rows});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      color: AppColor.Screenbackground,
-      child: ScreenShimmer(layout: layout),
-    );
-  }
-}

@@ -46,6 +46,7 @@ dependencies:
   video_player: ^2.9.2
   syncfusion_flutter_pdfviewer: ^27.1.48
   youtube_player_flutter: ^9.1.1
+  no_screenshot: ^2.0.1
 
 dev_dependencies:
   flutter_test:

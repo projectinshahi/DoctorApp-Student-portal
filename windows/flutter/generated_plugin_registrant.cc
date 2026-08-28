@@ -8,6 +8,7 @@
 
 #include <file_selector_windows/file_selector_windows.h>
 #include <flutter_inappwebview_windows/flutter_inappwebview_windows_plugin_c_api.h>
+#include <no_screenshot/no_screenshot_plugin_c_api.h>
 #include <syncfusion_pdfviewer_windows/syncfusion_pdfviewer_windows_plugin.h>
 #include <url_launcher_windows/url_launcher_windows.h>
 
@@ -16,6 +17,8 @@ void RegisterPlugins(flutter::PluginRegistry* registry) {
       registry->GetRegistrarForPlugin("FileSelectorWindows"));
   FlutterInappwebviewWindowsPluginCApiRegisterWithRegistrar(
       registry->GetRegistrarForPlugin("FlutterInappwebviewWindowsPluginCApi"));
+  NoScreenshotPluginCApiRegisterWithRegistrar(
+      registry->GetRegistrarForPlugin("NoScreenshotPluginCApi"));
   SyncfusionPdfviewerWindowsPluginRegisterWithRegistrar(
       registry->GetRegistrarForPlugin("SyncfusionPdfviewerWindowsPlugin"));
   UrlLauncherWindowsRegisterWithRegistrar(

@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../../../core/constant/local_storage.dart';
 import '../../../models/quiz_model.dart';
 import '../../../repository/quiz_provider.dart';
+import '../../../repository/saved_provider.dart';
 import '../../subjectSelection/select_exam_screen.dart';
 import '../../../widget/app_shimmer.dart';
 import '../../../widget/pro_plan_dialog.dart';
@@ -25,8 +26,8 @@ class QuizScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Provider is scoped to this route: questions are never cached across
-    // sessions, and a re-open always refetches.
+    // Provider is scoped to this route. The attempt lives on the server, so
+    // a re-open resumes it rather than replaying anything cached here.
     return ChangeNotifierProvider<QuizProvider>(
       create: (_) => QuizProvider()..load(lessonId),
       child: _QuizView(lessonId: lessonId, lessonTitle: lessonTitle),
@@ -44,15 +45,16 @@ class _QuizView extends StatelessWidget {
   Widget build(BuildContext context) {
     return Consumer<QuizProvider>(
       builder: (context, provider, _) {
-        final quizTitle = provider.questions?.quiz?.title ?? lessonTitle;
+        final quizTitle = provider.attempt?.quiz?.title ?? lessonTitle;
         final appBarTitle = provider.finished ? "Result" : quizTitle;
 
-        // Leaving mid-attempt loses nothing (every submitted answer is saved)
-        // but it still needs confirming, so nobody drops out by accident.
+        // Leaving mid-attempt loses nothing — every committed answer is on
+        // the server and the attempt resumes — but it still needs confirming
+        // so nobody drops out by accident.
         final guardExit = !provider.finished &&
             !provider.isLoading &&
             provider.failure == null &&
-            provider.visibleQuestions.isNotEmpty;
+            provider.questions.isNotEmpty;
 
         return PopScope(
           canPop: !guardExit,
@@ -98,8 +100,11 @@ class _QuizView extends StatelessWidget {
       );
     }
 
-    final questions = provider.questions;
-    if (questions == null || questions.questions.isEmpty) {
+    // First: a finished attempt is read-only, and the completed GET carries
+    // no `questions` list — checking for one below would call it empty.
+    if (provider.finished && provider.result != null) return const _ReviewView();
+
+    if (provider.attempt == null || provider.questions.isEmpty) {
       return const _EmptyState(
         icon: Icons.quiz_outlined,
         title: "No questions yet",
@@ -107,29 +112,14 @@ class _QuizView extends StatelessWidget {
       );
     }
 
-    if (provider.finished) return _ReviewView(questions: questions);
-
-    // Resumed an attempt where everything was already submitted.
-    if (provider.visibleQuestions.isEmpty) {
-      return _EmptyState(
-        icon: Icons.task_alt_rounded,
-        title: "All questions answered",
-        message: "You've already submitted every question in this quiz.",
-        actionLabel: "See result",
-        onAction: provider.finish,
-      );
-    }
-
-    return _QuestionView(questions: questions);
+    return const _QuestionView();
   }
 }
 
 /// "Exit the quiz?" — returns true when the student confirms.
 Future<bool> _confirmExit(BuildContext context, QuizProvider provider) async {
   final answered = provider.attemptedCount;
-  final left = provider.visibleQuestions
-      .where((q) => !provider.isSubmitted(q.id))
-      .length;
+  final left = provider.remainingCount;
 
   final result = await showDialog<bool>(
     context: context,
@@ -141,9 +131,9 @@ Future<bool> _confirmExit(BuildContext context, QuizProvider provider) async {
         style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700, color: Colors.black87),
       ),
       content: Text(
-        "You've submitted $answered answer${answered == 1 ? '' : 's'}. "
-        "$left question${left == 1 ? '' : 's'} left — they'll be waiting for you "
-        "when you come back.",
+        "You've answered $answered question${answered == 1 ? '' : 's'}. "
+        "$left left — the attempt is saved on your account, so it'll be "
+        "waiting exactly here when you come back.",
         style: TextStyle(fontSize: 13.sp, height: 1.45, color: Colors.grey.shade800),
       ),
       actions: [
@@ -203,12 +193,10 @@ class _StatChip extends StatelessWidget {
 // explanation are revealed, and the question locks.
 // ─────────────────────────────────────────────────────────────
 class _QuestionView extends StatelessWidget {
-  final QuizQuestionsModel questions;
-
-  const _QuestionView({required this.questions});
+  const _QuestionView();
 
   Future<void> _submitQuiz(BuildContext context, QuizProvider provider) async {
-    final unanswered = provider.allQuestions.length - provider.attemptedCount;
+    final unanswered = provider.remainingCount;
 
     final confirmed = await showDialog<bool>(
       context: context,
@@ -223,7 +211,7 @@ class _QuestionView extends StatelessWidget {
           unanswered == 0
               ? "You've answered every question."
               : "$unanswered question${unanswered == 1 ? '' : 's'} left unanswered. "
-                  "They'll be counted as skipped.",
+                  "${unanswered == 1 ? "It'll" : "They'll"} be counted as skipped.",
           style: TextStyle(fontSize: 13.sp, height: 1.45, color: Colors.grey.shade800),
         ),
         actions: [
@@ -252,19 +240,26 @@ class _QuestionView extends StatelessWidget {
   Widget build(BuildContext context) {
     final provider = context.watch<QuizProvider>();
     final question = provider.currentQuestion!;
-    final visible = provider.visibleQuestions;
-    final total = visible.length;
+    final total = provider.questions.length;
 
     final selectedOptionId = provider.selectedOption(question.id);
-    final submitted = provider.isSubmitted(question.id);
-    final correctOption = question.correctOption;
+    final submitted = provider.isAnswered(question.id);
 
-    // Primary button: Submit the answer → Next → Submit Quiz on the last one.
+    // Filled the moment this answer is posted — the key comes back with it.
+    // Null on a resumed answer: the server withholds the key until finish.
+    final outcome = provider.resultFor(question);
+    final checking = provider.isChecking(question.id);
+
+    // Answering is the option tap itself, so this button only ever moves the
+    // student along: Next / Skip, and Submit Quiz on the last question.
     final String primaryLabel;
     final VoidCallback? onPrimary;
-    if (!submitted && selectedOptionId != null) {
-      primaryLabel = "Submit";
-      onPrimary = provider.submitCurrent;
+    if (provider.isSubmitting) {
+      primaryLabel = "Submitting…";
+      onPrimary = null;
+    } else if (checking) {
+      primaryLabel = "Saving…";
+      onPrimary = null;
     } else if (provider.isLastQuestion) {
       primaryLabel = "Submit Quiz";
       onPrimary = () => _submitQuiz(context, provider);
@@ -289,7 +284,7 @@ class _QuestionView extends StatelessWidget {
                     style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600, color: Colors.grey.shade700),
                   ),
                   Text(
-                    "Attempted ${provider.attemptedCount}/${provider.allQuestions.length}",
+                    "Attempted ${provider.attemptedCount}/${provider.totalQuestions}",
                     style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600, color: _kPrimary),
                   ),
                 ],
@@ -313,7 +308,7 @@ class _QuestionView extends StatelessWidget {
                     Expanded(
                       child: Text(
                         "Continuing where you left off — "
-                        "${provider.carriedOverCount} already answered.",
+                        "${provider.resumedCount} already answered.",
                         style: TextStyle(fontSize: 11.sp, color: Colors.grey.shade600),
                       ),
                     ),
@@ -339,9 +334,18 @@ class _QuestionView extends StatelessWidget {
                   SizedBox(height: 14.h),
                 ],
 
-                Text(
-                  question.questionText,
-                  style: TextStyle(fontSize: 14.5.sp, height: 1.5, color: Colors.black87),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        question.questionText,
+                        style: TextStyle(fontSize: 14.5.sp, height: 1.5, color: Colors.black87),
+                      ),
+                    ),
+                    SizedBox(width: 8.w),
+                    _SaveButton(questionId: question.id),
+                  ],
                 ),
 
                 SizedBox(height: 10.h),
@@ -374,13 +378,15 @@ class _QuestionView extends StatelessWidget {
                   final option = question.options[i];
                   final isSelected = selectedOptionId == option.id;
 
-                  // Only after submitting does the tile know right from wrong,
-                  // and only when the API actually sent the answer key.
+                  // correctOptionId is tested FIRST on purpose: a correct
+                  // answer matches both ids, and reversing these two paints
+                  // it red. Anything else stays normal — a skipped question
+                  // highlights only the correct option.
                   bool? verdict;
-                  if (submitted && correctOption != null) {
-                    if (option.id == correctOption.id) {
+                  if (outcome != null) {
+                    if (option.id == outcome.correctOptionId) {
                       verdict = true;
-                    } else if (isSelected) {
+                    } else if (option.id == outcome.selectedOptionId) {
                       verdict = false;
                     }
                   }
@@ -391,24 +397,42 @@ class _QuestionView extends StatelessWidget {
                       letter: String.fromCharCode(65 + i), // A, B, C, D …
                       option: option,
                       isSelected: isSelected,
-                      locked: submitted,
+                      // Locked once answered, and while a tap is in flight so
+                      // a second one can't race it onto the same question.
+                      locked: submitted || checking,
+                      busy: checking && isSelected,
                       verdict: verdict,
-                      onTap: () => context.read<QuizProvider>().select(question.id, option.id),
+                      onTap: () =>
+                          context.read<QuizProvider>().answer(question.id, option.id),
                     ),
                   );
                 }),
 
-                if (submitted) ...[
+                if (submitted || outcome != null || checking) ...[
                   SizedBox(height: 4.h),
-                  _FeedbackCard(
-                    question: question,
-                    isCorrect: provider.resultFor(question),
-                  ),
+                  _FeedbackCard(outcome: outcome, isChecking: checking),
                 ],
               ],
             ),
           ),
         ),
+
+        if (provider.submitError != null)
+          Padding(
+            padding: EdgeInsets.fromLTRB(20.w, 0, 20.w, 10.h),
+            child: Row(
+              children: [
+                Icon(Icons.error_outline_rounded, size: 16.sp, color: Colors.red.shade600),
+                SizedBox(width: 8.w),
+                Expanded(
+                  child: Text(
+                    provider.submitError!,
+                    style: TextStyle(fontSize: 12.sp, color: Colors.red.shade700),
+                  ),
+                ),
+              ],
+            ),
+          ),
 
         // ── Previous / Submit / Next ──
         Padding(
@@ -443,7 +467,13 @@ class _QuestionView extends StatelessWidget {
                       elevation: 0,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30.r)),
                     ),
-                    child: Text(primaryLabel, style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700)),
+                    child: (provider.isSubmitting || checking)
+                        ? SizedBox(
+                            width: 20.w,
+                            height: 20.w,
+                            child: const CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          )
+                        : Text(primaryLabel, style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700)),
                   ),
                 ),
               ),
@@ -455,55 +485,106 @@ class _QuestionView extends StatelessWidget {
   }
 }
 
-/// Shown once a question is submitted: right/wrong, the correct answer when
-/// the student missed it, and the explanation.
-class _FeedbackCard extends StatelessWidget {
-  final QuizQuestionModel question;
-  final bool? isCorrect;
+/// Shown once a question is locked. Before the quiz is submitted there is
+/// nothing to reveal — the answer key only arrives with the submit response.
+/// After it, three states, never two: correct, wrong, skipped.
 
-  const _FeedbackCard({required this.question, required this.isCorrect});
+class _FeedbackCard extends StatelessWidget {
+  final QuizQuestionResult? outcome;
+  final bool isChecking;
+
+  const _FeedbackCard({required this.outcome, this.isChecking = false});
 
   @override
   Widget build(BuildContext context) {
-    final correct = question.correctOption;
-    final explanation = question.explanation;
+    final result = outcome;
 
-    // No answer key from the API — say so instead of implying a result.
-    if (correct == null) {
+    if (isChecking) {
       return _FeedbackShell(
         color: Colors.grey.shade600,
-        icon: Icons.info_outline_rounded,
-        title: "Answer recorded",
+        icon: Icons.hourglass_top_rounded,
+        title: "Saving your answer…",
+        children: const [],
+      );
+    }
+
+    // Answered in an earlier sitting. The server withholds the key for an
+    // unfinished attempt, so there is nothing to reveal yet — the answer is
+    // recorded and will be scored at the end.
+    if (result == null) {
+      return _FeedbackShell(
+        color: Colors.grey.shade600,
+        icon: Icons.lock_outline_rounded,
+        title: "Answered earlier",
         children: [
           Text(
-            "The correct answer isn't sent to the app for this quiz, so it "
-            "can't be shown here.",
+            "This one is already recorded. You'll see the answer and the "
+            "explanation when you finish the quiz.",
             style: TextStyle(fontSize: 12.sp, height: 1.45, color: Colors.grey.shade800),
           ),
         ],
       );
     }
 
-    final right = isCorrect == true;
-    final color = right ? _kPrimary : Colors.red.shade600;
+    final Color color;
+    final IconData icon;
+    final String title;
+    if (result.isCorrect) {
+      color = _kPrimary;
+      icon = Icons.check_circle_rounded;
+      title = "Correct";
+    } else if (result.isSkipped) {
+      // Skipped is not wrong — no penalty, so no red.
+      color = Colors.orange.shade800;
+      icon = Icons.remove_circle_outline_rounded;
+      title = "Skipped";
+    } else {
+      color = Colors.red.shade600;
+      icon = Icons.cancel_rounded;
+      title = "Incorrect";
+    }
+
+    final correct = result.correctOption;
+    final explanation = result.explanation;
 
     return _FeedbackShell(
       color: color,
-      icon: right ? Icons.check_circle_rounded : Icons.cancel_rounded,
-      title: right ? "Correct" : "Incorrect",
+      icon: icon,
+      title: title,
+      // Marks only where they were earned or lost. A skipped question scores
+      // 0 and must not read like a penalty.
+      trailing: result.answered
+          ? Text(
+              "${_trimNumber(result.marksAwarded)} marks",
+              style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: color),
+            )
+          : null,
       children: [
-        if (!right) ...[
+        // Always shown, right or wrong — the student wants to see the answer
+        // confirmed, not just inferred from the green tile.
+        if (correct != null) ...[
           Text(
             "Correct answer",
             style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.w700, color: Colors.grey.shade600),
           ),
           SizedBox(height: 4.h),
-          Text(
-            correct.optionText,
-            style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: _kPrimary, height: 1.4),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.check_circle_rounded, size: 15.sp, color: _kPrimary),
+              SizedBox(width: 6.w),
+              Expanded(
+                child: Text(
+                  correct.optionText,
+                  style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: _kPrimary, height: 1.4),
+                ),
+              ),
+            ],
           ),
-          SizedBox(height: 12.h),
+          if (explanation != null && explanation.trim().isNotEmpty) SizedBox(height: 12.h),
         ],
+        // Nullable on purpose — plenty of questions have none, and no space
+        // is reserved for it.
         if (explanation != null && explanation.trim().isNotEmpty) ...[
           Text(
             "Explanation",
@@ -525,12 +606,14 @@ class _FeedbackShell extends StatelessWidget {
   final IconData icon;
   final String title;
   final List<Widget> children;
+  final Widget? trailing;
 
   const _FeedbackShell({
     required this.color,
     required this.icon,
     required this.title,
     required this.children,
+    this.trailing,
   });
 
   @override
@@ -554,6 +637,7 @@ class _FeedbackShell extends StatelessWidget {
                 title,
                 style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700, color: color),
               ),
+              if (trailing != null) ...[const Spacer(), trailing!],
             ],
           ),
           if (children.isNotEmpty) SizedBox(height: 12.h),
@@ -569,8 +653,11 @@ class _OptionTile extends StatelessWidget {
   final QuizOptionModel option;
   final bool isSelected;
 
-  /// Answer submitted — no more taps.
+  /// Answered, or a tap already in flight — no more taps.
   final bool locked;
+
+  /// This option is the one being saved right now.
+  final bool busy;
 
   /// true = this is the correct option, false = the wrong one the student
   /// picked, null = neutral (or the answer key wasn't sent).
@@ -584,6 +671,7 @@ class _OptionTile extends StatelessWidget {
     required this.isSelected,
     required this.onTap,
     this.locked = false,
+    this.busy = false,
     this.verdict,
   });
 
@@ -652,7 +740,14 @@ class _OptionTile extends StatelessWidget {
                 ],
               ),
             ),
-            if (verdict != null) ...[
+            if (busy) ...[
+              SizedBox(width: 8.w),
+              SizedBox(
+                width: 18.sp,
+                height: 18.sp,
+                child: CircularProgressIndicator(strokeWidth: 2, color: accent),
+              ),
+            ] else if (verdict != null) ...[
               SizedBox(width: 8.w),
               Icon(
                 verdict! ? Icons.check_circle_rounded : Icons.cancel_rounded,
@@ -690,186 +785,94 @@ class _MarkPill extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────
-// Result — shown after the final Submit. The same totals are printed
-// to the terminal by QuizProvider.printScore().
+// Result — every number here comes from the submit response. The app
+// never computes a mark; the same totals are printed to the terminal
+// by QuizProvider.printScore().
 // ─────────────────────────────────────────────────────────────
 class _ReviewView extends StatelessWidget {
-  final QuizQuestionsModel questions;
-
-  const _ReviewView({required this.questions});
+  const _ReviewView();
 
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<QuizProvider>();
-    final scored = provider.hasAnswerKey;
+    final rows = provider.reviewResults;
 
     return Column(
       children: [
         Expanded(
-          child: SingleChildScrollView(
+          child: ListView(
             padding: EdgeInsets.fromLTRB(20.w, 8.h, 20.w, 20.h),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (scored) ...[
-                  Container(
-                    width: double.infinity,
-                    padding: EdgeInsets.symmetric(vertical: 20.h),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(20.r),
-                    ),
-                    child: Column(
-                      children: [
-                        Text(
-                          "Total marks",
-                          style: TextStyle(fontSize: 12.sp, color: Colors.grey.shade700),
-                        ),
-                        SizedBox(height: 4.h),
-                        Text(
-                          "${_trimNumber(provider.scoredMarks)} / ${_trimNumber(questions.totalMarks)}",
-                          style: TextStyle(fontSize: 30.sp, fontWeight: FontWeight.w800, color: _kPrimary),
-                        ),
-                      ],
-                    ),
-                  ),
-                  SizedBox(height: 12.h),
-                  Row(
-                    children: [
-                      _StatChip(label: "Correct", value: "${provider.correctCount}"),
-                      SizedBox(width: 12.w),
-                      _StatChip(label: "Wrong", value: "${provider.wrongCount}"),
-                    ],
-                  ),
-                  SizedBox(height: 12.h),
-                ],
-
-                Row(
+            children: [
+              Container(
+                width: double.infinity,
+                padding: EdgeInsets.symmetric(vertical: 20.h),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20.r),
+                ),
+                child: Column(
                   children: [
-                    _StatChip(label: "Attempted", value: "${provider.attemptedCount}"),
-                    SizedBox(width: 12.w),
-                    _StatChip(label: "Skipped", value: "${provider.skippedCount}"),
+                    Text(
+                      "Total marks",
+                      style: TextStyle(fontSize: 12.sp, color: Colors.grey.shade700),
+                    ),
+                    SizedBox(height: 4.h),
+                    Text(
+                      // score is genuinely negative when negative marking
+                      // bites — printed as sent, never absolute.
+                      "${_trimNumber(provider.scoredMarks)} / ${_trimNumber(provider.totalMarks)}",
+                      style: TextStyle(
+                        fontSize: 30.sp,
+                        fontWeight: FontWeight.w800,
+                        color: provider.scoredMarks < 0 ? Colors.red.shade600 : _kPrimary,
+                      ),
+                    ),
                   ],
                 ),
-                SizedBox(height: 16.h),
+              ),
+              SizedBox(height: 12.h),
+              Row(
+                children: [
+                  _StatChip(label: "Correct", value: "${provider.correctCount}"),
+                  SizedBox(width: 12.w),
+                  _StatChip(label: "Wrong", value: "${provider.wrongCount}"),
+                  SizedBox(width: 12.w),
+                  _StatChip(label: "Skipped", value: "${provider.skippedCount}"),
+                ],
+              ),
 
-                if (!scored)
-                  // Honest about the boundary — no score, no pass/fail.
-                  Container(
-                    width: double.infinity,
-                    padding: EdgeInsets.all(16.w),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16.r),
-                    ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Icon(Icons.info_outline_rounded, size: 18.sp, color: Colors.orange),
-                        SizedBox(width: 10.w),
-                        Expanded(
-                          child: Text(
-                            "Marks aren't available. This quiz's correct answers and "
-                            "explanations weren't sent to the app, so it can't score them.",
-                            style: TextStyle(fontSize: 12.sp, height: 1.45, color: Colors.grey.shade800),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+              SizedBox(height: 20.h),
+              Text(
+                "Your answers",
+                style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700, color: Colors.black87),
+              ),
+              SizedBox(height: 12.h),
 
-                SizedBox(height: 20.h),
+              // Every question in full — text, all the options marked up, and
+              // the explanation. Nothing to tap into: the attempt is over, so
+              // a jump-back-into-the-quiz would have nowhere to go.
+              ...List.generate(
+                rows.length,
+                (index) => _ReviewQuestionCard(number: index + 1, outcome: rows[index]),
+              ),
+
+              // Past attempts. Self-hides under the one-attempt-per-quiz rule;
+              // it only shows for quizzes attempted before that rule existed.
+              if (provider.history.length > 1) ...[
+                SizedBox(height: 8.h),
                 Text(
-                  "Your answers",
+                  "Past attempts",
                   style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700, color: Colors.black87),
                 ),
                 SizedBox(height: 12.h),
-
-                ...List.generate(provider.allQuestions.length, (index) {
-                  final question = provider.allQuestions[index];
-                  final selectedId = provider.selectedOption(question.id);
-                  final selected = selectedId == null
-                      ? null
-                      : question.options.where((o) => o.id == selectedId).firstOrNull;
-                  final verdict = provider.resultFor(question);
-
-                  // Only questions still in this attempt can be jumped back to.
-                  final visibleIndex =
-                      provider.visibleQuestions.indexWhere((q) => q.id == question.id);
-
-                  final Color answerColor;
-                  if (selected == null) {
-                    answerColor = Colors.orange.shade800;
-                  } else if (verdict == null) {
-                    answerColor = _kPrimary;
-                  } else {
-                    answerColor = verdict ? _kPrimary : Colors.red.shade600;
-                  }
-
-                  return Padding(
-                    padding: EdgeInsets.only(bottom: 12.h),
-                    child: GestureDetector(
-                      onTap: visibleIndex < 0 ? null : () => provider.goTo(visibleIndex),
-                      child: Container(
-                        padding: EdgeInsets.all(14.w),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(16.r),
-                        ),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Container(
-                              width: 26.w,
-                              height: 26.w,
-                              alignment: Alignment.center,
-                              decoration: const BoxDecoration(color: _kBg, shape: BoxShape.circle),
-                              child: Text(
-                                "${index + 1}",
-                                style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.w700, color: _kPrimary),
-                              ),
-                            ),
-                            SizedBox(width: 12.w),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    question.questionText,
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(fontSize: 12.5.sp, fontWeight: FontWeight.w600, height: 1.35),
-                                  ),
-                                  SizedBox(height: 6.h),
-                                  Text(
-                                    selected == null ? "Skipped" : selected.optionText,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      fontSize: 11.5.sp,
-                                      color: answerColor,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            if (verdict != null)
-                              Icon(
-                                verdict ? Icons.check_circle_rounded : Icons.cancel_rounded,
-                                size: 18.sp,
-                                color: verdict ? _kPrimary : Colors.red.shade600,
-                              )
-                            else
-                              Icon(Icons.chevron_right_rounded, size: 20.sp, color: Colors.grey.shade400),
-                          ],
-                        ),
-                      ),
-                    ),
-                  );
-                }),
+                ...provider.history.map(
+                  (summary) => _HistoryRow(
+                    summary: summary,
+                    isCurrent: summary.attemptId == provider.attempt?.attemptId,
+                  ),
+                ),
               ],
-            ),
+            ],
           ),
         ),
 
@@ -877,21 +880,7 @@ class _ReviewView extends StatelessWidget {
           padding: EdgeInsets.fromLTRB(20.w, 0, 20.w, 20.h),
           child: Row(
             children: [
-              Expanded(
-                child: SizedBox(
-                  height: 50.h,
-                  child: OutlinedButton(
-                    onPressed: provider.retakeFromStart,
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: _kPrimary,
-                      side: const BorderSide(color: _kPrimary),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30.r)),
-                    ),
-                    child: Text("Retake", style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w600)),
-                  ),
-                ),
-              ),
-              SizedBox(width: 12.w),
+              // No Retake: one attempt per quiz, so this review is final.
               Expanded(
                 child: SizedBox(
                   height: 50.h,
@@ -911,6 +900,236 @@ class _ReviewView extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// One question in the review: the question, every option marked up, and the
+/// correct answer with its explanation. Built from the finish response, which
+/// is the only place the answer key exists.
+class _ReviewQuestionCard extends StatelessWidget {
+  final int number;
+  final QuizQuestionResult outcome;
+
+  const _ReviewQuestionCard({required this.number, required this.outcome});
+
+  @override
+  Widget build(BuildContext context) {
+    final Color headerColor;
+    final IconData headerIcon;
+    final String headerLabel;
+    if (outcome.isCorrect) {
+      headerColor = _kPrimary;
+      headerIcon = Icons.check_circle_rounded;
+      headerLabel = "Correct";
+    } else if (outcome.isSkipped) {
+      // Skipped is not wrong — no penalty, so no red.
+      headerColor = Colors.orange.shade800;
+      headerIcon = Icons.remove_circle_outline_rounded;
+      headerLabel = "Skipped";
+    } else {
+      headerColor = Colors.red.shade600;
+      headerIcon = Icons.cancel_rounded;
+      headerLabel = "Incorrect";
+    }
+
+    return Container(
+      margin: EdgeInsets.only(bottom: 14.h),
+      padding: EdgeInsets.all(14.w),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18.r),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 24.w,
+                height: 24.w,
+                alignment: Alignment.center,
+                decoration: const BoxDecoration(color: _kBg, shape: BoxShape.circle),
+                child: Text(
+                  "$number",
+                  style: TextStyle(fontSize: 10.5.sp, fontWeight: FontWeight.w700, color: _kPrimary),
+                ),
+              ),
+              SizedBox(width: 8.w),
+              Icon(headerIcon, size: 16.sp, color: headerColor),
+              SizedBox(width: 5.w),
+              Text(
+                headerLabel,
+                style: TextStyle(fontSize: 12.5.sp, fontWeight: FontWeight.w700, color: headerColor),
+              ),
+              const Spacer(),
+              // A skipped question scores 0 — printing marks there would read
+              // as a penalty.
+              if (outcome.answered)
+                Text(
+                  "${_trimNumber(outcome.marksAwarded)} marks",
+                  style: TextStyle(fontSize: 11.5.sp, fontWeight: FontWeight.w700, color: headerColor),
+                ),
+              SizedBox(width: 4.w),
+              _SaveButton(questionId: outcome.questionId, compact: true),
+            ],
+          ),
+          SizedBox(height: 10.h),
+
+          if (outcome.questionImageUrl != null && outcome.questionImageUrl!.isNotEmpty) ...[
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12.r),
+              child: Image.network(outcome.questionImageUrl!, fit: BoxFit.cover),
+            ),
+            SizedBox(height: 10.h),
+          ],
+
+          Text(
+            outcome.questionText,
+            style: TextStyle(fontSize: 13.5.sp, height: 1.5, color: Colors.black87),
+          ),
+          SizedBox(height: 12.h),
+
+          ...List.generate(outcome.options.length, (i) {
+            final option = outcome.options[i];
+
+            // correctOptionId is tested FIRST on purpose: a correct answer
+            // matches both ids, and reversing these two paints it red.
+            bool? verdict;
+            if (option.id == outcome.correctOptionId) {
+              verdict = true;
+            } else if (option.id == outcome.selectedOptionId) {
+              verdict = false;
+            }
+
+            return Padding(
+              padding: EdgeInsets.only(bottom: 10.h),
+              child: _OptionTile(
+                letter: String.fromCharCode(65 + i),
+                option: option,
+                isSelected: option.id == outcome.selectedOptionId,
+                locked: true,
+                verdict: verdict,
+                onTap: () {},
+              ),
+            );
+          }),
+
+          // Nullable on purpose — plenty of questions have none, and no space
+          // is reserved for it.
+          if (outcome.explanation != null && outcome.explanation!.trim().isNotEmpty) ...[
+            SizedBox(height: 2.h),
+            Container(
+              width: double.infinity,
+              padding: EdgeInsets.all(12.w),
+              decoration: BoxDecoration(
+                color: _kBg,
+                borderRadius: BorderRadius.circular(14.r),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    "Explanation",
+                    style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.w700, color: Colors.grey.shade700),
+                  ),
+                  SizedBox(height: 4.h),
+                  Text(
+                    outcome.explanation!.trim(),
+                    style: TextStyle(fontSize: 12.5.sp, height: 1.5, color: Colors.black87),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// Save-for-later toggle. Writes straight through to /saved-questions via the
+/// app-wide provider, so the QBank badge and the saved list stay in step with
+/// this icon without either of them refetching.
+class _SaveButton extends StatelessWidget {
+  final int questionId;
+  final bool compact;
+
+  const _SaveButton({required this.questionId, this.compact = false});
+
+  @override
+  Widget build(BuildContext context) {
+    final saved = context.watch<SavedProvider>().isQuestionSaved(questionId);
+
+    return GestureDetector(
+      onTap: () => context.read<SavedProvider>().toggleQuestion(questionId),
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: EdgeInsets.all(compact ? 2.w : 4.w),
+        child: Icon(
+          saved ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
+          size: (compact ? 18 : 22).sp,
+          color: saved ? _kPrimary : Colors.grey.shade500,
+        ),
+      ),
+    );
+  }
+}
+
+/// One row of the attempt history. Summary fields only — the endpoint sends
+/// no per-question detail, so there is nothing here to tap into.
+class _HistoryRow extends StatelessWidget {
+  final QuizAttemptSummary summary;
+  final bool isCurrent;
+
+  const _HistoryRow({required this.summary, required this.isCurrent});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: EdgeInsets.only(bottom: 10.h),
+      padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 12.h),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14.r),
+        border: isCurrent ? Border.all(color: _kPrimary, width: 1.4) : null,
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  isCurrent ? "This attempt" : "Attempt #${summary.attemptId}",
+                  style: TextStyle(
+                    fontSize: 12.5.sp,
+                    fontWeight: FontWeight.w700,
+                    color: isCurrent ? _kPrimary : Colors.black87,
+                  ),
+                ),
+                SizedBox(height: 3.h),
+                Text(
+                  summary.completed
+                      ? "${summary.correctCount} correct of ${summary.totalQuestions}"
+                      : "In progress — ${summary.answeredCount} answered",
+                  style: TextStyle(fontSize: 11.sp, color: Colors.grey.shade700),
+                ),
+              ],
+            ),
+          ),
+          if (summary.completed)
+            Text(
+              // Negative scores are real; printed as sent.
+              _trimNumber(summary.score),
+              style: TextStyle(
+                fontSize: 15.sp,
+                fontWeight: FontWeight.w800,
+                color: summary.score < 0 ? Colors.red.shade600 : _kPrimary,
+              ),
+            ),
+        ],
+      ),
     );
   }
 }
@@ -1007,6 +1226,35 @@ class _FailureView extends StatelessWidget {
           onAction: () => Navigator.maybePop(context),
         );
 
+      case QuizErrorKind.noQuestions:
+        return const _EmptyState(
+          icon: Icons.inbox_rounded,
+          title: "No questions yet",
+          message: "This quiz is set up but doesn't have any questions in it "
+              "so far. Check back soon.",
+        );
+
+      case QuizErrorKind.attemptNotFound:
+        // Also what another student's attempt id returns — the API answers
+        // identically on purpose, so ids can't be probed.
+        return _EmptyState(
+          icon: Icons.help_outline_rounded,
+          title: "Attempt not found",
+          message: "That attempt is gone, or it isn't yours. Start a fresh one.",
+          actionLabel: "Start again",
+          onAction: onRetry,
+        );
+
+      case QuizErrorKind.attemptFinished:
+        return _EmptyState(
+          icon: Icons.done_all_rounded,
+          title: "Already finished",
+          message: "This attempt has been scored. Start a fresh one to "
+              "practise again — you'll get a new set of questions.",
+          actionLabel: "Start again",
+          onAction: onRetry,
+        );
+
       case QuizErrorKind.serverError:
         return _EmptyState(
           icon: Icons.cloud_off_rounded,
@@ -1100,8 +1348,4 @@ class _EmptyState extends StatelessWidget {
 String _trimNumber(double value) {
   final text = value.toStringAsFixed(2);
   return text.replaceFirst(RegExp(r'\.?0+$'), '');
-}
-
-extension _FirstOrNull<T> on Iterable<T> {
-  T? get firstOrNull => isEmpty ? null : first;
 }

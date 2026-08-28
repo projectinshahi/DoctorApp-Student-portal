@@ -105,10 +105,7 @@ class _AiVideoTabState extends State<AiVideoTab> {
                   children: [
                     Text(provider.errorMessage!, textAlign: TextAlign.center),
                     SizedBox(height: 12.h),
-                    ElevatedButton(
-                      onPressed: () => provider.loadContent(),
-                      child: const Text("Retry"),
-                    ),
+                    ElevatedButton(onPressed: () => provider.loadContent(), child: const Text("Retry")),
                   ],
                 ),
               ),
@@ -145,10 +142,7 @@ class _AiVideoTabState extends State<AiVideoTab> {
                     width: double.infinity,
                     height: 46.h,
                     padding: EdgeInsets.symmetric(horizontal: 16.w),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(30.r),
-                    ),
+                    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(30.r)),
                     child: Row(
                       children: [
                         Icon(Icons.search_rounded, color: Colors.grey.shade500, size: 20.sp),
@@ -178,7 +172,14 @@ class _AiVideoTabState extends State<AiVideoTab> {
                   ),
                   SizedBox(height: 12.h),
                   SizedBox(
-                    height: 130.h,
+                    // Square-ish: height tracks the card's own width so it
+                    // scales on the SAME axis as everything inside it, which
+                    // is all sized in .w/.sp. The old fixed 130.h was both
+                    // too short for the contents (icon + 2-line title + the
+                    // lessons pill + the optional premium badge need ~140)
+                    // and scaled on the opposite axis, so it burst in
+                    // portrait and again, much harder, in landscape.
+                    height: 150.w,
                     child: ListView.separated(
                       scrollDirection: Axis.horizontal,
                       itemCount: chapters.length,
@@ -218,13 +219,14 @@ class _AiVideoTabState extends State<AiVideoTab> {
                                     color: isSelected ? Colors.white : kPrimary.withOpacity(0.12),
                                     shape: BoxShape.circle,
                                   ),
-                                  child: Icon(
-                                    Icons.menu_book_rounded,
-                                    size: 14.sp,
-                                    color: kPrimary,
-                                  ),
+                                  child: Icon(Icons.menu_book_rounded, size: 14.sp, color: kPrimary),
                                 ),
                                 const Spacer(),
+                                // Plain Text, not Flexible: Flexible clamps the
+                                // box by height and ellipsis works on line
+                                // count, so a squeezed Flexible slices the
+                                // second line in half instead of ellipsizing.
+                                // The card is sized to fit two lines outright.
                                 Text(
                                   chapter.title,
                                   maxLines: 2,
@@ -334,13 +336,10 @@ class _AiVideoTabState extends State<AiVideoTab> {
                         final lesson = lessons[index];
 
                         return GestureDetector(
+                          // Locked lessons open too: the detail screen shows
+                          // the plans paywall. A snackbar here used to swallow
+                          // the tap, so a pro video had no way to sell itself.
                           onTap: () {
-                            if (lesson.locked) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Subscribe to unlock this lesson')),
-                              );
-                              return;
-                            }
                             Navigator.push(
                               context,
                               MaterialPageRoute(
@@ -380,11 +379,7 @@ class _AiVideoTabState extends State<AiVideoTab> {
                                               height: 72.h,
                                               fit: BoxFit.cover,
                                             )
-                                          : Container(
-                                              width: 92.w,
-                                              height: 72.h,
-                                              color: kPrimary,
-                                            ),
+                                          : Container(width: 92.w, height: 72.h, color: kPrimary),
                                     ),
                                     if (lesson.hasVideo)
                                       Positioned.fill(
@@ -395,7 +390,11 @@ class _AiVideoTabState extends State<AiVideoTab> {
                                               color: Colors.black.withOpacity(0.35),
                                               shape: BoxShape.circle,
                                             ),
-                                            child: Icon(Icons.play_arrow_rounded, size: 16.sp, color: Colors.white),
+                                            child: Icon(
+                                              Icons.play_arrow_rounded,
+                                              size: 16.sp,
+                                              color: Colors.white,
+                                            ),
                                           ),
                                         ),
                                       ),
@@ -425,7 +424,11 @@ class _AiVideoTabState extends State<AiVideoTab> {
                                         lesson.title,
                                         maxLines: 2,
                                         overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, height: 1.3),
+                                        style: TextStyle(
+                                          fontSize: 13.sp,
+                                          fontWeight: FontWeight.w700,
+                                          height: 1.3,
+                                        ),
                                       ),
                                       if (lesson.description != null && lesson.description!.isNotEmpty) ...[
                                         SizedBox(height: 4.h),
