@@ -5,7 +5,9 @@ import 'package:provider/provider.dart';
 
 import '../../../models/selection_content_model.dart';
 import '../../../repository/selection_content_provider.dart';
+import '../../../widget/app_shimmer.dart';
 import 'quiz_screen.dart';
+import '../../../core/utils/refresh_on_visible.dart';
 
 const Color _kPrimary = Color(0xFF87986B);
 const Color _kBg = Color(0xFFEFF4E2);
@@ -25,24 +27,17 @@ class QbankSubjectsScreen extends StatefulWidget {
   State<QbankSubjectsScreen> createState() => _QbankSubjectsScreenState();
 }
 
-class _QbankSubjectsScreenState extends State<QbankSubjectsScreen> {
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _refresh());
-  }
-
+class _QbankSubjectsScreenState extends State<QbankSubjectsScreen>
+    with RefreshOnVisible<QbankSubjectsScreen> {
   /// Refetches the tree every time this screen is entered.
   ///
   /// Scores and attempt state change while the student is off in a quiz — or
   /// on another device — and `lesson.attempt` from the tree is the only thing
   /// these rows render from. Silent: the shimmer shows only on a cold load, so
   /// this swaps the data underneath instead of flashing the list away.
-  void _refresh() {
-    if (!mounted) return;
-    final provider = context.read<SelectionContentProvider>();
-    if (!provider.isLoading) provider.loadContent();
-  }
+  @override
+  Future<void> onRefresh() =>
+      context.read<SelectionContentProvider>().loadContent();
 
   /// The chapter as the provider currently holds it. `widget.chapter` was
   /// captured when this route was pushed, so after a quiz is finished and the
@@ -65,15 +60,20 @@ class _QbankSubjectsScreenState extends State<QbankSubjectsScreen> {
       ),
     );
 
-    // They may have answered some questions or finished the attempt. Either
-    // changes `attempt`, and the tree is where this screen reads it from.
-    _refresh();
+    // Nothing to do here: the route observer refetches when this screen
+    // comes back into view.
   }
 
   @override
   Widget build(BuildContext context) {
+    final content = context.watch<SelectionContentProvider>();
     final live = _liveChapter(context);
     final subjects = live.lessons.where((l) => l.isQuiz).toList();
+
+    // Only while there is genuinely nothing to show. A refresh over rows that
+    // are already on screen stays silent — flashing them away on every entry
+    // would be worse than a moment of stale numbers.
+    final showShimmer = content.isLoading;
 
     return Scaffold(
       backgroundColor: _kBg,
@@ -93,7 +93,9 @@ class _QbankSubjectsScreenState extends State<QbankSubjectsScreen> {
           style: TextStyle(fontSize: 17.sp, fontWeight: FontWeight.w700, color: Colors.black),
         ),
       ),
-      body: subjects.isEmpty
+      body: showShimmer
+          ? const ScreenShimmer(layout: ShimmerLayout.rows)
+          : subjects.isEmpty
           ? Center(
               child: Padding(
                 padding: EdgeInsets.symmetric(horizontal: 32.w),

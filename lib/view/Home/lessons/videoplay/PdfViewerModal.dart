@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
+import '../../../../widget/app_shimmer.dart';
 
 /// Bottom-sheet PDF viewer, used for lesson notes. Renamed from the
 /// original private `_PdfViewerModal` to a public class so it can be
@@ -67,7 +68,14 @@ class _PdfViewerModalState extends State<PdfViewerModal> {
                     });
                   },
                 ),
-                if (_isLoading) const Center(child: CircularProgressIndicator(color: Color(0xFF87986B))),
+                // The page is a known-size sheet, so it greys out while the
+                // document loads instead of showing a spinner over blank.
+                if (_isLoading)
+                  const Positioned.fill(
+                    child: AppShimmer(
+                      child: ShimmerBox(width: double.infinity, height: double.infinity, radius: 0),
+                    ),
+                  ),
                 if (_hasError)
                   Center(
                     child: Column(

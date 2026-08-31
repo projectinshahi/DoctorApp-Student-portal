@@ -237,4 +237,83 @@ void main() {
       expect(rebuilds, 0);
     });
   });
+  group('saved bundle', () {
+    test('chips read counts, not list lengths', () {
+      // A filtered response still carries the full counts map. Binding a chip
+      // to a list length would make "Saved MCQs" read 0 while viewing videos.
+      final bundle = SavedBundle.fromJson({
+        'type': 'video',
+        'counts': {'all': 5, 'question': 3, 'video': 1, 'text': 0, 'quiz': 1, 'lesson': 2},
+        'questions': const [],
+        'lessons': [
+          {'id': 44, 'title': 'GYNACOLOGY', 'type': 'video', 'isSaved': true},
+        ],
+      });
+
+      expect(bundle.questions, isEmpty);
+      expect(bundle.countOf('question'), 3);
+      expect(bundle.countOf('all'), 5);
+      expect(bundle.countOf('note'), 0);
+    });
+
+    test('a saved lesson parses as a whole lesson, ready to open', () {
+      final bundle = SavedBundle.fromJson({
+        'counts': const {'lesson': 1},
+        'lessons': [
+          {
+            'id': 44,
+            'title': 'GYNACOLOGY',
+            'type': 'quiz',
+            'videoUrl': null,
+            'locked': false,
+            'isSaved': true,
+            'completed': true,
+            'lastPositionSeconds': 0,
+            'chapter': {'id': 17, 'title': 'Obstetrics And Gynecology'},
+            'attempt': {
+              'attemptId': 7,
+              'completed': true,
+              'totalQuestions': 2,
+              'answeredCount': 1,
+              'remainingCount': 1,
+              'correctCount': 0,
+              'score': -0.5,
+              'attemptCount': 1,
+            },
+          },
+        ],
+      });
+
+      final saved = bundle.lessons.single;
+      expect(saved.chapterTitle, 'Obstetrics And Gynecology');
+      expect(saved.lesson.isSaved, isTrue);
+      expect(saved.lesson.completed, isTrue);
+      // Negative marking is real; never absolute it.
+      expect(saved.lesson.attempt!.score, -0.5);
+    });
+
+    test('a locked lesson keeps its position and plans for the paywall', () {
+      final bundle = SavedBundle.fromJson({
+        'counts': const {'lesson': 1},
+        'lessons': [
+          {
+            'id': 9,
+            'title': 'Premium',
+            'type': 'video',
+            'videoUrl': null,
+            'locked': true,
+            'lastPositionSeconds': 212,
+            'plans': [
+              {'id': 3, 'title': 'Gold', 'price': 999, 'durationDays': 30},
+            ],
+          },
+        ],
+      });
+
+      final lesson = bundle.lessons.single.lesson;
+      expect(lesson.locked, isTrue);
+      expect(lesson.lastPositionSeconds, 212);
+      expect(lesson.plans, hasLength(1));
+    });
+  });
 }

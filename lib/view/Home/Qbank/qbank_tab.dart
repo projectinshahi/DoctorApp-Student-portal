@@ -11,8 +11,9 @@ import '../../../repository/saved_provider.dart';
 import '../../../repository/selection_content_provider.dart';
 import 'continue_mcqs_screen.dart';
 import 'qbank_subjects_screen.dart';
-import 'saved_questions_screen.dart';
+import 'bookmarks_screen.dart';
 import '../../../widget/app_shimmer.dart';
+import '../../../core/utils/refresh_on_visible.dart';
 
 const Color _kPrimary = Color(0xFF87986B);
 const Color _kBg = Color(0xFFEFF4E2);
@@ -24,15 +25,13 @@ class QbankTab extends StatefulWidget {
   State<QbankTab> createState() => _QbankTabState();
 }
 
-class _QbankTabState extends State<QbankTab> {
+class _QbankTabState extends State<QbankTab> with RefreshOnVisible<QbankTab> {
   final TextEditingController _searchController = TextEditingController();
   String _query = '';
 
   @override
   void initState() {
     super.initState();
-
-    WidgetsBinding.instance.addPostFrameCallback((_) => _refresh());
 
     _searchController.addListener(
       () => setState(() => _query = _searchController.text.trim().toLowerCase()),
@@ -45,26 +44,20 @@ class _QbankTabState extends State<QbankTab> {
     super.dispose();
   }
 
-  /// Refetch on every entry, not just the first: attempts, scores and
-  /// bookmarks all change while the student is off in a quiz, and the tree is
-  /// what this screen renders them from. Silent — the shimmer only shows on a
-  /// cold load, so this swaps the data underneath rather than flashing.
-  void _refresh() {
+  /// Attempts, scores and bookmarks all change while the student is off in a
+  /// quiz, and the tree is what this screen renders them from.
+  @override
+  Future<void> onRefresh() async {
     if (!mounted) return;
-    final content = context.read<SelectionContentProvider>();
-    if (!content.isLoading) content.loadContent();
-    context.read<SavedProvider>().loadQuestions();
+    await context.read<SelectionContentProvider>().loadContent();
+    if (!mounted) return;
+    await context.read<SavedProvider>().loadAll();
   }
 
-  /// Every push from this screen goes through here so returning from one
-  /// refreshes. `initState` alone is not enough: popping back does not
-  /// re-create the state, so a quiz finished two screens down would leave
-  /// this one showing yesterday's numbers.
+  /// The route observer refetches when this screen comes back into view, so
+  /// this is a plain push.
   void _open(Widget screen) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => screen),
-    ).then((_) => _refresh());
+    Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
   }
 
   /// A topic only belongs in QBank if at least one of its lessons is a quiz.
@@ -117,7 +110,9 @@ class _QbankTabState extends State<QbankTab> {
       ),
       body: Consumer<SelectionContentProvider>(
         builder: (context, provider, _) {
-          if (provider.isLoading && provider.content == null) {
+          // Every fetch, not only the cold one — the screen just became
+          // visible, so stale rows are worse than a moment of shimmer.
+          if (provider.isLoading) {
             return const ScreenShimmer(layout: ShimmerLayout.rows);
           }
 
@@ -198,7 +193,7 @@ class _QbankTabState extends State<QbankTab> {
                           // carries `count`, so this needs no call of its own.
                           subtitle:
                               "${context.watch<SavedProvider>().questionCount} saved",
-                          onTap: () => _open(const SavedQuestionsScreen()),
+                          onTap: () => _open(const BookmarksScreen()),
                         ),
                       ),
                       SizedBox(width: 14.w),
@@ -322,13 +317,3 @@ class _ShortcutCard extends StatelessWidget {
 
 // Placeholder so home_screen.dart's `case 2` compiles until the real
 // Tests screen exists.
-class TestsTab extends StatelessWidget {
-  const TestsTab({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return const Scaffold(
-      body: Center(child: Text("Tests — coming soon")),
-    );
-  }
-}

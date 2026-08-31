@@ -14,8 +14,12 @@ class SelectionContentProvider extends ChangeNotifier {
   /// Refetches the whole tree. Callers can fire this on every screen entry:
   /// the shimmer only shows on a cold load, so a refresh over content that is
   /// already on screen swaps it silently instead of flashing.
-  Future<void> loadContent() async {
-    isLoading = content == null;
+  /// [silent] keeps the current tree on screen while it refetches — used for
+  /// background top-ups. The default shows the loading state, which is what a
+  /// screen becoming visible wants: the student is looking straight at it and
+  /// stale numbers are worse than a moment of shimmer.
+  Future<void> loadContent({bool silent = false}) async {
+    isLoading = silent ? content == null : true;
     errorMessage = null;
     sessionExpired = false;
     notifyListeners();

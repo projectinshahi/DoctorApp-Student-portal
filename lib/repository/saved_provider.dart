@@ -33,13 +33,67 @@ class SavedProvider extends ChangeNotifier {
 
   bool _loadedOnce = false;
 
-  /// Fetches both lists the first time something needs them. Called once the
+  /// The full counts map from the server: all, question, video, text, quiz,
+  /// lesson. The Bookmarks chips bind to this rather than to list lengths,
+  /// so filtering to videos does not make the MCQ chip read zero.
+  Map<String, int> counts = const {};
+
+  /// Fetches everything the first time something needs it. Called once the
   /// student is authenticated — not from main(), where these calls would go
   /// out before there is a token and come back 401.
   Future<void> ensureLoaded() async {
     if (_loadedOnce) return;
     _loadedOnce = true;
-    await Future.wait([loadQuestions(), loadLessons()]);
+    await loadAll();
+  }
+
+  /// One call for both lists and every count, replacing the two-request
+  /// version. Cheaper, and the counts come back consistent with each other
+  /// instead of from two responses taken a moment apart.
+  Future<void> loadAll() async {
+    isLoadingQuestions = true;
+    isLoadingLessons = true;
+    errorMessage = null;
+    notifyListeners();
+
+    try {
+      final bundle = await _service.fetchAll();
+
+      counts = bundle.counts;
+      questions = bundle.questions;
+      lessons = bundle.lessons;
+      questionCount = bundle.counts['question'] ?? bundle.questions.length;
+      lessonCount = bundle.counts['lesson'] ?? bundle.lessons.length;
+
+      _savedQuestionIds
+        ..clear()
+        ..addAll(bundle.questions.map((q) => q.questionId));
+      _savedLessonIds
+        ..clear()
+        ..addAll(bundle.lessons.map((l) => l.lessonId));
+    } on QuizException catch (e) {
+      errorMessage = e.message;
+    }
+
+    isLoadingQuestions = false;
+    isLoadingLessons = false;
+    notifyListeners();
+  }
+
+  int countOf(String type) => counts[type] ?? 0;
+
+  /// A fetch is in flight. `loadAll` sets both flags, so either one is enough
+  /// — screens should not have to know which list they are waiting on.
+  bool get isLoading => isLoadingQuestions || isLoadingLessons;
+
+  /// Seeds from `isSaved` on lessons the app already has, so a bookmark icon
+  /// is right on first paint instead of flickering once the saved list lands.
+  /// Ids only — never overwrites a toggle already in flight.
+  void seedLessons(Iterable<int> savedLessonIds) {
+    final incoming = savedLessonIds.toSet();
+    if (incoming.every(_savedLessonIds.contains)) return;
+    _savedLessonIds.addAll(incoming.where((id) => !_busyLessons.contains(id)));
+    notifyListeners();
   }
 
   bool isQuestionSaved(int questionId) => _savedQuestionIds.contains(questionId);

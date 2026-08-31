@@ -4,9 +4,13 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 
 import '../../../models/selection_content_model.dart';
+import '../../../repository/saved_provider.dart';
 import '../../../repository/selection_content_provider.dart';
 import '../../../widget/app_shimmer.dart';
 import '../lessons/student_lesson_detail_screen.dart';
+import '../../../core/utils/refresh_on_visible.dart';
+
+const Color _kPrimary = Color(0xFF87986B);
 
 class AiVideoTab extends StatefulWidget {
   const AiVideoTab({super.key});
@@ -15,7 +19,7 @@ class AiVideoTab extends StatefulWidget {
   State<AiVideoTab> createState() => _AiVideoTabState();
 }
 
-class _AiVideoTabState extends State<AiVideoTab> {
+class _AiVideoTabState extends State<AiVideoTab> with RefreshOnVisible<AiVideoTab> {
   static const Color kPrimary = Color(0xFF87986B);
   static const Color kBg = Color(0xFFEFF4E2);
 
@@ -29,14 +33,6 @@ class _AiVideoTabState extends State<AiVideoTab> {
   @override
   void initState() {
     super.initState();
-    // In case this screen is opened before the content has loaded
-    // elsewhere (e.g. deep link), make sure we have the data.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final provider = context.read<SelectionContentProvider>();
-      if (provider.content == null && !provider.isLoading) {
-        provider.loadContent();
-      }
-    });
 
     _searchController.addListener(() {
       setState(() => _searchQuery = _searchController.text.trim().toLowerCase());
@@ -47,6 +43,33 @@ class _AiVideoTabState extends State<AiVideoTab> {
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  /// Refetch on every entry, not just the first.
+  ///
+  /// Watch position and completion change while the student is inside a
+  /// lesson, and these rows render them from the tree. Silent: the shimmer
+  /// shows only on a cold load, so this swaps the data underneath.
+  @override
+  Future<void> onRefresh() async {
+    if (!mounted) return;
+    final provider = context.read<SelectionContentProvider>();
+    await provider.loadContent();
+    if (!mounted) return;
+
+    // Every lesson in the tree carries `isSaved`, so the bookmark icons can
+    // be right immediately instead of waiting on the saved-list call.
+    final saved = [
+      for (final chapter in provider.content?.chapters ?? const <StudentChapterModel>[])
+        for (final lesson in chapter.lessons)
+          if (lesson.isSaved) lesson.id,
+    ];
+    context.read<SavedProvider>().seedLessons(saved);
+  }
+
+  /// The route observer refetches when this screen comes back into view.
+  void _open(Widget screen) {
+    Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
   }
 
   List<StudentLessonModel> _visibleLessons(List<StudentChapterModel> chapters) {
@@ -92,7 +115,9 @@ class _AiVideoTabState extends State<AiVideoTab> {
       ),
       body: Consumer<SelectionContentProvider>(
         builder: (context, provider, _) {
-          if (provider.isLoading && provider.content == null) {
+          // Every fetch, not only the cold one — the screen just became
+          // visible, so stale rows are worse than a moment of shimmer.
+          if (provider.isLoading) {
             return const ScreenShimmer(layout: ShimmerLayout.rows);
           }
 
@@ -179,7 +204,7 @@ class _AiVideoTabState extends State<AiVideoTab> {
                     // lessons pill + the optional premium badge need ~140)
                     // and scaled on the opposite axis, so it burst in
                     // portrait and again, much harder, in landscape.
-                    height: 150.w,
+                    height: 164.w,
                     child: ListView.separated(
                       scrollDirection: Axis.horizontal,
                       itemCount: chapters.length,
@@ -250,7 +275,13 @@ class _AiVideoTabState extends State<AiVideoTab> {
                                         borderRadius: BorderRadius.circular(8.r),
                                       ),
                                       child: Text(
-                                        "${chapter.lessons.length} Lessons",
+                                        // Counts live in the pill that is
+                                        // already here. A separate "2 of 2"
+                                        // line underneath overflowed this
+                                        // card, and repeated the same number.
+                                        chapter.progress != null
+                                            ? "${chapter.progress!.completedLessons}/${chapter.progress!.totalLessons} Lessons"
+                                            : "${chapter.lessons.length} Lessons",
                                         style: TextStyle(
                                           fontSize: 9.5.sp,
                                           fontWeight: FontWeight.w600,
@@ -260,6 +291,16 @@ class _AiVideoTabState extends State<AiVideoTab> {
                                     ),
                                   ],
                                 ),
+                                // Absent progress is unknown, not zero — an
+                                // empty bar would claim the student has done
+                                // none of it, which is a different statement.
+                                if (chapter.progress != null) ...[
+                                  SizedBox(height: 6.h),
+                                  _ChapterProgress(
+                                    progress: chapter.progress!,
+                                    onDark: isSelected,
+                                  ),
+                                ],
                                 if (isPremiumChapter) ...[
                                   SizedBox(height: 4.h),
                                   Text(
@@ -339,17 +380,13 @@ class _AiVideoTabState extends State<AiVideoTab> {
                           // Locked lessons open too: the detail screen shows
                           // the plans paywall. A snackbar here used to swallow
                           // the tap, so a pro video had no way to sell itself.
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => StudentLessonDetailScreen(
-                                  lesson: lesson,
-                                  relatedLessons: lessons, // all currently-visible lessons become "related"
-                                ),
-                              ),
-                            );
-                          },
+                          onTap: () => _open(
+                            StudentLessonDetailScreen(
+                              lesson: lesson,
+                              // all currently-visible lessons become "related"
+                              relatedLessons: lessons,
+                            ),
+                          ),
                           child: Container(
                             width: double.infinity,
                             padding: EdgeInsets.all(10.w),
@@ -440,6 +477,7 @@ class _AiVideoTabState extends State<AiVideoTab> {
                                         ),
                                       ],
                                       SizedBox(height: 6.h),
+                                      _LessonProgressLine(lesson: lesson),
                                       Container(
                                         padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 3.h),
                                         decoration: BoxDecoration(
@@ -462,7 +500,32 @@ class _AiVideoTabState extends State<AiVideoTab> {
                                   ),
                                 ),
 
-                                Icon(Icons.bookmark_border_rounded, size: 18.sp, color: Colors.grey.shade400),
+                                // Was a bare Icon with no handler — it looked
+                                // tappable and did nothing.
+                                GestureDetector(
+                                  onTap: () => context
+                                      .read<SavedProvider>()
+                                      .toggleLesson(lesson.id),
+                                  // Padding, not a bigger icon: an 18sp glyph
+                                  // is well under the 48px minimum tap target.
+                                  behavior: HitTestBehavior.opaque,
+                                  child: Padding(
+                                    padding: EdgeInsets.all(8.w),
+                                    child: Icon(
+                                      context
+                                              .watch<SavedProvider>()
+                                              .isLessonSaved(lesson.id)
+                                          ? Icons.bookmark_rounded
+                                          : Icons.bookmark_border_rounded,
+                                      size: 18.sp,
+                                      color: context
+                                              .watch<SavedProvider>()
+                                              .isLessonSaved(lesson.id)
+                                          ? _kPrimary
+                                          : Colors.grey.shade400,
+                                    ),
+                                  ),
+                                ),
                               ],
                             ),
                           ),
@@ -478,5 +541,102 @@ class _AiVideoTabState extends State<AiVideoTab> {
         },
       ),
     );
+  }
+}
+
+
+/// Chapter progress: the server's own counts, drawn as a bar.
+///
+/// The denominator includes locked lessons on purpose. Filtering them out
+/// would show a free student a full bar on a chapter that is mostly premium,
+/// telling them they had finished it.
+class _ChapterProgress extends StatelessWidget {
+  final ProgressInfo progress;
+
+  /// The selected chapter card is filled with the primary colour, so the bar
+  /// has to invert or it disappears into it.
+  final bool onDark;
+
+  const _ChapterProgress({required this.progress, required this.onDark});
+
+  @override
+  Widget build(BuildContext context) {
+    final track = onDark ? Colors.white.withValues(alpha: 0.25) : Colors.grey.shade200;
+    final fill = onDark ? Colors.white : _kPrimary;
+
+    // Bar only. The card is a fixed square and every extra line of text in it
+    // is an overflow waiting to happen; the numbers are in the lessons pill.
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(6.r),
+      child: LinearProgressIndicator(
+        value: progress.percent / 100,
+        minHeight: 4.h,
+        backgroundColor: track,
+        valueColor: AlwaysStoppedAnimation<Color>(fill),
+      ),
+    );
+  }
+}
+
+/// Per-lesson line: done, or where to pick up.
+///
+/// There is no percentage here on purpose — the server sends a position in
+/// seconds but not the video's duration, so a percentage would have to be
+/// invented. The timestamp is the honest version of the same information.
+class _LessonProgressLine extends StatelessWidget {
+  final StudentLessonModel lesson;
+
+  const _LessonProgressLine({required this.lesson});
+
+  static String _clock(int seconds) {
+    final minutes = seconds ~/ 60;
+    final remainder = (seconds % 60).toString().padLeft(2, '0');
+    if (minutes < 60) return '$minutes:$remainder';
+    return '${minutes ~/ 60}:${(minutes % 60).toString().padLeft(2, '0')}:$remainder';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // `completed` covers videos and quizzes alike — the server decides, and
+    // this must not re-derive it from the lesson type.
+    if (lesson.completed) {
+      return Padding(
+        padding: EdgeInsets.only(bottom: 6.h),
+        child: Row(
+          children: [
+            Icon(Icons.check_circle_rounded, size: 12.sp, color: _kPrimary),
+            SizedBox(width: 4.w),
+            Text(
+              "Completed",
+              style: TextStyle(fontSize: 10.sp, fontWeight: FontWeight.w600, color: _kPrimary),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Kept even when the lesson is locked: the lock strips videoUrl but not
+    // the position, so someone who resubscribes still sees their place.
+    if (lesson.lastPositionSeconds > 0) {
+      return Padding(
+        padding: EdgeInsets.only(bottom: 6.h),
+        child: Row(
+          children: [
+            Icon(Icons.history_rounded, size: 12.sp, color: Colors.orange.shade700),
+            SizedBox(width: 4.w),
+            Text(
+              "Resume at ${_clock(lesson.lastPositionSeconds)}",
+              style: TextStyle(
+                fontSize: 10.sp,
+                fontWeight: FontWeight.w600,
+                color: Colors.orange.shade700,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return const SizedBox.shrink();
   }
 }

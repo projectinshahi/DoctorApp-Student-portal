@@ -12,6 +12,7 @@ import 'package:dr_app/widget/screenshot_guard.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
+import 'core/utils/refresh_on_visible.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -44,6 +45,9 @@ class MyApp extends StatelessWidget {
           splitScreenMode: true,
         builder: (context, child){
           return MaterialApp(
+            // Screens mix in RefreshOnVisible to refetch when they appear.
+            // Without this line that mixin is silently inert.
+            navigatorObservers: [routeObserver],
               title: "Dr. SKM's Academy",
               debugShowCheckedModeBanner: false,
               // Wrapped here, not per screen: `builder` sits above the

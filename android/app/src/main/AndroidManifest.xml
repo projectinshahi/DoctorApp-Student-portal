@@ -1,5 +1,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Lets the app be told a screen recording started, so it can cover its
+         content. Normal permission: granted at install, no runtime prompt.
+         Android 15+ only; older versions ignore it. -->
+    <uses-permission android:name="android.permission.DETECT_SCREEN_RECORDING"/>
     <application
         android:label="Dr. SKM&apos;s Academy"
         android:name="${applicationName}"

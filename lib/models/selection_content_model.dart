@@ -20,11 +20,15 @@ class SelectionContentModel {
   final bool hasPaid;
   final List<StudentChapterModel> chapters;
 
+  /// Whole-course progress, same shape as a chapter's.
+  final ProgressInfo? progress;
+
   SelectionContentModel({
     this.course,
     this.courseType,
     this.hasPaid = false,
     required this.chapters,
+    this.progress,
   });
 
   static List<dynamic> _readChapterList(Map<String, dynamic> json) {
@@ -49,6 +53,7 @@ class SelectionContentModel {
       courseType: json['courseType'] != null ? SelectedCourseTypeInfo.fromJson(json['courseType']) : null,
       hasPaid: json['hasPaid'] ?? false,
       chapters: chapters.map((c) => StudentChapterModel.fromJson(c)).toList(),
+      progress: ProgressInfo.maybeFrom(json['progress']),
     );
   }
 
@@ -57,6 +62,22 @@ class SelectionContentModel {
   /// Every lesson in the tree, chapter order preserved.
   List<StudentLessonModel> get allLessons =>
       [for (final chapter in chapters) ...chapter.lessons];
+
+  /// Chapters finished, for the home screen's counter.
+  ///
+  /// A module is a chapter, so this is NOT the course-level `progress` block —
+  /// that one counts lessons ("4 of 6"), and printing it as modules would
+  /// claim four chapters were done when there are only three.
+  ///
+  /// `percent` is capped at 99 by the server until a chapter is genuinely
+  /// finished, so `isComplete` needs no other check.
+  int get completedModules =>
+      chapters.where((chapter) => chapter.progress?.isComplete == true).length;
+
+  /// Chapters the server reported progress for. A chapter with no progress
+  /// block is unknown rather than unfinished, so it counts in neither.
+  int get totalModules =>
+      chapters.where((chapter) => chapter.progress != null).length;
 }
 
 class SelectedCourseInfo {
@@ -113,11 +134,17 @@ class StudentChapterModel {
   final int displayOrder;
   final List<StudentLessonModel> lessons;
 
+  /// How far through this chapter the student is. Null when the server did
+  /// not send it — which is not the same as zero, so callers must not print
+  /// "0%" for an absent block.
+  final ProgressInfo? progress;
+
   StudentChapterModel({
     required this.id,
     required this.title,
     required this.displayOrder,
     required this.lessons,
+    this.progress,
   });
 
   factory StudentChapterModel.fromJson(Map<String, dynamic> json) {
@@ -129,6 +156,7 @@ class StudentChapterModel {
       title: json['title'] ?? '',
       displayOrder: json['displayOrder'] ?? json['display_order'] ?? 0,
       lessons: lessons.map((l) => StudentLessonModel.fromJson(l)).toList(),
+      progress: ProgressInfo.maybeFrom(json['progress']),
     );
   }
 
@@ -172,6 +200,28 @@ class StudentLessonModel {
   /// everywhere, not just on video lessons.
   final LessonAttemptInfo? attempt;
 
+  /// Where this student stopped watching, in seconds. 0 means "never played",
+  /// which is also what a lesson with no video reports.
+  ///
+  /// This SURVIVES the lock strip: a locked lesson comes back with
+  /// `videoUrl: null` but keeps its position, so someone who lets a
+  /// subscription lapse and renews has not lost their place. Never read
+  /// `locked: true` as "no progress".
+  final int lastPositionSeconds;
+
+  /// Whether this lesson is bookmarked, sent on every lesson everywhere —
+  /// the tree, a single lesson, the saved list. Read this instead of
+  /// searching the saved list for the id.
+  final bool isSaved;
+
+  /// Server's verdict on whether this lesson is done — for a video because
+  /// the player said so, for a quiz because an attempt was submitted.
+  ///
+  /// One flag for both. Do not branch on `type` to work it out; the server
+  /// has already decided, and re-deriving it here is how the two answers
+  /// drift apart.
+  final bool completed;
+
   StudentLessonModel({
     required this.id,
     required this.title,
@@ -192,6 +242,9 @@ class StudentLessonModel {
     this.plans = const [],
     this.planIds = const [],
     this.attempt,
+    this.lastPositionSeconds = 0,
+    this.isSaved = false,
+    this.completed = false,
   });
 
   static List<RequiredPlanModel> _readPlans(dynamic raw) {
@@ -247,6 +300,11 @@ class StudentLessonModel {
       attempt: json['attempt'] is Map
           ? LessonAttemptInfo.fromJson(Map<String, dynamic>.from(json['attempt'] as Map))
           : null,
+      lastPositionSeconds: _toInt(
+        json['lastPositionSeconds'] ?? json['last_position_seconds'],
+      ),
+      completed: json['completed'] == true,
+      isSaved: json['isSaved'] == true,
     );
   }
 
@@ -313,4 +371,57 @@ class LessonAttemptInfo {
       attemptCount: toInt(json['attemptCount']),
     );
   }
+}
+
+/// A completed/total pair with the server's own percentage, used for both a
+/// chapter and the whole course.
+class ProgressInfo {
+  final int completedLessons;
+
+  /// Every lesson that counts toward completion — **locked ones included**.
+  ///
+  /// Dropping locked lessons from the denominator would show a free student
+  /// "2 of 2, 100%" on a chapter where eight premium lessons remain, which
+  /// reads as "you have finished this" rather than "you have finished what
+  /// you can reach".
+  final int totalLessons;
+
+  /// The server's percentage, which deliberately caps at 99 until the last
+  /// lesson is genuinely done. That makes `percent == 100` safe to use on
+  /// its own as a "complete" badge.
+  final int percent;
+
+  const ProgressInfo({
+    required this.completedLessons,
+    required this.totalLessons,
+    required this.percent,
+  });
+
+  /// Null when the block is absent — an unsent progress object is unknown,
+  /// not zero, and rendering "0%" for it would be a lie.
+  static ProgressInfo? maybeFrom(dynamic raw) {
+    if (raw is! Map) return null;
+    final json = Map<String, dynamic>.from(raw);
+
+    final total = _toInt(json['totalLessons'] ?? json['total']);
+    final completed = _toInt(json['completedLessons'] ?? json['completed']);
+
+    return ProgressInfo(
+      completedLessons: completed,
+      totalLessons: total,
+      // Computed only as a fallback: an empty chapter is 0%, never a divide
+      // by zero, and never 100% for having nothing in it.
+      percent: json['percent'] != null
+          ? _toInt(json['percent'])
+          : (total == 0 ? 0 : ((completed * 100) ~/ total).clamp(0, 100)),
+    );
+  }
+
+  bool get isComplete => percent >= 100;
+}
+
+int _toInt(dynamic value) {
+  if (value is int) return value;
+  if (value is num) return value.toInt();
+  return int.tryParse('${value ?? ''}') ?? 0;
 }

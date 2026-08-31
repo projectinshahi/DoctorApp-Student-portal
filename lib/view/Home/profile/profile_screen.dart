@@ -12,6 +12,8 @@ import '../../../repository/profile_provider.dart';
 import '../../../repository/refresh_api_provider.dart';
 import '../../../widget/profile_shimmer.dart';
 import '../../Authendication/login/login_screen.dart';
+import '../Qbank/bookmarks_screen.dart';
+import '../../../core/utils/refresh_on_visible.dart';
 
 
 class ProfileScreen extends StatefulWidget {
@@ -21,7 +23,7 @@ class ProfileScreen extends StatefulWidget {
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen> {
+class _ProfileScreenState extends State<ProfileScreen> with RefreshOnVisible<ProfileScreen> {
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
   bool _fieldsInitialized = false;
@@ -29,10 +31,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      await context.read<ProfileProvider>().loadProfile();
-      _syncControllersFromProfile();
-    });
+    // The refresh itself is the mixin's job; this only exists because the
+    // edit fields have to be re-seeded from whatever came back.
+  }
+
+  @override
+  Future<void> onRefresh() async {
+    await context.read<ProfileProvider>().loadProfile();
+    if (!mounted) return;
+    _syncControllersFromProfile();
   }
 
   void _syncControllersFromProfile() {
@@ -213,7 +220,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       body: SafeArea(
         child: Consumer<ProfileProvider>(
           builder: (context, provider, child) {
-            if (provider.isLoading && provider.profile == null) {
+            if (provider.isLoading) {
               return const ProfileShimmer();
             }
 
@@ -444,7 +451,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                     child: Column(
                       children: [
-                        _ProfileMenuItem(label: "Bookmarks", onTap: () {}),
+                        _ProfileMenuItem(
+                          label: "Bookmarks",
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const BookmarksScreen()),
+                          ),
+                        ),
                         _menuDivider(),
                         _ProfileMenuItem(label: "Learn more", onTap: () {}),
                         _menuDivider(),

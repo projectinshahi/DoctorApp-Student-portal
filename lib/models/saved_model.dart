@@ -19,6 +19,7 @@
 // the first unrevealed bookmark.
 
 import 'quiz_model.dart' show QuizOptionModel;
+import 'selection_content_model.dart' show StudentLessonModel;
 
 double _toDouble(dynamic v) {
   if (v == null) return 0;
@@ -133,38 +134,82 @@ class SavedLessonsResponse {
     final raw = (json['lessons'] ?? json['savedLessons'] ?? json['items']) as List?;
     final items = (raw ?? const [])
         .whereType<Map>()
-        .map((l) => SavedLesson.fromJson(Map<String, dynamic>.from(l)))
+        .map((e) => SavedLesson.fromJson(Map<String, dynamic>.from(e)))
         .toList();
-
     return SavedLessonsResponse(
-      count: json['count'] == null ? items.length : _toInt(json['count']),
+      count: json['count'] is int ? json['count'] as int : items.length,
       lessons: items,
     );
   }
 }
 
+/// One bookmarked lesson.
+///
+/// The row the server sends IS a lesson — id, type, videoUrl, locked, plans,
+/// attempt, lastPositionSeconds and all — so it is parsed with the same model
+/// the content tree uses. That keeps one parser for one shape, and means a
+/// bookmark can open the lesson screen with nothing missing.
 class SavedLesson {
-  final int lessonId;
-  final String title;
-  final String? type;
-  final String? thumbnailUrl;
+  final StudentLessonModel lesson;
+
+  /// Shown as the card's subtitle. Only the saved list carries it; the tree
+  /// nests lessons under their chapter instead.
+  final String? chapterTitle;
+
   final DateTime? savedAt;
 
-  SavedLesson({
-    required this.lessonId,
-    required this.title,
-    this.type,
-    this.thumbnailUrl,
-    this.savedAt,
-  });
+  SavedLesson({required this.lesson, this.chapterTitle, this.savedAt});
 
   factory SavedLesson.fromJson(Map<String, dynamic> json) {
+    final chapter = json['chapter'];
     return SavedLesson(
-      lessonId: _toInt(json['lessonId'] ?? json['id']),
-      title: json['title']?.toString() ?? json['lessonTitle']?.toString() ?? '',
-      type: json['type']?.toString(),
-      thumbnailUrl: json['thumbnailUrl']?.toString(),
+      lesson: StudentLessonModel.fromJson(json),
+      chapterTitle: chapter is Map ? chapter['title']?.toString() : null,
       savedAt: _toDate(json['savedAt']),
     );
   }
+
+  int get lessonId => lesson.id;
+  String get title => lesson.title;
+  String get type => lesson.type;
+}
+
+/// Everything `GET /users/me/saved?type=…` returns in one call.
+class SavedBundle {
+  /// Always the FULL set of counts, whatever `type` was asked for. The filter
+  /// chips bind to this, never to a list's length — filtering to videos must
+  /// not make the MCQ chip read zero.
+  final Map<String, int> counts;
+
+  final List<SavedQuestion> questions;
+  final List<SavedLesson> lessons;
+
+  const SavedBundle({
+    required this.counts,
+    required this.questions,
+    required this.lessons,
+  });
+
+  static const empty = SavedBundle(counts: {}, questions: [], lessons: []);
+
+  factory SavedBundle.fromJson(Map<String, dynamic> json) {
+    final rawCounts = json['counts'];
+    return SavedBundle(
+      counts: rawCounts is Map
+          ? {
+              for (final entry in rawCounts.entries)
+                entry.key.toString(): _toInt(entry.value),
+            }
+          : const {},
+      questions: SavedQuestionsResponse.fromJson(json).questions,
+      lessons: SavedLessonsResponse.fromJson(json).lessons,
+    );
+  }
+
+  int countOf(String type) => counts[type] ?? 0;
+
+  /// Lessons of one type. `note` is not a server filter — notes are `text` —
+  /// so the split happens here rather than in a second request.
+  List<SavedLesson> lessonsOfType(String type) =>
+      lessons.where((saved) => saved.type == type).toList();
 }

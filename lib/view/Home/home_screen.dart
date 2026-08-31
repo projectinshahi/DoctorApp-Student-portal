@@ -7,10 +7,13 @@ import '../../../models/selection_content_model.dart';
 import '../../../repository/selection_content_provider.dart';
 import '../../repository/profile_provider.dart';
 import '../../repository/saved_provider.dart';
+import 'Qbank/bookmarks_screen.dart';
 import 'Qbank/qbank_tab.dart';
+import 'tests/tests_tab.dart';
 import 'dashbord/ai_video_tab.dart';
 import 'lessons/student_lesson_detail_screen.dart';
 import '../../widget/app_shimmer.dart';
+import '../../core/utils/refresh_on_visible.dart';
 
 // If you still keep a separate "AI Videos list" screen, import it too.
 // import 'ai_videos_screen.dart';
@@ -22,7 +25,7 @@ class Homescreen extends StatefulWidget {
   State<Homescreen> createState() => _HomescreenState();
 }
 
-class _HomescreenState extends State<Homescreen> {
+class _HomescreenState extends State<Homescreen> with RefreshOnVisible<Homescreen> {
   int _currentNavIndex = 0;
 
   static const Color kPrimary = Color(0xFF87986B);
@@ -90,22 +93,38 @@ class _HomescreenState extends State<Homescreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<SelectionContentProvider>().loadContent();
-      // Load the logged-in user's profile so the header can show their name.
-      context.read<ProfileProvider>().loadProfile();
+  }
+
+  /// Everything the home screen renders. Runs on first appearance and again
+  /// each time a tab is closed and this screen comes back into view.
+  @override
+  Future<void> onRefresh() async {
+    if (!mounted) return;
+    await Future.wait([
+      context.read<SelectionContentProvider>().loadContent(),
+      // The header's name.
+      context.read<ProfileProvider>().loadProfile(),
       // Bookmarks: the QBank badge and every bookmark icon read from here.
-      context.read<SavedProvider>().ensureLoaded();
-    });
+      context.read<SavedProvider>().loadAll(),
+    ]);
   }
 
   @override
   Widget build(BuildContext context) {
+    // The whole page, not a section of it. Half a home screen with a live
+    // header over a shimmering body reads as broken rather than loading.
+    // The nav bar stays put so the tabs are still reachable.
+    final loading = context.watch<SelectionContentProvider>().isLoading ||
+        context.watch<ProfileProvider>().isLoading;
+
     return Scaffold(
       extendBody: true,
       backgroundColor: kBg,
       body: Column(
         children: [
+          if (loading)
+            const Expanded(child: _HomeShimmer())
+          else
           Expanded(
             child: SingleChildScrollView(
               padding: EdgeInsets.only(bottom: 100.h),
@@ -205,7 +224,13 @@ class _HomescreenState extends State<Homescreen> {
                             ),
 
                             SizedBox(width: 10.w),
-                            _HeaderIconButton(icon: Icons.bookmark_border_rounded),
+                            _HeaderIconButton(
+                              icon: Icons.bookmark_border_rounded,
+                              onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (_) => const BookmarksScreen()),
+                              ),
+                            ),
                             SizedBox(width: 10.w),
                             _HeaderIconButton(icon: Icons.notifications_none_rounded),
                           ],
@@ -309,8 +334,10 @@ class _HomescreenState extends State<Homescreen> {
                                           ],
                                         ),
                                         Divider(color: Colors.white, thickness: 1),
+                                        // Chapters at 100%, from the server's
+                                        // own per-chapter progress.
                                         Text(
-                                          "0 Modules completed",
+                                          "${context.watch<SelectionContentProvider>().content?.completedModules ?? 0} Modules completed",
                                           style: TextStyle(
                                             fontSize: 15.sp,
                                             fontWeight: FontWeight.w700,
@@ -639,15 +666,23 @@ class _HomescreenState extends State<Homescreen> {
 // ── Header icon button (bookmark / bell) ──
 class _HeaderIconButton extends StatelessWidget {
   final IconData icon;
-  const _HeaderIconButton({required this.icon});
+
+  /// Null leaves the button inert — which is what the notifications one still
+  /// is, since there is no notifications screen to open yet.
+  final VoidCallback? onTap;
+
+  const _HeaderIconButton({required this.icon, this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 40.w,
-      height: 40.w,
-      decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-      child: Icon(icon, size: 20.sp, color: const Color(0xFF87986B)),
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 40.w,
+        height: 40.w,
+        decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+        child: Icon(icon, size: 20.sp, color: const Color(0xFF87986B)),
+      ),
     );
   }
 }
@@ -834,6 +869,112 @@ class _NavItem extends StatelessWidget {
               fontSize: 18.sp,
               fontWeight: isSelected ? FontWeight.w700 : FontWeight.w400,
               color: isSelected ? Colors.white : Colors.white.withOpacity(0.55),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Skeleton of the home screen, block for block.
+///
+/// A generic list shimmer settles into a visibly different page, which reads
+/// as the layout jumping rather than as content arriving. So this mirrors the
+/// real thing: the green header with its rounded bottom and search bar, the
+/// welcome card, the MCQ card, then the lesson grid — at the same sizes the
+/// live widgets use.
+class _HomeShimmer extends StatelessWidget {
+  const _HomeShimmer();
+
+  static const _kPrimary = Color(0xFF87986B);
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      // Not scrollable while loading: the skeleton is the whole page.
+      physics: const NeverScrollableScrollPhysics(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ── Header. Keeps its real colour so the page does not flash from
+          // grey to green when the data lands. ──
+          Container(
+            width: double.infinity,
+            height: 250.h,
+            padding: EdgeInsets.fromLTRB(20.w, 16.h, 20.w, 24.h),
+            decoration: BoxDecoration(
+              color: _kPrimary,
+              borderRadius: BorderRadius.vertical(bottom: Radius.circular(35.r)),
+            ),
+            child: SafeArea(
+              bottom: false,
+              child: AppShimmer(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        ShimmerBox(width: 44.w, height: 44.w, radius: 22.r),
+                        SizedBox(width: 12.w),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            ShimmerBox(width: 70.w, height: 12.h, radius: 6.r),
+                            SizedBox(height: 8.h),
+                            ShimmerBox(width: 130.w, height: 14.h, radius: 6.r),
+                          ],
+                        ),
+                        const Spacer(),
+                        ShimmerBox(width: 40.w, height: 40.w, radius: 20.r),
+                        SizedBox(width: 10.w),
+                        ShimmerBox(width: 40.w, height: 40.w, radius: 20.r),
+                      ],
+                    ),
+                    SizedBox(height: 28.h),
+                    ShimmerBox(width: double.infinity, height: 48.h, radius: 24.r),
+                  ],
+                ),
+              ),
+            ),
+          ),
+
+          Padding(
+            padding: EdgeInsets.fromLTRB(20.w, 44.h, 20.w, 0),
+            child: AppShimmer(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Welcome card — same 165.h the live one uses.
+                  ShimmerBox(width: double.infinity, height: 165.h, radius: 18.r),
+                  SizedBox(height: 26.h),
+
+                  // "Continue MCQs" heading, then its card.
+                  ShimmerBox(width: 130.w, height: 15.h, radius: 6.r),
+                  SizedBox(height: 12.h),
+                  ShimmerBox(width: double.infinity, height: 190.h, radius: 18.r),
+                  SizedBox(height: 28.h),
+
+                  // Lesson grid heading and two rows of cards.
+                  ShimmerBox(width: 160.w, height: 15.h, radius: 6.r),
+                  SizedBox(height: 12.h),
+                  Row(
+                    children: [
+                      Expanded(child: ShimmerBox(width: double.infinity, height: 120.h, radius: 14.r)),
+                      SizedBox(width: 12.w),
+                      Expanded(child: ShimmerBox(width: double.infinity, height: 120.h, radius: 14.r)),
+                    ],
+                  ),
+                  SizedBox(height: 12.h),
+                  Row(
+                    children: [
+                      Expanded(child: ShimmerBox(width: double.infinity, height: 120.h, radius: 14.r)),
+                      SizedBox(width: 12.w),
+                      Expanded(child: ShimmerBox(width: double.infinity, height: 120.h, radius: 14.r)),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
         ],

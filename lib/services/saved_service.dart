@@ -14,6 +14,15 @@ class SavedService {
   static String get _questionsUrl => '${ApiConstant.baseUrl}/users/me/saved-questions';
   static String get _lessonsUrl => '${ApiConstant.baseUrl}/users/me/saved-lessons';
 
+  static String get _allUrl => '${ApiConstant.baseUrl}/users/me/saved';
+
+  /// Everything in one call, with the full `counts` set attached.
+  ///
+  /// `type` accepts all | question | video | text | quiz. NOT `note` — notes
+  /// are stored as `text`, and asking for `note` is a 400, not an empty list.
+  Future<SavedBundle> fetchAll({String type = 'all'}) async =>
+      SavedBundle.fromJson(await _send('GET', '$_allUrl?type=$type'));
+
   Future<SavedQuestionsResponse> fetchQuestions() async =>
       SavedQuestionsResponse.fromJson(await _send('GET', _questionsUrl));
 

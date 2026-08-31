@@ -7,6 +7,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:no_screenshot/no_screenshot.dart';
 import 'package:no_screenshot/screenshot_snapshot.dart';
@@ -51,8 +52,19 @@ class _ScreenshotGuardState extends State<ScreenshotGuard>
   final _noScreenshot = NoScreenshot.instance;
 
   StreamSubscription<ScreenshotSnapshot>? _events;
+  StreamSubscription<dynamic>? _recordingEvents;
   Timer? _hideTimer;
   bool _showWarning = false;
+
+  /// True while the screen is being recorded or mirrored. Unlike the
+  /// screenshot warning this is not a 2.5s flash — it stays up for as long as
+  /// the recording runs, because the danger is ongoing rather than a moment.
+  bool _isRecording = false;
+
+  /// Screen-recording state from the platform. Android 15+ reports it via
+  /// WindowManager; iOS via UIScreen.isCaptured. Older Androids send nothing,
+  /// so the stream simply stays quiet there.
+  static const _recordingChannel = EventChannel('dr_app/screen_recording');
 
   @override
   void initState() {
@@ -69,6 +81,16 @@ class _ScreenshotGuardState extends State<ScreenshotGuard>
     _events ??= _noScreenshot.screenshotStream.listen((snapshot) {
       if (snapshot.wasScreenshotTaken) _flashWarning();
     });
+
+    _recordingEvents ??= _recordingChannel.receiveBroadcastStream().listen(
+      (event) {
+        if (!mounted) return;
+        setState(() => _isRecording = event == true);
+      },
+      // A platform with no such signal is not an error worth surfacing — the
+      // recording is still blank, there is just no message.
+      onError: (_) {},
+    );
   }
 
   @override
@@ -94,6 +116,7 @@ class _ScreenshotGuardState extends State<ScreenshotGuard>
     WidgetsBinding.instance.removeObserver(this);
     _hideTimer?.cancel();
     _events?.cancel();
+    _recordingEvents?.cancel();
     _noScreenshot.stopScreenshotListening();
     super.dispose();
   }
@@ -103,6 +126,21 @@ class _ScreenshotGuardState extends State<ScreenshotGuard>
     return Stack(
       children: [
         widget.child,
+        // While a recording runs, cover the app entirely. On Android the
+        // captured frames are already blank, but the person holding the phone
+        // can still be filming the screen with a second device — and on iOS,
+        // where there is no FLAG_SECURE, this cover IS the protection.
+        if (_isRecording)
+          Positioned.fill(
+            child: Material(
+              color: Colors.black,
+              child: _WarningBanner(
+                message: 'Screen recording detected.\n'
+                    'This content is protected and has been hidden.',
+              ),
+            ),
+          ),
+
         // IgnorePointer so the warning never eats a tap meant for the app.
         IgnorePointer(
           child: AnimatedOpacity(
