@@ -13,6 +13,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 import 'core/utils/refresh_on_visible.dart';
+import 'widget/integrity_gate.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -54,7 +55,10 @@ class MyApp extends StatelessWidget {
               // Navigator, so every route — dialogs, the video player and the
               // quiz included — is blocked by this one switch.
               builder: (context, child) => ScreenshotGuard(child: child!),
-              home: AuthGate()
+              // Before AuthGate on purpose: a compromised device must not
+              // reach a sign-in form, because the credentials it collects are
+              // the next thing to be read out of memory.
+              home: const IntegrityGate(child: AuthGate())
           );
         }
 

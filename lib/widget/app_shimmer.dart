@@ -8,7 +8,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:shimmer/shimmer.dart';
 
-import '../core/theam /app_color.dart';
 
 /// Which page skeleton to draw. Each one mirrors the real screen's layout so
 /// nothing jumps when the content lands.

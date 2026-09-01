@@ -7,6 +7,9 @@ import '../models/quiz_model.dart' show QuizException, QuizErrorKind;
 import '../models/test_model.dart';
 import '../services/test_service.dart';
 
+/// How a question looks in the navigator grid.
+enum QuestionState { answered, marked, unanswered }
+
 /// One instance per open test paper — created by the attempt screen, never
 /// registered globally.
 ///
@@ -27,6 +30,11 @@ class TestProvider extends ChangeNotifier {
 
   /// The question whose write is in flight, so only its card shows a spinner.
   int? busyQuestionId;
+
+  /// Questions starred to come back to. Deliberately local: there is no
+  /// endpoint for it, and it means nothing once the paper is submitted — it
+  /// is a note to self for the next 30 minutes, not a bookmark.
+  final Set<int> markedForReview = {};
 
   int currentIndex = 0;
   bool isSubmitting = false;
@@ -65,6 +73,24 @@ class TestProvider extends ChangeNotifier {
   String? selectedOption(int questionId) => answers[questionId];
   bool isBusy(int questionId) => busyQuestionId == questionId;
 
+  bool isMarked(int questionId) => markedForReview.contains(questionId);
+
+  void toggleMark(int questionId) {
+    if (!markedForReview.remove(questionId)) markedForReview.add(questionId);
+    notifyListeners();
+  }
+
+  int get markedCount => markedForReview.length;
+
+  /// What the palette paints each numbered box.
+  QuestionState stateAt(int index) {
+    if (index < 0 || index >= questions.length) return QuestionState.unanswered;
+    final id = questions[index].id;
+    if (answers.containsKey(id)) return QuestionState.answered;
+    if (markedForReview.contains(id)) return QuestionState.marked;
+    return QuestionState.unanswered;
+  }
+
   /// mm:ss, or h:mm:ss for a paper longer than an hour.
   String get formattedTime {
     final seconds = secondsRemaining < 0 ? 0 : secondsRemaining;
@@ -88,6 +114,7 @@ class TestProvider extends ChangeNotifier {
       answers
         ..clear()
         ..addAll(started.answered);
+      markedForReview.clear();
 
       // The server's remaining time, NOT durationMinutes. A resumed paper has
       // less time left, and reading the duration would hand out a fresh clock

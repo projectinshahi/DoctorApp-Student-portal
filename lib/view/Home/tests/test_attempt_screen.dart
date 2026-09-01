@@ -10,6 +10,7 @@ import '../../../models/quiz_model.dart' show QuizErrorKind;
 import '../../../models/test_model.dart';
 import '../../../repository/test_provider.dart';
 import '../../../widget/app_shimmer.dart';
+import 'test_question_palette.dart';
 import 'test_result_screen.dart';
 
 const Color _kPrimary = Color(0xFF87986B);
@@ -113,6 +114,23 @@ class _AttemptViewState extends State<_AttemptView> {
     if (confirmed != true || !context.mounted) return;
 
     await _finish(context, provider);
+  }
+
+  /// The navigator, over the paper. It shares this screen's provider, so the
+  /// grid is live: answering a question recolours its box.
+  void _openPalette(BuildContext context, TestProvider provider) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => ChangeNotifierProvider<TestProvider>.value(
+          value: provider,
+          child: TestQuestionPalette(
+            onSubmit: () => _submit(context, provider),
+          ),
+        ),
+      ),
+    );
   }
 
   /// Submits and shows the sheet. Shared by the button and by the clock
@@ -232,7 +250,11 @@ class _AttemptViewState extends State<_AttemptView> {
               ],
             ),
           ),
-        _Footer(provider: provider, onSubmit: () => _submit(context, provider)),
+        _Footer(
+          provider: provider,
+          onSubmit: () => _submit(context, provider),
+          onOpenPalette: () => _openPalette(context, provider),
+        ),
       ],
     );
   }
@@ -381,9 +403,19 @@ class _Image extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(12.r),
-      child: Image.network(
+    return GestureDetector(
+      // The answer often lives in a detail — an ECG lead, one cell on a slide
+      // — that is unreadable at column width. Tapping opens it full screen.
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(
+          fullscreenDialog: true,
+          builder: (_) => _FullScreenImage(url: url),
+        ),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12.r),
+        child: Image.network(
         url,
         fit: BoxFit.contain,
         loadingBuilder: (context, child, progress) => progress == null
@@ -398,6 +430,47 @@ class _Image extends StatelessWidget {
           child: Text('Image unavailable',
               style: TextStyle(fontSize: 11.sp, color: Colors.grey.shade600)),
         ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The question image on its own, on black, pinch to zoom.
+class _FullScreenImage extends StatelessWidget {
+  final String url;
+
+  const _FullScreenImage({required this.url});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: Stack(
+        children: [
+          Positioned.fill(
+            child: InteractiveViewer(
+              minScale: 1,
+              maxScale: 5,
+              child: Center(
+                child: Image.network(
+                  url,
+                  fit: BoxFit.contain,
+                  errorBuilder: (context, _, __) => Text('Image unavailable',
+                      style: TextStyle(fontSize: 13.sp, color: Colors.white70)),
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            top: MediaQuery.of(context).padding.top + 8.h,
+            right: 8.w,
+            child: IconButton(
+              onPressed: () => Navigator.maybePop(context),
+              icon: Icon(Icons.close_rounded, size: 28.sp, color: Colors.white),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -480,42 +553,59 @@ class _OptionTile extends StatelessWidget {
   }
 }
 
+/// The bar from the paper: navigator, star, and one forward button.
+///
+/// Previous/Next are gone on purpose — at 40 questions, walking the paper two
+/// taps at a time is unusable. The navigator does the moving, and this row
+/// keeps only what is needed without leaving the question.
 class _Footer extends StatelessWidget {
   final TestProvider provider;
   final VoidCallback onSubmit;
+  final VoidCallback onOpenPalette;
 
-  const _Footer({required this.provider, required this.onSubmit});
+  const _Footer({
+    required this.provider,
+    required this.onSubmit,
+    required this.onOpenPalette,
+  });
 
   @override
   Widget build(BuildContext context) {
-    // At zero there is nothing left to do but submit, so it takes the row.
+    final question = provider.currentQuestion;
+    final marked = question != null && provider.isMarked(question.id);
+    final answered =
+        question != null && provider.selectedOption(question.id) != null;
+
+    // At zero, and on the last question, forward is submit.
     final onlySubmit = provider.isTimeUp || provider.isLastQuestion;
 
-    return Padding(
-      padding: EdgeInsets.fromLTRB(20.w, 0, 20.w, 20.h),
+    return Container(
+      padding: EdgeInsets.fromLTRB(16.w, 10.h, 16.w, 16.h),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border(top: BorderSide(color: Colors.grey.shade200)),
+      ),
       child: Row(
         children: [
-          if (provider.currentIndex > 0 && !provider.isTimeUp) ...[
-            Expanded(
-              child: SizedBox(
-                height: 48.h,
-                child: OutlinedButton(
-                  onPressed: provider.previous,
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: _kPrimary,
-                    side: const BorderSide(color: _kPrimary),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28.r)),
-                  ),
-                  child: Text('Previous',
-                      style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)),
-                ),
-              ),
+          IconButton(
+            onPressed: onOpenPalette,
+            tooltip: 'All questions',
+            icon: Icon(Icons.menu_rounded, size: 24.sp, color: Colors.grey.shade800),
+          ),
+          IconButton(
+            onPressed:
+                question == null ? null : () => provider.toggleMark(question.id),
+            tooltip: marked ? 'Unmark' : 'Mark for review',
+            icon: Icon(
+              marked ? Icons.star_rounded : Icons.star_border_rounded,
+              size: 24.sp,
+              color: marked ? const Color(0xFFE8A33D) : Colors.grey.shade600,
             ),
-            SizedBox(width: 12.w),
-          ],
+          ),
+          SizedBox(width: 6.w),
           Expanded(
             child: SizedBox(
-              height: 48.h,
+              height: 46.h,
               child: ElevatedButton(
                 onPressed: provider.isSubmitting
                     ? null
@@ -523,8 +613,10 @@ class _Footer extends StatelessWidget {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: _kPrimary,
                   foregroundColor: Colors.white,
+                  disabledBackgroundColor: _kPrimary.withValues(alpha: 0.5),
                   elevation: 0,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28.r)),
+                  shape:
+                      RoundedRectangleBorder(borderRadius: BorderRadius.circular(26.r)),
                 ),
                 child: provider.isSubmitting
                     ? SizedBox(
@@ -533,8 +625,15 @@ class _Footer extends StatelessWidget {
                         child: const CircularProgressIndicator(
                             strokeWidth: 2, color: Colors.white),
                       )
-                    : Text(onlySubmit ? 'Submit test' : 'Next',
-                        style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700)),
+                    : Text(
+                        // "Skip" is honest about what Next does on an
+                        // unanswered question, and skipping is not penalised.
+                        onlySubmit ? 'SUBMIT' : (answered ? 'NEXT' : 'SKIP'),
+                        style: TextStyle(
+                            fontSize: 14.sp,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.5),
+                      ),
               ),
             ),
           ),

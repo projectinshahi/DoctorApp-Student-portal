@@ -110,6 +110,27 @@ class TestSummary {
   bool get isInProgress => lastAttempt?.inProgress == true;
   bool get isSubmitted => lastAttempt?.submittedAt != null;
   bool get hasNegativeMarking => marksIncorrect < 0;
+
+  /// What a perfect paper scores. The list endpoint sends the two factors but
+  /// not the product, and a score means nothing without it — "0.75" reads
+  /// very differently out of 2 than out of 200.
+  double get totalMarks => totalQuestions * marksCorrect;
+
+  /// Seconds left on a running attempt, or null when nothing is running.
+  ///
+  /// Derived, because the list endpoint does not send it — but it is the same
+  /// arithmetic the server does (startedAt + durationMinutes), so the card
+  /// can show a live countdown without a second call. The paper itself still
+  /// reads the server's own secondsRemaining; this is only for the card.
+  int? get secondsLeftOnAttempt {
+    final startedAt = lastAttempt?.startedAt;
+    if (!isInProgress || startedAt == null) return null;
+    final left = startedAt
+        .add(Duration(minutes: durationMinutes))
+        .difference(DateTime.now())
+        .inSeconds;
+    return left > 0 ? left : 0;
+  }
 }
 
 /// One question on the paper. Text and every option are nullable: a question
@@ -340,6 +361,11 @@ class TestResult {
   final int wrongCount;
   final int skippedCount;
   final List<TestQuestionResult> results;
+
+  /// Every question ends in exactly one of the three, so they sum to the
+  /// paper. Taken from the counts rather than results.length: the counts are
+  /// what the server scored, and they stay right even if the list is trimmed.
+  int get totalQuestions => correctCount + wrongCount + skippedCount;
 
   TestResult({
     required this.score,

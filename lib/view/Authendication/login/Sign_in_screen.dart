@@ -16,7 +16,6 @@ class SignInScreen extends StatefulWidget {
 }
 
 class _SignInScreenState extends State<SignInScreen> {
-  @override
   bool _obscurePassword = true;
 
   Widget build(BuildContext context) {

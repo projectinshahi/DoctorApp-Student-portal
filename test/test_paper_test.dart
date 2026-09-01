@@ -256,4 +256,109 @@ void main() {
       expect(provider.actionError, isNull);
     });
   });
+
+  test('a submitted test offers no retake', () {
+    final tests = TestSummary.listFromJson({
+      'tests': [
+        {
+          'id': 1,
+          'name': 'Grand Test 1',
+          'totalQuestions': 2,
+          'durationMinutes': 30,
+          'marksCorrect': 1,
+          'marksIncorrect': -0.25,
+          'attemptCount': 2,
+          'lastAttempt': {
+            'attemptId': 4,
+            'startedAt': '2026-08-31T10:36:06.473Z',
+            'submittedAt': '2026-08-31T10:39:58.487Z',
+            'score': 0.75,
+            'inProgress': false,
+          },
+        },
+      ],
+    });
+
+    // One sitting per test: submitted is terminal. If this ever reads as
+    // "not submitted", the card grows a Start button and the leaderboard
+    // stops meaning anything.
+    expect(tests.single.isSubmitted, isTrue);
+    expect(tests.single.isInProgress, isFalse);
+    expect(tests.single.secondsLeftOnAttempt, isNull,
+        reason: 'a finished paper has no clock left to run');
+  });
+
+  test('a running attempt derives its own deadline', () {
+    // The list endpoint sends startedAt but no secondsRemaining, so the card
+    // does the same arithmetic the server does: startedAt + durationMinutes.
+    final startedAt =
+        DateTime.now().toUtc().subtract(const Duration(minutes: 10));
+    final tests = TestSummary.listFromJson({
+      'tests': [
+        {
+          'id': 1,
+          'name': 'Grand Test 1',
+          'totalQuestions': 2,
+          'durationMinutes': 30,
+          'marksCorrect': 1,
+          'marksIncorrect': -0.25,
+          'attemptCount': 1,
+          'lastAttempt': {
+            'attemptId': 4,
+            'startedAt': startedAt.toIso8601String(),
+            'score': null,
+            'inProgress': true,
+          },
+        },
+      ],
+    });
+
+    // 30 minutes allotted, 10 gone: about 20 left, never the full duration.
+    final left = tests.single.secondsLeftOnAttempt;
+    expect(left, isNotNull);
+    expect(left, closeTo(20 * 60, 5));
+  });
+
+  test('an abandoned paper past its deadline reports zero, not negative', () {
+    final tests = TestSummary.listFromJson({
+      'tests': [
+        {
+          'id': 3,
+          'name': 'Grand Test 2',
+          'totalQuestions': 2,
+          'durationMinutes': 20,
+          'marksCorrect': 1,
+          'marksIncorrect': -0.25,
+          'attemptCount': 1,
+          'lastAttempt': {
+            'attemptId': 2,
+            'startedAt': '2026-08-29T07:03:56.813Z',
+            'score': null,
+            'inProgress': true,
+          },
+        },
+      ],
+    });
+
+    // Days late. A negative number would render as "Resume - -1:-2:-3".
+    expect(tests.single.secondsLeftOnAttempt, 0);
+  });
+
+
+  test('the marked paper sums to the number of questions', () {
+    final result = TestResult.fromJson({
+      'attemptId': 4,
+      'score': 0.75,
+      'totalMarks': 2,
+      'timeTakenSeconds': 232,
+      'correctCount': 1,
+      'wrongCount': 1,
+      'skippedCount': 0,
+      'results': const [],
+    });
+
+    // The gauges divide by this. Taking it from results.length instead would
+    // read 0 here and draw three empty rings on a scored paper.
+    expect(result.totalQuestions, 2);
+  });
 }

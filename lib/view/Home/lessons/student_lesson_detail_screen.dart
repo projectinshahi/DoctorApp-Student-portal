@@ -15,6 +15,8 @@ import '../../../services/lesson_progress_service.dart';
 import '../../../widget/app_shimmer.dart';
 import '../../../widget/pro_plan_dialog.dart';
 import '../Qbank/quiz_screen.dart';    // adjust path to wherever you place this file
+import '../lessons/comments_section.dart';
+import '../../../core/utils/capture_watch.dart';
 
 class StudentLessonDetailScreen extends StatefulWidget {
   final StudentLessonModel lesson;
@@ -71,6 +73,11 @@ class _StudentLessonDetailScreenState extends State<StudentLessonDetailScreen> {
   void initState() {
     super.initState();
     _lesson = widget.lesson;
+
+    // Blanking the frames is not enough on its own: the audio keeps playing
+    // behind the black cover, and a recording captures the whole soundtrack.
+    // Stopping the player is what actually protects the lesson.
+    CaptureWatch.instance.isCapturing.addListener(_onCaptureChanged);
     // A locked lesson never touches the player: build() hands the whole screen
     // to the paywall instead, the same way the quiz screen does.
     // Same rule as QBank: refetch on entry. Watch position, completion and
@@ -312,6 +319,21 @@ class _StudentLessonDetailScreenState extends State<StudentLessonDetailScreen> {
     );
   }
 
+  /// Pauses on capture. Deliberately does not resume afterwards — restarting
+  /// a lesson the moment a recording stops would hand back exactly what the
+  /// pause was protecting, and the student can press play themselves.
+  void _onCaptureChanged() {
+    if (!mounted || !CaptureWatch.instance.isCapturing.value) return;
+
+    _controller?.pause();
+    _ytController?.pause();
+    _hideControlsTimer?.cancel();
+
+    // Flush the position now: the student is about to see a black screen and
+    // may well close the app from there.
+    _progress?.flush();
+  }
+
   void _switchToLesson(StudentLessonModel lesson) {
     setState(() => _lesson = lesson);
     _hideControlsTimer?.cancel();
@@ -404,6 +426,9 @@ class _StudentLessonDetailScreenState extends State<StudentLessonDetailScreen> {
     // Before the controllers go: close() fires the last write and lets it
     // outlive this widget, so leaving mid-video still keeps the place.
     _progress?.close();
+    // The notifier outlives this screen, so a listener left on it would fire
+    // into a disposed State on the next capture.
+    CaptureWatch.instance.isCapturing.removeListener(_onCaptureChanged);
     _ytController?.removeListener(_onYoutubeTick);
     _controller?.dispose();
     _ytController?.dispose();
@@ -1032,6 +1057,17 @@ class _StudentLessonDetailScreenState extends State<StudentLessonDetailScreen> {
               ),
 
               _buildRelatedVideos(),
+
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 8.h),
+                child: Divider(color: Colors.grey.shade300, height: 1),
+              ),
+
+              // Comments live under the lesson, below the related videos.
+              // Keyed on the lesson id so opening a related video from here
+              // rebuilds the section against the new lesson instead of
+              // showing the previous one's thread.
+              CommentsSection(key: ValueKey(_lesson.id), lessonId: _lesson.id),
 
               SizedBox(height: 30.h),
             ],
