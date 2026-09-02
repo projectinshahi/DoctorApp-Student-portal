@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
+
+import '../../repository/refresh_api_provider.dart';
 import 'package:provider/provider.dart';
 
 import '../../View_model/Course_get_model.dart';
-import '../../core/constant/local_storage.dart';
 import '../../repository/course_get_provider.dart';
 import '../../repository/selection_provider.dart';
 import '../../widget/course_card_shimmer.dart';
-import '../Home/home_screen.dart';
 import 'package:flutter/services.dart';
 
 class ExamSelectionScreen extends StatefulWidget {
@@ -93,6 +93,11 @@ class _ExamSelectionScreenState extends State<ExamSelectionScreen> {
 
     final selectionProvider = context.read<SelectionProvider>();
 
+    // The button already dims while saving, but a fast double tap lands both
+    // taps before the first rebuild — which is how the same selection was
+    // being POSTed twice.
+    if (selectionProvider.isSaving) return;
+
     bool success;
     if (selectedCourseId != null) {
       debugPrint(
@@ -115,16 +120,28 @@ class _ExamSelectionScreenState extends State<ExamSelectionScreen> {
     if (success) {
       debugPrint('Selection saved successfully.');
 
-      await LocalStorage.setHasSelectedExam(true);
+      // Tell AuthProvider first: AuthGate is watching, and it swaps its own
+      // root to the home screen.
+      //
+      // Not `pushAndRemoveUntil(Homescreen, false)`, which is what this used
+      // to do — that removed AuthGate from the tree entirely, and AuthGate is
+      // what listens for the session dying. After picking a course a
+      // SESSION_ENDED then reset nothing and showed no message.
+      await context.read<AuthProvider>().markExamSelected();
 
       if (!mounted) return;
 
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(
-          builder: (_) => const Homescreen(),
-        ),
-            (route) => false,
-      );
+      // Two ways in, so two ways out:
+      //
+      //  * pushed on top of AuthGate (from login or QBank) — pop just this
+      //    route, revealing the gate, which has already become the home
+      //    screen. `pop()` and not `popUntil`, so nothing else is disturbed.
+      //
+      //  * rendered by AuthGate as the root — there is nothing to pop, and
+      //    the rebuild has already swapped it for the home screen. Popping
+      //    the only route here is what would close the app.
+      final navigator = Navigator.of(context);
+      if (navigator.canPop()) navigator.pop();
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

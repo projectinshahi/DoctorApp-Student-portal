@@ -1,25 +1,20 @@
 
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:uuid/uuid.dart';
+
+import '../utils/device_id_helper.dart';
 
 class LocalStorage {
-  static const String _deviceIdKey = 'device_id';
   static const String _accessTokenKey = 'access_token';
   static const String _refreshTokenKey = 'refresh_token';
   static const String _kHasSelectedExamKey = 'has_selected_exam';
 
   // ---- Device ID ----
-  static Future<String> getDeviceId() async {
-    final prefs = await SharedPreferences.getInstance();
-    String? deviceId = prefs.getString(_deviceIdKey);
-
-    if (deviceId == null) {
-      deviceId = const Uuid().v4();
-      await prefs.setString(_deviceIdKey, deviceId);
-    }
-
-    return deviceId;
-  }
+  /// Delegates to [DeviceIdHelper], which is the single source of truth.
+  ///
+  /// This used to mint its own UUID, so the value the splash screen printed
+  /// and the value login actually sent could be different — and only one of
+  /// them is what the server binds the account to.
+  static Future<String> getDeviceId() => DeviceIdHelper.getDeviceId();
 
   /// Call this right after a successful PUT /api/selection call.
   static Future<void> setHasSelectedExam(bool value) async {

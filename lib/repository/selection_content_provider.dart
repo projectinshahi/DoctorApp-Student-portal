@@ -1,6 +1,7 @@
 // lib/provider/selection_content_provider.dart
 import 'package:flutter/foundation.dart';
 import '../models/selection_content_model.dart';
+import '../services/lesson_progress_service.dart' show LessonProgress;
 import '../services/selection_content_service.dart';
 
 class SelectionContentProvider extends ChangeNotifier {
@@ -33,6 +34,47 @@ class SelectionContentProvider extends ChangeNotifier {
       errorMessage = result.errorMessage;
       sessionExpired = result.sessionExpired;
     }
+    notifyListeners();
+  }
+
+  /// Writes the server's answer to a progress call straight into the tree.
+  ///
+  /// The acceptance criterion is that the tick appears the moment a video
+  /// crosses the threshold — and the crossing is reported on the progress
+  /// call the player already makes. Waiting for the next /selection/content
+  /// would leave the row stale for as long as the student keeps watching.
+  void applyProgress(LessonProgress progress) {
+    final current = content;
+    if (current == null) return;
+
+    var touched = false;
+
+    final chapters = [
+      for (final chapter in current.chapters)
+        chapter.withLessons([
+          for (final lesson in chapter.lessons)
+            if (lesson.id == progress.lessonId)
+              () {
+                touched = true;
+                return lesson.copyWith(
+                  // Straight from the server. `copyWith` refuses to turn a
+                  // tick back off, so a rewind cannot clear it.
+                  completed: progress.completed,
+                  lastPositionSeconds: progress.lastPositionSeconds,
+                  watchedPercent: progress.watchedPercent,
+                  durationSeconds: progress.durationSeconds,
+                );
+              }()
+            else
+              lesson,
+        ]),
+    ];
+
+    // Nothing matched — a deep link into a lesson outside the loaded tree.
+    // Rebuilding for that would be a wasted frame.
+    if (!touched) return;
+
+    content = current.withChapters(chapters);
     notifyListeners();
   }
 }

@@ -31,6 +31,18 @@ class SelectionContentModel {
     this.progress,
   });
 
+  /// Same tree with new chapters. Used to patch one lesson's progress in
+  /// place; the course-level rollup is the server's and is left alone until
+  /// the next fetch corrects it.
+  SelectionContentModel withChapters(List<StudentChapterModel> chapters) =>
+      SelectionContentModel(
+        course: course,
+        courseType: courseType,
+        hasPaid: hasPaid,
+        chapters: chapters,
+        progress: progress,
+      );
+
   static List<dynamic> _readChapterList(Map<String, dynamic> json) {
     if (json['chapters'] != null) return json['chapters'] as List<dynamic>;
     if (json['course'] is Map && json['course']['chapters'] != null) {
@@ -147,6 +159,15 @@ class StudentChapterModel {
     this.progress,
   });
 
+  StudentChapterModel withLessons(List<StudentLessonModel> lessons) =>
+      StudentChapterModel(
+        id: id,
+        title: title,
+        displayOrder: displayOrder,
+        lessons: lessons,
+        progress: progress,
+      );
+
   factory StudentChapterModel.fromJson(Map<String, dynamic> json) {
     // Server order is authoritative — mapped as-is, never sorted.
     final lessons = (json['lessons'] ?? json['lesson'] ?? json['items'] ?? []) as List<dynamic>;
@@ -222,6 +243,18 @@ class StudentLessonModel {
   /// drift apart.
   final bool completed;
 
+  /// How much of the video the server has seen reported, 0-100.
+  ///
+  /// **Nullable, and null is not zero.** Null means the video's length is not
+  /// known yet, so no percentage can be computed — rendering that as a 0% bar
+  /// would read as "never watched" for a lesson the student is halfway
+  /// through. Always null on notes and quizzes; only videos have a share.
+  final int? watchedPercent;
+
+  /// The video's length, once the server has it. Null on an older upload
+  /// nobody has played since duration reporting started.
+  final int? durationSeconds;
+
   StudentLessonModel({
     required this.id,
     required this.title,
@@ -245,7 +278,48 @@ class StudentLessonModel {
     this.lastPositionSeconds = 0,
     this.isSaved = false,
     this.completed = false,
+    this.watchedPercent,
+    this.durationSeconds,
   });
+
+  /// Patches a row in place after a progress write, so the tick appears while
+  /// the video is still playing instead of waiting for the next content
+  /// fetch.
+  StudentLessonModel copyWith({
+    bool? completed,
+    int? lastPositionSeconds,
+    int? watchedPercent,
+    int? durationSeconds,
+    bool? isSaved,
+  }) =>
+      StudentLessonModel(
+        id: id,
+        title: title,
+        description: description,
+        type: type,
+        content: content,
+        videoUrl: videoUrl,
+        thumbnailUrl: thumbnailUrl,
+        noteUrl: noteUrl,
+        noteFileType: noteFileType,
+        displayOrder: displayOrder,
+        isFreePreview: isFreePreview,
+        accessType: accessType,
+        locked: locked,
+        quizId: quizId,
+        quiz: quiz,
+        quizQuestionCount: quizQuestionCount,
+        plans: plans,
+        planIds: planIds,
+        attempt: attempt,
+        lastPositionSeconds: lastPositionSeconds ?? this.lastPositionSeconds,
+        isSaved: isSaved ?? this.isSaved,
+        // A rewind never un-finishes a lesson: once the server has said
+        // completed, nothing local takes the tick away.
+        completed: completed == true || this.completed,
+        watchedPercent: watchedPercent ?? this.watchedPercent,
+        durationSeconds: durationSeconds ?? this.durationSeconds,
+      );
 
   static List<RequiredPlanModel> _readPlans(dynamic raw) {
     if (raw is! List) return const [];
@@ -304,6 +378,9 @@ class StudentLessonModel {
         json['lastPositionSeconds'] ?? json['last_position_seconds'],
       ),
       completed: json['completed'] == true,
+      // Read as nullable on purpose — see the field comment.
+      watchedPercent: _toIntOrNull(json['watchedPercent']),
+      durationSeconds: _toIntOrNull(json['durationSeconds']),
       isSaved: json['isSaved'] == true,
     );
   }
@@ -323,6 +400,20 @@ class StudentLessonModel {
   /// lessons, so filtering on media alone would hide exactly the paid
   /// content these lists exist to advertise.
   bool get isWatchable => !isQuiz && (hasMedia || locked);
+
+  /// Video or note, decided by `type` rather than by which URL happens to be
+  /// present.
+  ///
+  /// A locked lesson has its `videoUrl` stripped to null, so [hasVideo] is
+  /// false for every premium video — partitioning on that would file the
+  /// whole paid catalogue under notes. `type` survives the lock; the URL
+  /// does not.
+  bool get isVideo => type == 'video' || hasVideo;
+
+  /// Everything watchable that is not a video. Together with [isVideo] and
+  /// [isQuiz] this covers every lesson exactly once, so nothing can appear in
+  /// two sections or vanish from both.
+  bool get isNote => !isQuiz && !isVideo;
 
   bool get isPremium => accessType == 'premium';
 }
@@ -418,6 +509,15 @@ class ProgressInfo {
   }
 
   bool get isComplete => percent >= 100;
+}
+
+/// Null stays null. Used where the server distinguishes "not known" from
+/// zero — `watchedPercent` most of all.
+int? _toIntOrNull(dynamic value) {
+  if (value == null) return null;
+  if (value is int) return value;
+  if (value is num) return value.round();
+  return int.tryParse(value.toString());
 }
 
 int _toInt(dynamic value) {

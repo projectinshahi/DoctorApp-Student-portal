@@ -48,6 +48,7 @@ dependencies:
   youtube_player_flutter: ^9.1.1
   no_screenshot: ^2.0.1
   safe_device: ^1.4.1
+  device_info_plus: ^10.1.2
 
 dev_dependencies:
   flutter_test:

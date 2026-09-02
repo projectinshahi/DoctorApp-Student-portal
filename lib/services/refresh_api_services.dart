@@ -12,7 +12,12 @@ class ApiClient {
 
   // Optional: set this from AuthProvider so ApiClient can notify it
   // when the session dies (see AuthProvider below for wiring)
-  static void Function()? onSessionExpired;
+  /// Called when the session is definitively over. The message is the
+  /// server's own — "You were signed out because your account was accessed on
+  /// another device" tells the student something a generic "session expired"
+  /// does not, and it is the whole reason the backend distinguishes these
+  /// codes.
+  static void Function(String message)? onSessionExpired;
 
   static Future<http.Response> get(String url) =>
       _sendWithAuth((token) => http.get(Uri.parse(url), headers: _headers(token)));
@@ -52,32 +57,48 @@ class ApiClient {
     final accessToken = await LocalStorage.getAccessToken();
 
     if (accessToken == null) {
-      _handleSessionExpired();
+      _handleSessionExpired("Please log in to continue.");
       throw SessionExpiredException("Not logged in");
     }
 
     var response = await requestFn(accessToken);
 
+    // 403 is its own ending: the account is disabled, and no amount of
+    // refreshing fixes that. Without this the response fell through as if it
+    // were ordinary data.
+    if (response.statusCode == 403) {
+      final blocked = _errorCode(response) == "ACCOUNT_BLOCKED";
+      if (blocked) {
+        await LocalStorage.clearAll();
+        final message = _errorMessage(response) ??
+            "This account has been disabled. Please contact support.";
+        _handleSessionExpired(message);
+        throw SessionExpiredException(message);
+      }
+      // Any other 403 is a permission answer about one resource — a locked
+      // lesson, someone else's comment — and belongs to the caller.
+      return response;
+    }
+
     if (response.statusCode != 401) {
       return response;
     }
 
-    // Got a 401 — inspect why
-    Map<String, dynamic> body = {};
-    try {
-      body = jsonDecode(response.body);
-    } catch (_) {}
-    final code = body["error"]?["code"];
+    // Got a 401 — three different things share that status, and only one of
+    // them is worth a refresh.
+    final code = _errorCode(response);
 
-    // These mean the session is definitively dead — don't bother refreshing
+    // These mean the session is definitively dead. Refreshing here is the bug
+    // this design exists to prevent: /refresh answers 401 too, so the app
+    // would spin instead of telling the student why they were signed out.
     if (code == "SESSION_ENDED" ||
         code == "SESSION_NOT_FOUND" ||
         code == "REFRESH_TOKEN_REUSED") {
       await LocalStorage.clearAll();
-      _handleSessionExpired();
-      throw SessionExpiredException(
-        body["error"]?["message"] ?? "Your session has ended. Please log in again.",
-      );
+      final message = _errorMessage(response) ??
+          "Your session has ended. Please log in again.";
+      _handleSessionExpired(message);
+      throw SessionExpiredException(message);
     }
 
     // Otherwise assume the access token just expired naturally — refresh and retry once
@@ -85,14 +106,38 @@ class ApiClient {
       final newAccessToken = await _refreshAccessToken();
       response = await requestFn(newAccessToken);
       return response;
-    } on SessionExpiredException {
-      _handleSessionExpired();
+    } on SessionExpiredException catch (e) {
+      _handleSessionExpired(e.message);
       rethrow;
     } catch (e) {
       await LocalStorage.clearAll();
-      _handleSessionExpired();
-      throw SessionExpiredException("Session expired. Please log in again.");
+      const message = "Session expired. Please log in again.";
+      _handleSessionExpired(message);
+      throw SessionExpiredException(message);
     }
+  }
+
+  /// The server's `error.code`, or null on a body that is not the usual
+  /// envelope.
+  static String? _errorCode(http.Response response) =>
+      _error(response)?["code"]?.toString();
+
+  static String? _errorMessage(http.Response response) {
+    final message = _error(response)?["message"]?.toString();
+    return (message == null || message.isEmpty) ? null : message;
+  }
+
+  static Map<String, dynamic>? _error(http.Response response) {
+    try {
+      final body = jsonDecode(response.body);
+      if (body is Map && body["error"] is Map) {
+        return Map<String, dynamic>.from(body["error"] as Map);
+      }
+    } catch (_) {
+      // A gateway error page is not JSON. Not knowing the code is fine; it
+      // just means no special handling.
+    }
+    return null;
   }
 
   static Future<String> _refreshAccessToken() {
@@ -131,10 +176,8 @@ class ApiClient {
     );
   }
 
-  static void _handleSessionExpired() {
-    if (onSessionExpired != null) {
-      onSessionExpired!();
-    }
+  static void _handleSessionExpired(String message) {
+    onSessionExpired?.call(message);
   }
 }
 

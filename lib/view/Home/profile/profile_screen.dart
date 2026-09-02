@@ -2,6 +2,10 @@
 
 import 'dart:io';
 import 'package:flutter/material.dart';
+
+import '../../../widget/app_snackbar.dart';
+import 'info_screens.dart';
+import 'settings_screen.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
@@ -72,9 +76,7 @@ class _ProfileScreenState extends State<ProfileScreen> with RefreshOnVisible<Pro
     if (!mounted) return;
 
     if (success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Profile photo updated')),
-      );
+      showAppSnackBar(context, 'Profile photo updated');
     }
   }
 
@@ -89,29 +91,66 @@ class _ProfileScreenState extends State<ProfileScreen> with RefreshOnVisible<Pro
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
+              // The app's own background rather than the theme's white, so
+              // the dialog reads as part of this app instead of a system
+              // sheet dropped on top of it.
+              backgroundColor: AppColor.Screenbackground,
+              surfaceTintColor: Colors.transparent,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16.r),
               ),
-              title: const Text(
+              title: Text(
                 "Edit profile",
-                style: TextStyle(fontWeight: FontWeight.w700),
+                style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 17.sp,
+                    color: AppColor.Textcolor),
               ),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   if (provider.errorMessage != null) ...[
-                    Text(
-                      provider.errorMessage!,
-                      style: const TextStyle(color: Colors.red, fontSize: 12.5),
+                    // A tinted panel, not bare red text: on the cream
+                    // background a line of red on nothing reads as a stray
+                    // label rather than as the reason the save failed.
+                    Container(
+                      width: double.infinity,
+                      padding: EdgeInsets.symmetric(
+                          horizontal: 12.w, vertical: 10.h),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFD65745).withValues(alpha: 0.10),
+                        borderRadius: BorderRadius.circular(10.r),
+                        border: Border.all(
+                            color: const Color(0xFFD65745).withValues(alpha: 0.35)),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(Icons.error_outline_rounded,
+                              size: 15.sp, color: const Color(0xFFB03A2B)),
+                          SizedBox(width: 8.w),
+                          Expanded(
+                            child: Text(
+                              provider.errorMessage!,
+                              style: TextStyle(
+                                  color: const Color(0xFFB03A2B),
+                                  fontSize: 12.sp,
+                                  height: 1.35,
+                                  fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                    SizedBox(height: 10.h),
+                    SizedBox(height: 14.h),
                   ],
                   TextField(
                     controller: _nameController,
                     decoration: InputDecoration(
                       labelText: "Display name",
                       filled: true,
-                      fillColor: Colors.grey.shade100,
+                      // White on cream, so the field reads as a field.
+                      fillColor: Colors.white,
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10.r),
                         borderSide: BorderSide.none,
@@ -125,7 +164,7 @@ class _ProfileScreenState extends State<ProfileScreen> with RefreshOnVisible<Pro
                     decoration: InputDecoration(
                       labelText: "Phone",
                       filled: true,
-                      fillColor: Colors.grey.shade100,
+                      fillColor: Colors.white,
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10.r),
                         borderSide: BorderSide.none,
@@ -139,7 +178,11 @@ class _ProfileScreenState extends State<ProfileScreen> with RefreshOnVisible<Pro
                   onPressed: provider.isSaving
                       ? null
                       : () => Navigator.pop(dialogContext),
-                  child: const Text("Cancel"),
+                  child: Text("Cancel",
+                      style: TextStyle(
+                          fontSize: 13.sp,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.grey.shade700)),
                 ),
                 ElevatedButton(
                   onPressed: provider.isSaving
@@ -155,8 +198,12 @@ class _ProfileScreenState extends State<ProfileScreen> with RefreshOnVisible<Pro
                     }
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColor.Textcolor,
-                    foregroundColor: Colors.white,
+                    backgroundColor: AppColor.buttoncolor,
+                    foregroundColor: AppColor.Buttontextcolor,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(22.r)),
+                    padding: EdgeInsets.symmetric(horizontal: 22.w),
                   ),
                   child: provider.isSaving
                       ? SizedBox(
@@ -459,17 +506,40 @@ class _ProfileScreenState extends State<ProfileScreen> with RefreshOnVisible<Pro
                           ),
                         ),
                         _menuDivider(),
-                        _ProfileMenuItem(label: "Learn more", onTap: () {}),
+                        _ProfileMenuItem(
+                          label: "Learn more",
+                          onTap: () => Navigator.push(context,
+                              MaterialPageRoute(builder: (_) => const LearnMoreScreen())),
+                        ),
                         _menuDivider(),
-                        _ProfileMenuItem(label: "FAQ", onTap: () {}),
+                        _ProfileMenuItem(
+                          label: "FAQ",
+                          onTap: () => Navigator.push(context,
+                              MaterialPageRoute(builder: (_) => const FaqScreen())),
+                        ),
                         _menuDivider(),
-                        _ProfileMenuItem(label: "Contact us", onTap: () {}),
+                        _ProfileMenuItem(
+                          label: "Contact us",
+                          onTap: () => Navigator.push(context,
+                              MaterialPageRoute(builder: (_) => const ContactUsScreen())),
+                        ),
                         _menuDivider(),
-                        _ProfileMenuItem(label: "Settings", onTap: () {}),
+                        _ProfileMenuItem(
+                          label: "Settings",
+                          onTap: () => Navigator.push(context,
+                              MaterialPageRoute(builder: (_) => const SettingsScreen())),
+                        ),
                         _menuDivider(),
-                        _ProfileMenuItem(label: "Terms & Conditions", onTap: () {}),
+                        _ProfileMenuItem(
+                          label: "Terms & Conditions",
+                          onTap: () => Navigator.push(context,
+                              MaterialPageRoute(builder: (_) => const TermsScreen())),
+                        ),
                         _menuDivider(),
-                        _ProfileMenuItem(label: "Share this app", onTap: () {}),
+                        _ProfileMenuItem(
+                          label: "Share this app",
+                          onTap: () => ShareAppSheet.show(context),
+                        ),
                       ],
                     ),
                   ),

@@ -1,5 +1,8 @@
 import 'package:dr_app/view/Home/home_screen.dart';
 import 'package:flutter/material.dart';
+
+import '../../../services/Auth_services.dart' show LoginRefusedException;
+import '../../../widget/login_refused_dialog.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 import 'package:dr_app/core/constant/app_size.dart';
@@ -173,13 +176,25 @@ class _SignupScreenState extends State<SignupScreen> {
                             print('UI: Google sign-in button tapped.');
 
                             bool success = false;
+                            LoginRefusedException? refused;
                             try {
                               success = await viewModel.signInWithGoogle();
-                              print('UI: signInWithGoogle() returned: $success');
-                            } catch (e, st) {
-                              print('UI: signInWithGoogle() THREW an error: $e');
-                              print('UI: Stack trace: $st');
+                            } on LoginRefusedException catch (e) {
+                              // The server turned it away for a stated
+                              // reason — a bound device, a blocked account.
+                              // Swallowing it into a generic failure is what
+                              // leaves a student tapping a button that never
+                              // works and never says why.
+                              refused = e;
                               success = false;
+                            } catch (_) {
+                              success = false;
+                            }
+
+                            if (refused != null && context.mounted) {
+                              setState(() => _isSigningIn = false);
+                              await showLoginRefusedDialog(context, refused);
+                              return;
                             }
 
                             if (!context.mounted) return;

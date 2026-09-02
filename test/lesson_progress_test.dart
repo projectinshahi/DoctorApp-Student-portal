@@ -6,9 +6,23 @@ import 'package:flutter_test/flutter_test.dart';
 class _FakeProgressService implements LessonProgressService {
   final calls = <Map<String, Object?>>[];
 
+  /// What the server would answer. Null mimics a failed write.
+  LessonProgress? reply;
+
   @override
-  Future<void> save(int lessonId, {int? positionSeconds, bool? completed}) async {
-    calls.add({'id': lessonId, 'pos': positionSeconds, 'done': completed});
+  Future<LessonProgress?> save(
+    int lessonId, {
+    int? positionSeconds,
+    int? durationSeconds,
+    bool? completed,
+  }) async {
+    calls.add({
+      'id': lessonId,
+      'pos': positionSeconds,
+      'dur': durationSeconds,
+      'done': completed,
+    });
+    return reply;
   }
 }
 
@@ -38,7 +52,7 @@ void main() {
       await writer.flush();
 
       expect(service.calls, [
-        {'id': 7, 'pos': 42, 'done': null},
+        {'id': 7, 'pos': 42, 'dur': null, 'done': null},
       ]);
     });
 

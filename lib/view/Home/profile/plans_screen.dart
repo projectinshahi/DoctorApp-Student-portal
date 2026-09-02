@@ -1,5 +1,7 @@
 // lib/view/Home/profile/plans_screen.dart
 import 'package:flutter/material.dart';
+
+import '../../../widget/app_snackbar.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 
@@ -43,9 +45,11 @@ class _PlansScreenState extends State<PlansScreen> {
     if (!mounted) return;
 
     if (!success) {
-      ScaffoldMessenger.of(
+      showAppSnackBar(
         context,
-      ).showSnackBar(SnackBar(content: Text(planProvider.subscribeErrorMessage ?? 'Failed to subscribe')));
+        planProvider.subscribeErrorMessage ?? 'Failed to subscribe',
+        kind: AppMessage.failure,
+      );
       return;
     }
 
@@ -56,7 +60,7 @@ class _PlansScreenState extends State<PlansScreen> {
     ]);
     if (!mounted) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Subscribed successfully!')));
+    showAppSnackBar(context, 'Subscribed successfully!');
     Navigator.pop(context, true);
   }
 

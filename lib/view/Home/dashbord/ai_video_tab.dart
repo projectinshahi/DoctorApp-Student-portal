@@ -9,6 +9,7 @@ import '../../../repository/selection_content_provider.dart';
 import '../../../widget/app_shimmer.dart';
 import '../lessons/student_lesson_detail_screen.dart';
 import '../../../core/utils/refresh_on_visible.dart';
+import '../../../widget/lesson_watch_indicator.dart';
 
 const Color _kPrimary = Color(0xFF87986B);
 
@@ -578,65 +579,13 @@ class _ChapterProgress extends StatelessWidget {
   }
 }
 
-/// Per-lesson line: done, or where to pick up.
-///
-/// There is no percentage here on purpose — the server sends a position in
-/// seconds but not the video's duration, so a percentage would have to be
-/// invented. The timestamp is the honest version of the same information.
+/// Per-lesson line, from the shared indicator so the outline, the related
+/// list and any future row cannot drift into three different answers.
 class _LessonProgressLine extends StatelessWidget {
   final StudentLessonModel lesson;
 
   const _LessonProgressLine({required this.lesson});
 
-  static String _clock(int seconds) {
-    final minutes = seconds ~/ 60;
-    final remainder = (seconds % 60).toString().padLeft(2, '0');
-    if (minutes < 60) return '$minutes:$remainder';
-    return '${minutes ~/ 60}:${(minutes % 60).toString().padLeft(2, '0')}:$remainder';
-  }
-
   @override
-  Widget build(BuildContext context) {
-    // `completed` covers videos and quizzes alike — the server decides, and
-    // this must not re-derive it from the lesson type.
-    if (lesson.completed) {
-      return Padding(
-        padding: EdgeInsets.only(bottom: 6.h),
-        child: Row(
-          children: [
-            Icon(Icons.check_circle_rounded, size: 12.sp, color: _kPrimary),
-            SizedBox(width: 4.w),
-            Text(
-              "Completed",
-              style: TextStyle(fontSize: 10.sp, fontWeight: FontWeight.w600, color: _kPrimary),
-            ),
-          ],
-        ),
-      );
-    }
-
-    // Kept even when the lesson is locked: the lock strips videoUrl but not
-    // the position, so someone who resubscribes still sees their place.
-    if (lesson.lastPositionSeconds > 0) {
-      return Padding(
-        padding: EdgeInsets.only(bottom: 6.h),
-        child: Row(
-          children: [
-            Icon(Icons.history_rounded, size: 12.sp, color: Colors.orange.shade700),
-            SizedBox(width: 4.w),
-            Text(
-              "Resume at ${_clock(lesson.lastPositionSeconds)}",
-              style: TextStyle(
-                fontSize: 10.sp,
-                fontWeight: FontWeight.w600,
-                color: Colors.orange.shade700,
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return const SizedBox.shrink();
-  }
+  Widget build(BuildContext context) => LessonWatchIndicator(lesson: lesson);
 }

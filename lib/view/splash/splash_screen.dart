@@ -1,75 +1,25 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
+
 import '../../widget/app_shimmer.dart';
 
-import '../../core/constant/local_storage.dart';
-import '../Authendication/login/login_screen.dart';
-import '../subjectSelection/select_exam_screen.dart';
-import '../Home/home_screen.dart'; // adjust path
-
-class SplashScreen extends StatefulWidget {
+/// The loading face of [AuthGate], and nothing more.
+///
+/// This used to run its own copy of the routing rules — read the tokens,
+/// read the local `hasSelectedExam`, then `pushReplacement` to Home, the
+/// course picker or Login. Two problems with that:
+///
+///  * It **replaced AuthGate**, which is what listens for the session dying.
+///    Once splash had run, a SESSION_ENDED reset nothing.
+///
+///  * It decided from the local flag alone. A reinstall or a new phone has no
+///    flag, so it sent a student who picked a course months ago back to the
+///    picker — even after AuthGate had already asked the server and knew
+///    better. Two deciders, and the wrong one ran last.
+///
+/// So it now decides nothing. AuthGate owns the branch; this is what the
+/// student looks at while it does.
+class SplashScreen extends StatelessWidget {
   const SplashScreen({super.key});
-
-  @override
-  State<SplashScreen> createState() => _SplashScreenState();
-}
-
-class _SplashScreenState extends State<SplashScreen> {
-  @override
-  void initState() {
-    super.initState();
-    _checkLogin();
-  }
-
-  Future<void> _checkLogin() async {
-    await Future.delayed(const Duration(seconds: 2));
-
-    final String? accessToken = await LocalStorage.getAccessToken();
-    final String? refreshToken = await LocalStorage.getRefreshToken();
-    final String deviceId = await LocalStorage.getDeviceId();
-    final bool hasSelectedExam = await LocalStorage.getHasSelectedExam(); // NEW
-
-    debugPrint("==================================");
-    debugPrint("Device ID       : $deviceId");
-    debugPrint("Access Token    : $accessToken");
-    debugPrint("Refresh Token   : $refreshToken");
-    debugPrint("Has Selected Exam: $hasSelectedExam");
-    debugPrint("==================================");
-
-    if (!mounted) return;
-
-    if (accessToken != null && accessToken.isNotEmpty) {
-      if (hasSelectedExam) {
-        // Already picked a course/exam before -> straight to Home
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (_) => const Homescreen(), // adjust constructor args if needed
-          ),
-        );
-      } else {
-        // Logged in but hasn't picked yet -> show the selection screen
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (_) => ExamSelectionScreen(
-              accessToken: accessToken,
-              refreshToken: refreshToken ?? "",
-              deviceId: deviceId,
-            ),
-          ),
-        );
-      }
-    } else {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (_) => const LoginScreen(),
-        ),
-      );
-    }
-  }
 
   @override
   Widget build(BuildContext context) {

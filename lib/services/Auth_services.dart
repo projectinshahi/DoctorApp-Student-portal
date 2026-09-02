@@ -76,10 +76,23 @@ class AuthService {
         return authResult;
       }
 
-      final error = jsonDecode(response.body);
+      // The server refuses a login for reasons the student can act on, and
+      // each needs its own words. A raw Exception here surfaced as
+      // "Exception: ..." on the login screen.
+      Map<String, dynamic> error = const {};
+      try {
+        final decoded = jsonDecode(response.body);
+        if (decoded is Map && decoded["error"] is Map) {
+          error = Map<String, dynamic>.from(decoded["error"] as Map);
+        }
+      } catch (_) {
+        // A gateway page is not JSON. The generic message below covers it.
+      }
 
-      throw Exception(
-        error["error"]?["message"] ?? "Google Sign-In Failed",
+      throw LoginRefusedException(
+        code: error["code"]?.toString(),
+        message: error["message"]?.toString() ??
+            "Could not sign in. Please try again.",
       );
     } catch (e, stackTrace) {
       print("Google Sign-In Error : $e");
@@ -92,4 +105,27 @@ class AuthService {
     await _googleSignIn.signOut();
     await LocalStorage.clearAll();
   }
+}
+
+/// A login the server turned away, carrying its reason.
+///
+/// The code matters more than the status: a device already registered to
+/// another account is a different conversation from a blocked account, and
+/// both are different from a network failure.
+class LoginRefusedException implements Exception {
+  /// e.g. `DEVICE_BOUND`, `ACCOUNT_BLOCKED`. Null when the body carried none.
+  final String? code;
+  final String message;
+
+  const LoginRefusedException({required this.code, required this.message});
+
+  /// This phone is already registered to a different account — the
+  /// subscription-sharing case. Nothing the student can do in the app; it
+  /// needs support to release the device.
+  bool get isDeviceBound => code == 'DEVICE_BOUND';
+
+  bool get isAccountBlocked => code == 'ACCOUNT_BLOCKED';
+
+  @override
+  String toString() => message;
 }

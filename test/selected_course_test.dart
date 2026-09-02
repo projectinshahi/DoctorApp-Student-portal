@@ -74,4 +74,50 @@ void main() {
     expect(content.completedModules, 0);
     expect(content.totalModules, 0);
   });
+
+  group('lesson sections', () {
+    StudentLessonModel lesson(Map<String, dynamic> extra) =>
+        StudentLessonModel.fromJson({
+          'id': 1,
+          'title': 'L',
+          'displayOrder': 1,
+          'isFreePreview': false,
+          'accessType': 'premium',
+          'locked': false,
+          ...extra,
+        });
+
+    test('a locked video is still a video', () {
+      // The lock strips videoUrl to null, so hasVideo is false — filtering
+      // the home grid on that filed the whole paid catalogue under notes and
+      // put videos and notes in one row.
+      final locked = lesson({'type': 'video', 'videoUrl': null, 'locked': true});
+
+      expect(locked.hasVideo, isFalse, reason: 'no url while locked');
+      expect(locked.isVideo, isTrue, reason: 'type survives the lock');
+      expect(locked.isNote, isFalse);
+    });
+
+    test('a note is a note', () {
+      final note = lesson({'type': 'text', 'noteUrl': 'https://x/n.pdf'});
+      expect(note.isNote, isTrue);
+      expect(note.isVideo, isFalse);
+    });
+
+    test('every watchable lesson lands in exactly one section', () {
+      final all = [
+        lesson({'type': 'video', 'videoUrl': 'https://x/v.mp4'}),
+        lesson({'type': 'video', 'videoUrl': null, 'locked': true}),
+        lesson({'type': 'text', 'noteUrl': 'https://x/n.pdf'}),
+        lesson({'type': 'quiz', 'quizId': 5}),
+      ];
+
+      for (final l in all) {
+        // Exactly one of the three, so nothing shows twice or vanishes.
+        final sections =
+            [l.isQuiz, l.isVideo, l.isNote].where((inIt) => inIt).length;
+        expect(sections, 1, reason: 'type ${l.type} landed in $sections');
+      }
+    });
+  });
 }

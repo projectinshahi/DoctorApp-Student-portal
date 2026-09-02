@@ -10,6 +10,7 @@ import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import '../../../core/utils/youtube_utils.dart';
 import '../../../models/selection_content_model.dart';
 import '../../../repository/saved_provider.dart';
+import '../../../repository/daily_quiz_provider.dart';
 import '../../../repository/selection_content_provider.dart';
 import '../../../services/lesson_progress_service.dart';
 import '../../../widget/app_shimmer.dart';
@@ -91,7 +92,31 @@ class _StudentLessonDetailScreenState extends State<StudentLessonDetailScreen> {
 
     if (_lesson.locked) return;
     if (_lesson.hasVideo && _lesson.videoUrl != null && _lesson.videoUrl!.isNotEmpty) {
-      _progress = LessonProgressWriter(lessonId: _lesson.id);
+      _progress = LessonProgressWriter(
+        lessonId: _lesson.id,
+        // The server answers every write with its own verdict, so the tick
+        // can land while the video is still playing. Waiting for the next
+        // /selection/content would leave the row stale for the whole lesson.
+        onProgress: (progress) {
+          if (!mounted) return;
+          context.read<SelectionContentProvider>().applyProgress(progress);
+
+          // Crossing the threshold takes it out of Continue Watching at
+          // once. Waiting for the next /home would leave a finished video
+          // sitting in the row for the rest of the session.
+          if (progress.completed) {
+            context.read<HomeSummaryProvider>().dropCompleted(progress.lessonId);
+          }
+          // The screen renders from its own copy of the lesson, so patch
+          // that too or the header keeps saying "not watched".
+          setState(() => _lesson = _lesson.copyWith(
+                completed: progress.completed,
+                lastPositionSeconds: progress.lastPositionSeconds,
+                watchedPercent: progress.watchedPercent,
+                durationSeconds: progress.durationSeconds,
+              ));
+        },
+      );
       _setupVideo();
     }
   }
@@ -221,6 +246,11 @@ class _StudentLessonDetailScreenState extends State<StudentLessonDetailScreen> {
     final value = controller.value;
     if (!value.isInitialized || !_resumed) return;
 
+    // Handed over once the player knows it. Without a length the server
+    // cannot judge a percentage at all, and every video uploaded before
+    // lengths were stored has none — so this backfills the old catalogue.
+    _progress?.durationSeconds = value.duration.inSeconds;
+
     final seconds = value.position.inSeconds;
     _progress?.record(seconds);
 
@@ -241,6 +271,10 @@ class _StudentLessonDetailScreenState extends State<StudentLessonDetailScreen> {
 
     final position = controller.value.position;
     if (position <= Duration.zero) return;
+
+    // Same backfill as the direct player: YouTube reports its length on the
+    // metadata rather than the value.
+    _progress?.durationSeconds = controller.metadata.duration.inSeconds;
 
     _progress?.record(position.inSeconds);
 

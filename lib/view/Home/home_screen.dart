@@ -11,7 +11,10 @@ import 'Qbank/bookmarks_screen.dart';
 import 'Qbank/qbank_tab.dart';
 import 'tests/tests_tab.dart';
 import 'dashbord/ai_video_tab.dart';
+import 'continue_learning_row.dart';
 import 'lessons/student_lesson_detail_screen.dart';
+import '../../repository/daily_quiz_provider.dart';
+import 'daily_quiz/daily_quiz_card.dart';
 import '../../widget/app_shimmer.dart';
 import '../../core/utils/refresh_on_visible.dart';
 
@@ -106,6 +109,8 @@ class _HomescreenState extends State<Homescreen> with RefreshOnVisible<Homescree
       context.read<ProfileProvider>().loadProfile(),
       // Bookmarks: the QBank badge and every bookmark icon read from here.
       context.read<SavedProvider>().loadAll(),
+      // Read-only summary for the MCQ of the Day card. Starts nothing.
+      context.read<HomeSummaryProvider>().load(),
     ]);
   }
 
@@ -363,81 +368,20 @@ class _HomescreenState extends State<Homescreen> with RefreshOnVisible<Homescree
 
                         SizedBox(height: 26.h),
 
-                        // ── Continue MCQs ──
-                        Text(
-                          "Continue MCQs",
-                          style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700, color: Colors.black87),
-                        ),
-                        SizedBox(height: 12.h),
-                        Container(
-                          width: double.infinity,
-                          padding: EdgeInsets.all(18.w),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(18.r),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.03),
-                                blurRadius: 12,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                "A 6-month-old presented with a genetic disorder "
-                                    "attributed to multifactorial inheritance. This type "
-                                    "of inheritance is most likely to play a significant "
-                                    "role in which of the following disorder?",
-                                style: TextStyle(
-                                  fontSize: 13.5.sp,
-                                  fontWeight: FontWeight.w500,
-                                  color: Colors.black87,
-                                  height: 1.4,
-                                ),
-                              ),
-                              SizedBox(height: 16.h),
-                              _McqOption(label: "A", text: "Achondroplasia"),
-                              SizedBox(height: 10.h),
-                              _McqOption(label: "B", text: "Lysosomal storage disease"),
-                              SizedBox(height: 10.h),
-                              _McqOption(label: "c", text: "Lysosomal storage disease"),
-                              SizedBox(height: 10.h),
-                              _McqOption(label: "B", text: "Lysosomal storage disease"),
-                            ],
-                          ),
-                        ),
+                        // ── MCQ of the Day ──
+                        //
+                        // Replaces the old hardcoded "Continue MCQs" card.
+                        // The summary comes from /users/me/home, which starts
+                        // nothing; the card itself only fetches the question
+                        // once an attempt exists or the student taps Start.
+                        Consumer2<HomeSummaryProvider,
+                            SelectionContentProvider>(
+                          builder: (context, daily, content, _) {
+                            final summary = daily.summary;
+                            final courseId = content.content?.course?.id;
 
-                        SizedBox(height: 28.h),
-
-                        Consumer<SelectionContentProvider>(
-                          builder: (context, provider, _) {
-                            if (provider.isLoading) {
-                              return const Padding(
-                                padding: EdgeInsets.symmetric(vertical: 12),
-                                child: ScreenShimmer(layout: ShimmerLayout.grid),
-                              );
-                            }
-
-                            // Videos and notes only — quiz lessons belong in QBank.
-                            final lessons = <StudentLessonModel>[];
-                            for (final chapter in provider.content?.chapters ?? const <StudentChapterModel>[]) {
-                              lessons.addAll(chapter.lessons.where((l) => l.isWatchable));
-                            }
-
-                            if (provider.errorMessage != null && lessons.isEmpty) {
-                              return Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 12),
-                                child: Text(
-                                  provider.errorMessage!,
-                                  style: const TextStyle(color: Colors.red),
-                                ),
-                              );
-                            }
-
-                            if (lessons.isEmpty) {
+                            // Null when no course is picked yet — hide it.
+                            if (summary == null || courseId == null) {
                               return const SizedBox.shrink();
                             }
 
@@ -445,93 +389,62 @@ class _HomescreenState extends State<Homescreen> with RefreshOnVisible<Homescree
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  "Your selected course lessons",
+                                  "Continue MCQs",
                                   style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700, color: Colors.black87),
                                 ),
                                 SizedBox(height: 12.h),
-                                GridView.builder(
-                                  shrinkWrap: true,
-                                  physics: const NeverScrollableScrollPhysics(),
-                                  itemCount: lessons.length,
-                                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                                    crossAxisCount: 2,
-                                    crossAxisSpacing: 12,
-                                    mainAxisSpacing: 12,
-                                    childAspectRatio: 0.82,
-                                  ),
-                                  itemBuilder: (context, index) {
-                                    final lesson = lessons[index];
-                                    return GestureDetector(
-                                      onTap: () {
-                                        Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (_) => StudentLessonDetailScreen(lesson: lesson),
-                                          ),
-                                        );
-                                      },
-                                      child: Container(
-                                        decoration: BoxDecoration(
-                                          color: Colors.white,
-                                          borderRadius: BorderRadius.circular(16.r),
-                                          boxShadow: [
-                                            BoxShadow(
-                                              color: Colors.black.withOpacity(0.04),
-                                              blurRadius: 10,
-                                              offset: const Offset(0, 4),
-                                            ),
-                                          ],
-                                        ),
-                                        padding: EdgeInsets.all(10.w),
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            // The tile's height comes from the grid's childAspectRatio,
-                                            // which doesn't track ScreenUtil's .h scaling — a fixed 90.h
-                                            // thumbnail overflowed the column on wide/short viewports.
-                                            // Letting the thumbnail take whatever is left can't overflow.
-                                            Expanded(
-                                              child: lesson.thumbnailUrl != null
-                                                  ? ClipRRect(
-                                                      borderRadius: BorderRadius.circular(12.r),
-                                                      child: Image.network(
-                                                        lesson.thumbnailUrl!,
-                                                        width: double.infinity,
-                                                        fit: BoxFit.cover,
-                                                      ),
-                                                    )
-                                                  : Container(
-                                                      width: double.infinity,
-                                                      decoration: BoxDecoration(
-                                                        color: const Color(0xFF87986B),
-                                                        borderRadius: BorderRadius.circular(12.r),
-                                                      ),
-                                                      child: const Icon(Icons.play_circle_fill_rounded, color: Colors.white),
-                                                    ),
-                                            ),
-                                            SizedBox(height: 10.h),
-                                            Text(
-                                              lesson.title,
-                                              maxLines: 2,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: TextStyle(fontSize: 12.5.sp, fontWeight: FontWeight.w700),
-                                            ),
-                                            SizedBox(height: 6.h),
-                                            Row(
-                                              children: [
-                                                if (lesson.hasVideo)
-                                                  const Icon(Icons.videocam_outlined, size: 14, color: Colors.green),
-                                                if (lesson.hasNote)
-                                                  const Icon(Icons.description_outlined, size: 14, color: Colors.orange),
-                                                const Spacer(),
-                                                if (lesson.locked)
-                                                  const Icon(Icons.lock_rounded, size: 14, color: Colors.grey),
-                                              ],
-                                            )
-                                          ],
-                                        ),
+                                DailyQuizCard(
+                                  // Keyed on the date so the card rebuilds
+                                  // from scratch when the set rolls over at
+                                  // midnight Gulf time.
+                                  key: ValueKey(summary.date),
+                                  summary: summary,
+                                  courseId: courseId,
+                                  onChanged: () => context
+                                      .read<HomeSummaryProvider>()
+                                      .load(),
+                                ),
+                              ],
+                            );
+                          },
+                        ),
+
+                        SizedBox(height: 28.h),
+
+                        // ── Continue Learning ──
+                        //
+                        // Two cards: the video they left, and the one after
+                        // it. Replaces both the Continue Watching row and the
+                        // lesson grid — a home screen is somewhere to resume
+                        // from, and a full catalogue here buried the one
+                        // lesson the student actually wanted.
+                        Consumer2<HomeSummaryProvider,
+                            SelectionContentProvider>(
+                          builder: (context, home, content, _) {
+                            final items = pickLearningItems(
+                              inProgress: home.inProgressVideos,
+                              content: content.content,
+                            );
+                            if (items.isEmpty) return const SizedBox.shrink();
+
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                ContinueLearningRow(
+                                  items: items,
+                                  onOpen: (lesson) async {
+                                    await Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => StudentLessonDetailScreen(
+                                            lesson: lesson),
                                       ),
                                     );
+                                    // On return only — the player already
+                                    // drops a finished video from the list.
+                                    if (context.mounted) {
+                                      context.read<HomeSummaryProvider>().load();
+                                    }
                                   },
                                 ),
                                 SizedBox(height: 28.h),
@@ -539,27 +452,6 @@ class _HomescreenState extends State<Homescreen> with RefreshOnVisible<Homescree
                             );
                           },
                         ),
-
-                        // ── Continue Learning ──
-                        Text(
-                          "Continue Learning",
-                          style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700, color: Colors.black87),
-                        ),
-                        SizedBox(height: 12.h),
-                        Row(
-                          children: [
-                            Expanded(child: _LearningCard(title: "DHA Case : Chest pain inferior STEMI")),
-                            SizedBox(width: 12.w),
-                            Expanded(
-                              child: _LearningCard(
-                                title: "Cardiology – Ischemic Heart Disease",
-                                icon: Icons.favorite_rounded,
-                              ),
-                            ),
-                          ],
-                        ),
-
-                        SizedBox(height: 28.h),
 
                         // ── AI picks for you ──
                         Row(
@@ -687,82 +579,6 @@ class _HeaderIconButton extends StatelessWidget {
   }
 }
 
-// ── MCQ answer option row ──
-class _McqOption extends StatelessWidget {
-  final String label;
-  final String text;
-  const _McqOption({required this.label, required this.text});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 12.h),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF6F6F1),
-        borderRadius: BorderRadius.circular(30.r),
-      ),
-      child: Row(
-        children: [
-          CircleAvatar(
-            radius: 13.r,
-            backgroundColor: Colors.white,
-            child: Text(
-              label,
-              style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: Colors.black87),
-            ),
-          ),
-          SizedBox(width: 12.w),
-          Expanded(
-            child: Text(
-              text,
-              style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500, color: Colors.black87),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ── Continue Learning card ──
-class _LearningCard extends StatelessWidget {
-  final String title;
-  final IconData icon;
-  const _LearningCard({required this.title, this.icon = Icons.play_arrow_rounded});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 130.h,
-      padding: EdgeInsets.all(14.w),
-      decoration: BoxDecoration(
-        color: const Color(0xFF87986B),
-        borderRadius: BorderRadius.circular(16.r),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 32.w,
-            height: 32.w,
-            decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-            child: Icon(icon, size: 16.sp, color: const Color(0xFF87986B)),
-          ),
-          const Spacer(),
-          Text(
-            title,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: Colors.white, height: 1.3),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ── AI picks card ──
 class _AiPickCard extends StatelessWidget {
   final IconData icon;
   final String tagText;

@@ -2,12 +2,14 @@ package com.keerthana.dr_app
 
 import android.content.Context
 import android.hardware.display.DisplayManager
+import android.provider.Settings
 import android.os.Build
 import android.view.Display
 import android.view.WindowManager
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.EventChannel
+import io.flutter.plugin.common.MethodChannel
 import java.util.function.Consumer
 
 /**
@@ -34,6 +36,7 @@ class MainActivity : FlutterActivity() {
 
     private companion object {
         const val CHANNEL = "dr_app/screen_recording"
+        const val DEVICE_CHANNEL = "dr_app/device"
         const val MIN_SDK_FOR_CALLBACK = 35
     }
 
@@ -46,6 +49,22 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+
+        // ANDROID_ID: unique per (device, user, app signing key), survives a
+        // reinstall, resets only on a factory reset. device_info_plus does not
+        // expose it — its `id` is Build.ID, the OS build label, which is the
+        // same on every phone running that firmware and would bind them all
+        // to one account.
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, DEVICE_CHANNEL)
+            .setMethodCallHandler { call, result ->
+                if (call.method == "getAndroidId") {
+                    result.success(
+                        Settings.Secure.getString(contentResolver, Settings.Secure.ANDROID_ID)
+                    )
+                } else {
+                    result.notImplemented()
+                }
+            }
 
         EventChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setStreamHandler(
             object : EventChannel.StreamHandler {
