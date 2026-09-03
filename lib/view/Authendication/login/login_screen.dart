@@ -20,8 +20,6 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
-    print("Hight of the screen : ${size.height}");
-    print(" Width of the screen : ${size.width}");
 
 
 

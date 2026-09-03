@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
+
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
 
@@ -23,7 +25,7 @@ class AuthService {
 
   Future<AuthResultModel> signInWithGoogle() async {
     try {
-      print("========== GOOGLE SIGN IN ==========");
+
 
       // Optional: clear previous Google session
       await _googleSignIn.signOut();
@@ -35,7 +37,7 @@ class AuthService {
         throw Exception("User cancelled Google Sign-In");
       }
 
-      print("User Email : ${googleUser.email}");
+
 
       final GoogleSignInAuthentication googleAuth =
       await googleUser.authentication;
@@ -59,8 +61,10 @@ class AuthService {
         }),
       );
 
-      print("Status Code : ${response.statusCode}");
-      print("Response : ${response.body}");
+      // Never the body: it carries the access and refresh tokens, and
+      // print() reaches logcat in release builds too, where any app with log
+      // access could read them. The status alone is enough to debug with.
+      if (kDebugMode) debugPrint('AUTH  POST [${response.statusCode}]  google');
 
       if (response.statusCode == 200) {
         final AuthResultModel authResult =
@@ -70,8 +74,7 @@ class AuthService {
         await LocalStorage.saveAccessToken(authResult.accessToken);
         await LocalStorage.saveRefreshToken(authResult.refreshToken);
 
-        print("Access Token Saved");
-        print("Refresh Token Saved");
+
 
         return authResult;
       }
@@ -106,9 +109,8 @@ class AuthService {
             ? retry
             : int.tryParse('${retry ?? ''}'),
       );
-    } catch (e, stackTrace) {
-      print("Google Sign-In Error : $e");
-      print(stackTrace);
+    } catch (e) {
+      if (kDebugMode) debugPrint('Google sign-in failed: $e');
       rethrow;
     }
   }

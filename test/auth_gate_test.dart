@@ -118,21 +118,21 @@ void main() {
     /// used comes off it.
     Duration remainingHold({
       required Duration workTook,
-      Duration floor = const Duration(seconds: 2),
+      Duration floor = const Duration(seconds: 1),
     }) =>
         workTook >= floor ? Duration.zero : floor - workTook;
 
-    test('a fast sign-in is padded to the full two seconds', () {
+    test('a fast sign-in is padded to the full second', () {
       // Without this, three screens flash past in under 200ms and it reads
       // as a glitch rather than as speed.
       expect(
         remainingHold(workTook: const Duration(milliseconds: 150)),
-        const Duration(milliseconds: 1850),
+        const Duration(milliseconds: 850),
       );
     });
 
     test('a slow sign-in is never made slower', () {
-      // A cold backend can take five seconds on its own. Adding two more on
+      // A cold backend can take five seconds on its own. Adding the floor on
       // top would punish exactly the students already waiting longest.
       expect(
         remainingHold(workTook: const Duration(seconds: 5)),
@@ -142,7 +142,7 @@ void main() {
 
     test('work that lands exactly on the floor waits no longer', () {
       expect(
-        remainingHold(workTook: const Duration(seconds: 2)),
+        remainingHold(workTook: const Duration(seconds: 1)),
         Duration.zero,
       );
     });

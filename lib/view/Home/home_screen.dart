@@ -18,8 +18,6 @@ import 'daily_quiz/daily_quiz_card.dart';
 import '../../widget/app_shimmer.dart';
 import '../../core/utils/refresh_on_visible.dart';
 
-// If you still keep a separate "AI Videos list" screen, import it too.
-// import 'ai_videos_screen.dart';
 
 class Homescreen extends StatefulWidget {
   const Homescreen({super.key});

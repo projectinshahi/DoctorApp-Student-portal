@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../../core/theam /app_color.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 import '../../repository/refresh_api_provider.dart';
@@ -9,6 +11,10 @@ import '../../repository/course_get_provider.dart';
 import '../../repository/selection_provider.dart';
 import '../../widget/course_card_shimmer.dart';
 import 'package:flutter/services.dart';
+
+/// The app's red, not Material's — Colors.red is far louder than this
+/// palette and made an ordinary retry look like a crash.
+const Color _kDanger = Color(0xFFD65745);
 
 class ExamSelectionScreen extends StatefulWidget {
   final String accessToken;
@@ -147,7 +153,7 @@ class _ExamSelectionScreenState extends State<ExamSelectionScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(selectionProvider.errorMessage ?? 'Failed to save selection'),
-          backgroundColor: Colors.red,
+          backgroundColor: _kDanger,
         ),
       );
     }
@@ -168,7 +174,7 @@ class _ExamSelectionScreenState extends State<ExamSelectionScreen> {
         if (!didPop && isRootScreen) SystemNavigator.pop();
       },
       child: Scaffold(
-        backgroundColor: const Color(0xFFF3F4F6),
+        backgroundColor: AppColor.Screenbackground,
         appBar: AppBar(
           backgroundColor: Colors.transparent,
           elevation: 0,
@@ -191,8 +197,14 @@ class _ExamSelectionScreenState extends State<ExamSelectionScreen> {
                         ? _handleDone
                         : null,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: _hasSelection ? Colors.black : Colors.white,
-                      foregroundColor: _hasSelection ? Colors.white : Colors.grey,
+                      backgroundColor: _hasSelection
+                          ? AppColor.buttoncolor
+                          : Colors.white,
+                      foregroundColor: _hasSelection
+                          ? AppColor.Buttontextcolor
+                          : Colors.grey.shade500,
+                      disabledBackgroundColor: Colors.white,
+                      disabledForegroundColor: Colors.grey.shade400,
                       elevation: 0,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(24),
@@ -238,7 +250,7 @@ class _ExamSelectionScreenState extends State<ExamSelectionScreen> {
                       Text(
                         provider.coursesErrorMessage!,
                         textAlign: TextAlign.center,
-                        style: TextStyle(color: Colors.red, fontSize: 16.sp),
+                        style: TextStyle(color: _kDanger, fontSize: 16.sp),
                       ),
                       SizedBox(height: 16.h),
                       ElevatedButton(
@@ -290,12 +302,28 @@ class _ExamSelectionScreenState extends State<ExamSelectionScreen> {
     final bool isStandaloneSelected = selectedCourseId == course.id;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
+      margin: EdgeInsets.only(bottom: 16.h),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(20.r),
+        // The chosen card carries the app's olive outline. Previously only a
+        // small grey tick changed, which is easy to miss on a list of
+        // identically white cards.
+        border: Border.all(
+          color: isStandaloneSelected
+              ? AppColor.buttoncolor
+              : Colors.transparent,
+          width: 1.6,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
       ),
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(20.w),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -416,14 +444,14 @@ class _SelectionCircle extends StatelessWidget {
       height: 28.h,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: isSelected ? const Color(0xFFDCDCDC) : const Color(0xFFE5E5E5),
+        color: isSelected ? AppColor.buttoncolor : Colors.transparent,
         border: Border.all(
-          color: isSelected ? const Color(0xFF8E8E8E) : Colors.transparent,
+          color: isSelected ? AppColor.buttoncolor : Colors.grey.shade400,
           width: 2,
         ),
       ),
       child: isSelected
-          ? Icon(Icons.check, color: Colors.black87, size: 16.sp)
+          ? Icon(Icons.check, color: AppColor.Buttontextcolor, size: 16.sp)
           : null,
     );
   }

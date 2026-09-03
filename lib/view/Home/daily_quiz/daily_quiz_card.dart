@@ -64,6 +64,15 @@ class DailyQuizCard extends StatefulWidget {
 class _DailyQuizCardState extends State<DailyQuizCard> {
   DailyQuizProvider? _quiz;
 
+  /// The shimmer stays up for at least a second.
+  ///
+  /// A *floor*, not an added delay: the fetch runs during it and only the
+  /// leftover is waited out, so a slow request is never made slower. Without
+  /// it a cached question snapped in within a frame or two, which reads as a
+  /// flicker rather than as speed.
+  static const _minimumShimmer = Duration(seconds: 1);
+  bool _shimmerHeld = true;
+
   @override
   void initState() {
     super.initState();
@@ -93,8 +102,16 @@ class _DailyQuizCardState extends State<DailyQuizCard> {
     final provider =
         DailyQuizProvider(courseId: widget.courseId, service: widget.service);
     setState(() => _quiz = provider);
-    provider.load().then((_) {
-      if (mounted) widget.onChanged();
+
+    final startedAt = DateTime.now();
+    provider.load().then((_) async {
+      final elapsed = DateTime.now().difference(startedAt);
+      if (elapsed < _minimumShimmer) {
+        await Future<void>.delayed(_minimumShimmer - elapsed);
+      }
+      if (!mounted) return;
+      setState(() => _shimmerHeld = false);
+      widget.onChanged();
     });
   }
 
@@ -126,7 +143,7 @@ class _DailyQuizCardState extends State<DailyQuizCard> {
         children: [
           _Header(summary: widget.summary, quiz: quiz),
           SizedBox(height: 14.h),
-          if (quiz == null)
+          if (quiz == null || _shimmerHeld)
             AppShimmer(
               child: ShimmerBox(
                   width: double.infinity, height: 180.h, radius: 12.r),

@@ -32,9 +32,13 @@ class AuthProvider extends ChangeNotifier {
   /// How long the welcome screen stays up at minimum.
   ///
   /// A *floor*, not an added delay: the real work runs during it, and only
-  /// the leftover is waited out. A fast sign-in would otherwise flash three
-  /// screens in under 200ms, which reads as a glitch rather than as speed.
-  static const _welcomeMinimum = Duration(seconds: 2);
+  /// the leftover is waited out, so a slow sign-in is never made slower.
+  ///
+  /// One second. Long enough that a fast sign-in does not flash three
+  /// screens past in under 200ms — which reads as a glitch rather than as
+  /// speed — and short enough not to feel like waiting. It was two, and that
+  /// was too long.
+  static const _welcomeMinimum = Duration(seconds: 1);
   final AuthService _authService = AuthService();
 
   /// True once an authenticated request has succeeded in this run.

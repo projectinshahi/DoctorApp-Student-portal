@@ -201,4 +201,42 @@ void main() {
 
     expect(find.text('Answered — new question tomorrow'), findsOneWidget);
   });
+
+  testWidgets('the shimmer holds for a second before the question appears',
+      (tester) async {
+    // _pump ends on pumpAndSettle, which runs past the floor — so check the
+    // frames in between rather than the settled state.
+    tester.view.physicalSize = const Size(440, 956);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      ScreenUtilInit(
+        designSize: const Size(440, 956),
+        minTextAdapt: true,
+        builder: (context, child) => MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: DailyQuizCard(
+                summary: DailyQuizSummary.fromJson(
+                    {'state': 'inProgress', 'totalQuestions': 2}),
+                courseId: 22,
+                onChanged: () {},
+                service: _FakeService(),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    // The fake answers instantly, so without the floor the question would be
+    // on screen by now and the shimmer would have flickered past.
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.textContaining('multifactorial inheritance'), findsNothing);
+
+    await tester.pump(const Duration(milliseconds: 900));
+    expect(find.textContaining('multifactorial inheritance'), findsOneWidget);
+  });
 }

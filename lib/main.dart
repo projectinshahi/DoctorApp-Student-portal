@@ -13,6 +13,7 @@ import 'package:dr_app/widget/screenshot_guard.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
+import 'core/theam /app_theme.dart';
 import 'core/utils/app_navigator.dart';
 import 'core/utils/refresh_on_visible.dart';
 import 'widget/integrity_gate.dart';
@@ -59,6 +60,10 @@ class MyApp extends StatelessWidget {
             navigatorKey: navigatorKey,
               title: "Dr. SKM's Academy",
               debugShowCheckedModeBanner: false,
+              // One theme for every screen. Without it, anything a screen
+              // did not style itself fell back to Flutter's blue and purple
+              // — which is how the course picker ended up grey and black.
+              theme: AppTheme.light,
               // Wrapped here, not per screen: `builder` sits above the
               // Navigator, so every route — dialogs, the video player and the
               // quiz included — is blocked by this one switch.

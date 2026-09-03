@@ -30,9 +30,6 @@ class _SignInScreenState extends State<SignInScreen> {
   bool _obscurePassword = true;
 
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-    print("Hight of the screen : ${size.height}");
-    print(" Width of the screen : ${size.width}");
 
     return Scaffold(
       backgroundColor: AppColor.Screenbackground,

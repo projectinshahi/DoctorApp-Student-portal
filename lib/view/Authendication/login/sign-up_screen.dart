@@ -21,9 +21,6 @@ class _SignupScreenState extends State<SignupScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-    print("Hight of the screen : ${size.height}");
-    print(" Width of the screen : ${size.width}");
 
     return Scaffold(
       backgroundColor: AppColor.Screenbackground,
@@ -160,7 +157,6 @@ class _SignupScreenState extends State<SignupScreen> {
                               ? null
                               : () async {
                             setState(() => _isSigningIn = true);
-                            print('UI: Google sign-in button tapped.');
 
                             final success = await viewModel.signInWithGoogle();
 
@@ -215,7 +211,6 @@ class _SignupScreenState extends State<SignupScreen> {
                               // strings for the tokens it needs.
                               Navigator.of(context).popUntil((r) => r.isFirst);
                             } else {
-                              print('UI: Sign-in failed. errorMessage = ${viewModel.errorMessage}');
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
                                   content: Text(
