@@ -19,6 +19,14 @@ class ApiClient {
   /// codes.
   static void Function(String message)? onSessionExpired;
 
+  /// Fired the first time an authenticated request actually succeeds.
+  ///
+  /// This is what separates "the session died while you were using the app"
+  /// from "you opened the app and the token was already dead". A cold start
+  /// with a revoked session never gets a 200, so it never fires — and the
+  /// student is not met by a modal before touching anything.
+  static void Function()? onAuthenticatedSuccess;
+
   static Future<http.Response> get(String url) =>
       _sendWithAuth((token) => http.get(Uri.parse(url), headers: _headers(token)));
 
@@ -81,6 +89,9 @@ class ApiClient {
     }
 
     if (response.statusCode != 401) {
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        onAuthenticatedSuccess?.call();
+      }
       return response;
     }
 
@@ -105,6 +116,9 @@ class ApiClient {
     try {
       final newAccessToken = await _refreshAccessToken();
       response = await requestFn(newAccessToken);
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        onAuthenticatedSuccess?.call();
+      }
       return response;
     } on SessionExpiredException catch (e) {
       _handleSessionExpired(e.message);

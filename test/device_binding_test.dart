@@ -49,4 +49,47 @@ void main() {
       expect(reworded.isDeviceBound, isTrue);
     });
   });
+
+  group('SESSION_ACTIVE_ELSEWHERE — the new policy', () {
+    test('the second device is refused, and told how long', () {
+      const refused = LoginRefusedException(
+        code: 'SESSION_ACTIVE_ELSEWHERE',
+        message: 'This account is signed in on another device. Sign out there '
+            'first, or try again in a few minutes.',
+        retryAfterMinutes: 30,
+      );
+
+      // The policy flipped: the account holder keeps their session and the
+      // newcomer waits, instead of the first device being kicked off.
+      expect(refused.isSessionActiveElsewhere, isTrue);
+      expect(refused.retryAfterMinutes, 30);
+
+      // Not one of the others — each needs different words.
+      expect(refused.isAccountBlocked, isFalse);
+      expect(refused.isDeviceBound, isFalse);
+    });
+
+    test('a refusal without a window still explains itself', () {
+      // retryAfterMinutes is optional; the dialog falls back to "sign out on
+      // your other device" rather than printing "null minutes".
+      const refused = LoginRefusedException(
+        code: 'SESSION_ACTIVE_ELSEWHERE',
+        message: 'This account is signed in on another device.',
+      );
+
+      expect(refused.isSessionActiveElsewhere, isTrue);
+      expect(refused.retryAfterMinutes, isNull);
+    });
+
+    test('the code decides, not the wording', () {
+      // The server may rephrase or translate the sentence at any time.
+      const reworded = LoginRefusedException(
+        code: 'SESSION_ACTIVE_ELSEWHERE',
+        message: 'Hierdie rekening is op \'n ander toestel aangeteken.',
+        retryAfterMinutes: 15,
+      );
+      expect(reworded.isSessionActiveElsewhere, isTrue);
+      expect(reworded.retryAfterMinutes, 15);
+    });
+  });
 }

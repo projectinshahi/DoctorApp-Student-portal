@@ -1,7 +1,7 @@
-import 'package:dr_app/view/Home/home_screen.dart';
 import 'package:flutter/material.dart';
 
-import '../../../services/Auth_services.dart' show LoginRefusedException;
+import '../../../repository/refresh_api_provider.dart';
+
 import '../../../widget/login_refused_dialog.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
@@ -9,7 +9,6 @@ import 'package:dr_app/core/constant/app_size.dart';
 import '../../../core/theam /app_color.dart';
 import '../../../core/utils/device_id_helper.dart';
 import '../../../repository/google_sign_in_provider.dart';
-import '../../subjectSelection/select_exam_screen.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -175,22 +174,14 @@ class _SignupScreenState extends State<SignupScreen> {
                             setState(() => _isSigningIn = true);
                             print('UI: Google sign-in button tapped.');
 
-                            bool success = false;
-                            LoginRefusedException? refused;
-                            try {
-                              success = await viewModel.signInWithGoogle();
-                            } on LoginRefusedException catch (e) {
-                              // The server turned it away for a stated
-                              // reason — a bound device, a blocked account.
-                              // Swallowing it into a generic failure is what
-                              // leaves a student tapping a button that never
-                              // works and never says why.
-                              refused = e;
-                              success = false;
-                            } catch (_) {
-                              success = false;
-                            }
+                            final success = await viewModel.signInWithGoogle();
 
+                            // The server turned it away for a stated reason —
+                            // in use elsewhere, blocked, a bound device. Each
+                            // needs different words, and the code is what
+                            // decides. Staying put is the point: there is no
+                            // force-sign-in to offer.
+                            final refused = viewModel.refusal;
                             if (refused != null && context.mounted) {
                               setState(() => _isSigningIn = false);
                               await showLoginRefusedDialog(context, refused);
@@ -204,35 +195,37 @@ class _SignupScreenState extends State<SignupScreen> {
                             final result = viewModel.authResult;
 
                             if (success && result != null) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    result.isNewUser
-                                        ? 'Welcome, ${result.user.name}!'
-                                        : 'Welcome back, ${result.user.name}!',
-                                  ),
-                                ),
-                              );
+                              // No "Welcome back" toast. The home screen
+                              // already greets them by name, and a snack bar
+                              // riding in over the transition just competes
+                              // with the notice shown when another device was
+                              // signed out.
 
-                              if (result.isNewUser) {
-                                Navigator.pushReplacement(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => ExamSelectionScreen(
-                                      accessToken: '', refreshToken: '', deviceId: '',
-                                    ),
-                                  ),
-                                );
-                              } else {
-                                Navigator.pushReplacement(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => Homescreen(
-                                      //authResult: result,
-                                    ),
-                                  ),
-                                );
-                              }
+                              // Hand the session to AuthProvider, which is
+                              // what AuthGate watches. Without this the
+                              // tokens were stored but the gate went on
+                              // showing the login screen until some later
+                              // rebuild — the flicker between signing in and
+                              // landing on home.
+                              await context
+                                  .read<AuthProvider>()
+                                  .adoptSession(result);
+
+                              if (!context.mounted) return;
+                              // Left spinning until now on purpose:
+                              // adoptSession still had a /selection/content
+                              // call to make after the 200 landed.
+                              setState(() => _isSigningIn = false);
+
+                              // No navigation of our own. AuthGate swaps its
+                              // root — to the course picker for a new
+                              // account, to home otherwise.
+                              //
+                              // pushReplacement removed AuthGate from the
+                              // tree, taking the session watcher with it, and
+                              // it pushed ExamSelectionScreen with three empty
+                              // strings for the tokens it needs.
+                              Navigator.of(context).popUntil((r) => r.isFirst);
                             } else {
                               print('UI: Sign-in failed. errorMessage = ${viewModel.errorMessage}');
                               ScaffoldMessenger.of(context).showSnackBar(

@@ -3,6 +3,9 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 
+import '../../../core/constant/local_storage.dart';
+import '../../subjectSelection/select_exam_screen.dart';
+import '../../../repository/selection_content_provider.dart';
 import '../../../widget/app_snackbar.dart';
 import 'info_screens.dart';
 import 'settings_screen.dart';
@@ -222,6 +225,42 @@ class _ProfileScreenState extends State<ProfileScreen> with RefreshOnVisible<Pro
         );
       },
     );
+  }
+
+  /// Opens the course picker over the profile.
+  ///
+  /// Pushed, not swapped: the student may back out without choosing, and the
+  /// course they already have must survive that. The picker only writes on a
+  /// successful save.
+  Future<void> _changeCourse(BuildContext context) async {
+    final tokens = await Future.wait([
+      LocalStorage.getAccessToken(),
+      LocalStorage.getRefreshToken(),
+      LocalStorage.getDeviceId(),
+    ]);
+
+    if (!context.mounted) return;
+
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ExamSelectionScreen(
+          accessToken: tokens[0] ?? '',
+          refreshToken: tokens[1] ?? '',
+          deviceId: tokens[2] ?? '',
+        ),
+      ),
+    );
+
+    if (!context.mounted) return;
+
+    // Changing course changes everything downstream — the lesson tree, the
+    // tests, the daily quiz. Refetch both rather than leave the old course's
+    // content on screen under a new course's name.
+    await Future.wait([
+      context.read<ProfileProvider>().loadProfile(),
+      context.read<SelectionContentProvider>().loadContent(),
+    ]);
   }
 
   Future<void> _handleLogout(BuildContext context) async {
@@ -482,8 +521,40 @@ class _ProfileScreenState extends State<ProfileScreen> with RefreshOnVisible<Pro
                             color: AppColor.Buttontextcolor,
                           ),
                         ),
-
-
+                        SizedBox(height: 14.h),
+                        Divider(
+                            height: 1,
+                            color: AppColor.Buttontextcolor.withValues(alpha: 0.25)),
+                        SizedBox(height: 6.h),
+                        InkWell(
+                          onTap: () => _changeCourse(context),
+                          borderRadius: BorderRadius.circular(10.r),
+                          child: Padding(
+                            padding: EdgeInsets.symmetric(vertical: 8.h),
+                            child: Row(
+                              children: [
+                                Icon(Icons.swap_horiz_rounded,
+                                    size: 18.sp,
+                                    color: AppColor.Buttontextcolor),
+                                SizedBox(width: 8.w),
+                                Text(
+                                  profile.selectedCourse == null
+                                      ? "Choose a course"
+                                      : "Change course",
+                                  style: TextStyle(
+                                    fontSize: 13.5.sp,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppColor.Buttontextcolor,
+                                  ),
+                                ),
+                                const Spacer(),
+                                Icon(Icons.chevron_right_rounded,
+                                    size: 20.sp,
+                                    color: AppColor.Buttontextcolor),
+                              ],
+                            ),
+                          ),
+                        ),
                       ],
                     ),
                   ),

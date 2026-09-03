@@ -115,4 +115,37 @@ void main() {
       );
     });
   });
+
+  group('the flag must not outlive the account', () {
+    // hasSelectedExam answers "has *this account* picked a course?", but it
+    // lives in device storage. Left behind on sign-out, the next person to
+    // sign in on the same phone inherited the previous student's answer.
+
+    test('a stale true flag would send a course-less account to home', () {
+      // What the bug looked like: student A picks a course, signs out, and
+      // student B — or A on a fresh account — lands on an empty home screen
+      // having never chosen anything.
+      expect(
+        decide(localFlag: true, requestSucceeded: true, content: _withoutCourse()),
+        GateDecision.home,
+        reason: 'this is why the flag has to be cleared with the tokens, '
+            'not merely reset in memory',
+      );
+    });
+
+    test('cleared, the same account resolves correctly from the server', () {
+      // No course on the server -> the picker, every launch, until they pick.
+      expect(
+        decide(localFlag: false, requestSucceeded: true, content: _withoutCourse()),
+        GateDecision.askForCourse,
+      );
+
+      // A course on the server -> straight home, no picker, for a returning
+      // student on any device.
+      expect(
+        decide(localFlag: false, requestSucceeded: true, content: _withCourse()),
+        GateDecision.home,
+      );
+    });
+  });
 }

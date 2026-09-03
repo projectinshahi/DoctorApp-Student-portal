@@ -19,6 +19,7 @@ import 'package:provider/provider.dart';
 
 import '../../core/constant/local_storage.dart';
 import '../../core/utils/app_navigator.dart';
+import '../../repository/daily_quiz_provider.dart';
 import '../../repository/refresh_api_provider.dart';
 import '../Authendication/login/login_screen.dart';
 import '../splash/splash_screen.dart';
@@ -31,13 +32,37 @@ class AuthGate extends StatefulWidget {
   State<AuthGate> createState() => _AuthGateState();
 }
 
-class _AuthGateState extends State<AuthGate> {
+class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
   AuthProvider? _auth;
   AuthStatus? _lastStatus;
 
   /// Loaded once. A FutureBuilder given an inline future re-runs it on every
   /// rebuild, which re-read storage on each frame the picker was up.
   Future<Map<String, String?>>? _tokens;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  /// Re-checks the session every time the app comes back to the foreground.
+  ///
+  /// An admin revoking a session, or blocking a student, only reaches the app
+  /// on its next request — so a student sitting on the home screen would stay
+  /// there indefinitely. Resuming is the cheapest honest moment to notice:
+  /// the call goes through ApiClient, so a 401 or 403 takes the normal path
+  /// and signs them out.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed) return;
+    if (_auth?.status != AuthStatus.authenticated) return;
+    if (!mounted) return;
+
+    // /users/me/home is small, already cached by the home screen, and starts
+    // nothing — unlike the daily-quiz endpoint beside it.
+    context.read<HomeSummaryProvider>().load();
+  }
 
   @override
   void didChangeDependencies() {
@@ -53,6 +78,7 @@ class _AuthGateState extends State<AuthGate> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _auth?.removeListener(_onAuthChanged);
     super.dispose();
   }
@@ -65,6 +91,19 @@ class _AuthGateState extends State<AuthGate> {
     final wasSignedIn = _lastStatus == AuthStatus.authenticated;
     _lastStatus = status;
 
+    // A sign-in that displaced another device. Shown from here rather than
+    // from the login screen, because that screen is being replaced by this
+    // very state change — its context dies with it.
+    final notice = auth.signInNotice;
+    if (notice != null && status == AuthStatus.authenticated) {
+      auth.clearSignInNotice();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final navigatorContext = navigatorKey.currentContext;
+        if (navigatorContext != null) _showNotice(navigatorContext, notice);
+      });
+      return;
+    }
+
     // Only the transition out of a signed-in state, and only once.
     if (status != AuthStatus.unauthenticated || !wasSignedIn) return;
 
@@ -74,13 +113,97 @@ class _AuthGateState extends State<AuthGate> {
     // the app.
     navigatorKey.currentState?.popUntil((route) => route.isFirst);
 
-    // The message is dropped, not shown.
-    //
-    // A dialog here fired on every cold start with a dead session — the app
-    // opens, the first request 401s, and the student is met by "Signed out"
-    // before they have touched anything. Landing on the login screen already
-    // says it. Clearing the message stops it queueing up for later.
-    auth.clearSessionMessage();
+    // The message is deliberately not cleared: the login screen keeps it
+    // above the sign-in button either way, so the reason is still there
+    // after the dialog is dismissed.
+    final message = auth.sessionMessage;
+
+    // Only interrupt when the session was actually in use. A cold start with
+    // an already-dead token never completed a request, so the student is
+    // taken quietly to the login screen and reads the banner there.
+    if (message == null || !auth.sessionWasLive) return;
+    auth.markSessionEndShown();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final navigatorContext = navigatorKey.currentContext;
+      if (navigatorContext != null) _showSessionEnded(navigatorContext, message);
+    });
+  }
+
+  /// Shown before the login screen is reached, so the student learns why they
+  /// were interrupted rather than finding themselves back at sign-in with no
+  /// explanation.
+  void _showSessionEnded(BuildContext context, String message) {
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: const Color(0xFFEFF4E2),
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        icon: const Icon(Icons.devices_other_rounded,
+            size: 34, color: Color(0xFF87986B)),
+        title: const Text('Signed out',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+        // The server's wording, unchanged.
+        content: Text(message,
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 13.5, height: 1.45)),
+        actionsAlignment: MainAxisAlignment.center,
+        actions: [
+          ElevatedButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF87986B),
+              foregroundColor: Colors.white,
+              elevation: 0,
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 28, vertical: 12),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(24)),
+            ),
+            child: const Text('Sign in again',
+                style: TextStyle(fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// The server's sentence, verbatim. Composing our own from
+  /// `signedOutOtherDevice` would drift from what actually happened.
+  void _showNotice(BuildContext context, String notice) {
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: const Color(0xFFEFF4E2),
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        icon: const Icon(Icons.devices_other_rounded,
+            size: 32, color: Color(0xFF87986B)),
+        content: Text(notice,
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 13.5, height: 1.45)),
+        actionsAlignment: MainAxisAlignment.center,
+        actions: [
+          ElevatedButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF87986B),
+              foregroundColor: Colors.white,
+              elevation: 0,
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 30, vertical: 12),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(24)),
+            ),
+            child:
+                const Text('OK', style: TextStyle(fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
   }
 
   @override

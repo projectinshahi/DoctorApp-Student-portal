@@ -7,17 +7,29 @@ import 'package:flutter_test/flutter_test.dart';
 /// one worth pinning: the old gate re-applied the sign-out effects from a
 /// post-frame callback in `build`, so any rebuild while signed out reset the
 /// navigation stack again.
-enum GateEffect { none, resetStackAndWarn }
+enum GateEffect {
+  none,
+
+  /// Stack reset only. The login screen's banner carries the reason.
+  resetStackQuietly,
+
+  /// Stack reset plus a dialog, because the student was mid-something.
+  resetStackAndInterrupt,
+}
 
 GateEffect onAuthChanged({
   required AuthStatus? previous,
   required AuthStatus next,
+  bool sessionWasLive = true,
+  String? message,
 }) {
   final wasSignedIn = previous == AuthStatus.authenticated;
   if (next != AuthStatus.unauthenticated || !wasSignedIn) {
     return GateEffect.none;
   }
-  return GateEffect.resetStackAndWarn;
+  return (message != null && sessionWasLive)
+      ? GateEffect.resetStackAndInterrupt
+      : GateEffect.resetStackQuietly;
 }
 
 void main() {
@@ -26,8 +38,38 @@ void main() {
       expect(
         onAuthChanged(
             previous: AuthStatus.authenticated,
-            next: AuthStatus.unauthenticated),
-        GateEffect.resetStackAndWarn,
+            next: AuthStatus.unauthenticated,
+            message: 'x'),
+        GateEffect.resetStackAndInterrupt,
+      );
+    });
+
+    test('a session already dead at launch does not interrupt', () {
+      // The cold start case: the app opens, the first request 401s, and the
+      // student has touched nothing. A modal there is an interruption with
+      // nothing to interrupt — the login banner says it instead.
+      expect(
+        onAuthChanged(
+          previous: AuthStatus.authenticated,
+          next: AuthStatus.unauthenticated,
+          sessionWasLive: false,
+          message: 'You were signed out...',
+        ),
+        GateEffect.resetStackQuietly,
+      );
+    });
+
+    test('a live session dying does interrupt, before the login screen', () {
+      // Mid-quiz, mid-video: the student needs to know why it stopped.
+      expect(
+        onAuthChanged(
+          previous: AuthStatus.authenticated,
+          next: AuthStatus.unauthenticated,
+          sessionWasLive: true,
+          message: 'You were signed out because your account was accessed '
+              'on another device.',
+        ),
+        GateEffect.resetStackAndInterrupt,
       );
     });
 

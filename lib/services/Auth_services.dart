@@ -89,10 +89,22 @@ class AuthService {
         // A gateway page is not JSON. The generic message below covers it.
       }
 
+      // retryAfterMinutes sits beside `error`, not inside it.
+      Map<String, dynamic> body = const {};
+      try {
+        final decoded = jsonDecode(response.body);
+        if (decoded is Map) body = Map<String, dynamic>.from(decoded);
+      } catch (_) {}
+
+      final retry = body["retryAfterMinutes"];
+
       throw LoginRefusedException(
         code: error["code"]?.toString(),
         message: error["message"]?.toString() ??
             "Could not sign in. Please try again.",
+        retryAfterMinutes: retry is int
+            ? retry
+            : int.tryParse('${retry ?? ''}'),
       );
     } catch (e, stackTrace) {
       print("Google Sign-In Error : $e");
@@ -113,11 +125,28 @@ class AuthService {
 /// another account is a different conversation from a blocked account, and
 /// both are different from a network failure.
 class LoginRefusedException implements Exception {
-  /// e.g. `DEVICE_BOUND`, `ACCOUNT_BLOCKED`. Null when the body carried none.
+  /// e.g. `SESSION_ACTIVE_ELSEWHERE`, `ACCOUNT_BLOCKED`. Null when the body
+  /// carried none.
   final String? code;
   final String message;
 
-  const LoginRefusedException({required this.code, required this.message});
+  /// How long until the held session is released on its own. Only sent with
+  /// [isSessionActiveElsewhere].
+  final int? retryAfterMinutes;
+
+  const LoginRefusedException({
+    required this.code,
+    required this.message,
+    this.retryAfterMinutes,
+  });
+
+  /// The account is signed in on another device, and this login was refused
+  /// rather than the other device being kicked off.
+  ///
+  /// **Not an error to retry.** There is no force-sign-in flag in the API, so
+  /// there is nothing to offer but the wait — either the student signs out on
+  /// the other device, or the session goes idle and is released.
+  bool get isSessionActiveElsewhere => code == 'SESSION_ACTIVE_ELSEWHERE';
 
   /// This phone is already registered to a different account — the
   /// subscription-sharing case. Nothing the student can do in the app; it

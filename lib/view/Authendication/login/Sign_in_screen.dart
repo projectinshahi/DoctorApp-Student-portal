@@ -1,6 +1,9 @@
-import 'package:dr_app/view/Home/home_screen.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+
+import '../../../repository/refresh_api_provider.dart';
+
+import '../../../widget/login_refused_dialog.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 
@@ -16,6 +19,14 @@ class SignInScreen extends StatefulWidget {
 }
 
 class _SignInScreenState extends State<SignInScreen> {
+  /// Spans the whole sign-in, not just the HTTP call.
+  ///
+  /// `viewModel.isLoading` drops as soon as the 200 lands, but the session is
+  /// not usable until AuthProvider has adopted it and, on a new device,
+  /// resolved the course — so the button un-spun and sat there looking idle
+  /// while work was still going on.
+  bool _finishing = false;
+
   bool _obscurePassword = true;
 
   Widget build(BuildContext context) {
@@ -171,35 +182,52 @@ class _SignInScreenState extends State<SignInScreen> {
                     Consumer<GoogleSignInIntergration>(
                       builder: (context, viewModel, child) {
                         return GestureDetector(
-                          onTap: viewModel.isLoading
+                          onTap: (viewModel.isLoading || _finishing)
                               ? null
                               : () async {
+                            setState(() => _finishing = true);
                             final success = await viewModel.signInWithGoogle();
 
                             if (!context.mounted) return;
 
+                            // A refusal stays on this screen and explains
+                            // itself, rather than falling through to the
+                            // generic failure snack bar below.
+                            final refused = viewModel.refusal;
+                            if (refused != null) {
+                              setState(() => _finishing = false);
+                              await showLoginRefusedDialog(context, refused);
+                              return;
+                            }
+
                             if (success) {
-                              final result = viewModel.authResult!;
+                              // Hand the session to AuthProvider, which is
+                              // what AuthGate watches. Without this the
+                              // tokens were stored but the gate still showed
+                              // the login screen until some later rebuild —
+                              // the flicker between signing in and landing on
+                              // home.
+                              final result = viewModel.authResult;
+                              if (result != null) {
+                                await context
+                                    .read<AuthProvider>()
+                                    .adoptSession(result);
+                              }
+                              if (!context.mounted) return;
+                              setState(() => _finishing = false);
 
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    result.isNewUser
-                                        ? 'Welcome, ${result.user.name}!'
-                                        : 'Welcome back, ${result.user.name}!',
-                                  ),
-                                ),
-                              );
-
-                              Navigator.pushReplacement(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => Homescreen(
-                                    //authResult: result,
-                                  ),
-                                ),
-                              );
+                              // No "Welcome back" toast, and no navigation.
+                              // The home screen already greets them by name,
+                              // and AuthGate swaps its own root — to the
+                              // course picker for a new account, to home
+                              // otherwise. pushReplacement here removed
+                              // AuthGate, and with it the session watcher.
+                              Navigator.of(context).popUntil((r) => r.isFirst);
                             } else {
+                              // Without this the button stays disabled after
+                              // a failed attempt and the student cannot try
+                              // again.
+                              setState(() => _finishing = false);
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
                                   content: Text(viewModel.errorMessage ?? 'Sign-in failed'),
@@ -215,7 +243,7 @@ class _SignInScreenState extends State<SignInScreen> {
                               borderRadius: BorderRadius.circular(12.r),
                             ),
                             child: Center(
-                              child: viewModel.isLoading
+                              child: (viewModel.isLoading || _finishing)
                                   ? const CircularProgressIndicator()
                                   : Row(
                                 mainAxisAlignment: MainAxisAlignment.center,

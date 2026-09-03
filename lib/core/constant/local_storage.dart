@@ -55,6 +55,18 @@ class LocalStorage {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_accessTokenKey);
     await prefs.remove(_refreshTokenKey);
-    // Note: deviceId is intentionally NOT cleared — it should persist across sign-outs
+
+    // Goes with the tokens, because it answers a question about the
+    // *account*, not the phone: "has this student picked a course?".
+    //
+    // Leaving it behind meant the next person to sign in on this device
+    // inherited the previous student's answer — a fresh account, or one that
+    // backed out of the picker, went straight to an empty home screen.
+    // signOut() reset the field in memory but not the stored value, so it
+    // came back on the next launch.
+    await prefs.remove(_kHasSelectedExamKey);
+
+    // deviceId is deliberately kept: it identifies the phone, not the
+    // session, and regenerating it makes a reinstall look like a new device.
   }
 }
