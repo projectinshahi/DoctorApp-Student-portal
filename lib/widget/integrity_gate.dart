@@ -2,6 +2,7 @@
 //
 // Stands in front of the whole app while the device is checked.
 import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 import '../core/utils/device_integrity.dart';
 
@@ -73,17 +74,17 @@ class _Blocked extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.gpp_bad_outlined, size: 56, color: Color(0xFF87986B)),
-              const SizedBox(height: 20),
+              Icon(Icons.gpp_bad_outlined, size: 56.sp, color: Color(0xFF87986B)),
+              SizedBox(height: 20.h),
               Text(title,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(
-                      fontSize: 19, fontWeight: FontWeight.w800, color: Colors.black87)),
-              const SizedBox(height: 12),
+                  style: TextStyle(
+                      fontSize: 19.sp, fontWeight: FontWeight.w800, color: Colors.black87)),
+              SizedBox(height: 12.h),
               Text(body,
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                      fontSize: 14, height: 1.5, color: Colors.grey.shade700)),
+                      fontSize: 14.sp, height: 1.5, color: Colors.grey.shade700)),
             ],
           ),
         ),

@@ -18,10 +18,11 @@ import '../../../core/theam /app_color.dart';
 import '../../../repository/profile_provider.dart';
 import '../../../repository/refresh_api_provider.dart';
 import '../../../widget/profile_shimmer.dart';
-import '../../Authendication/login/login_screen.dart';
 import '../Qbank/bookmarks_screen.dart';
 import '../../../core/utils/refresh_on_visible.dart';
 
+
+const Color _kDanger = Color(0xFFD65745);
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -267,16 +268,55 @@ class _ProfileScreenState extends State<ProfileScreen> with RefreshOnVisible<Pro
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text("Log out"),
-        content: const Text("Are you sure you want to log out?"),
+        // The app's own background, not the theme's white. Material 3 also
+        // paints a purple surface tint over that white, which is what made
+        // this read as a system dialog dropped on top of the app.
+        backgroundColor: AppColor.Screenbackground,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16.r)),
+        icon: Icon(Icons.logout_rounded, size: 30.sp, color: _kDanger),
+        title: Text("Log out?",
+            textAlign: TextAlign.center,
+            style: TextStyle(
+                fontSize: 17.sp,
+                fontWeight: FontWeight.w800,
+                color: AppColor.Textcolor)),
+        content: Text(
+          "You'll need to sign in again to reach your course.",
+          textAlign: TextAlign.center,
+          style: TextStyle(
+              fontSize: 13.sp, height: 1.45, color: Colors.grey.shade700),
+        ),
+        actionsAlignment: MainAxisAlignment.center,
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text("Cancel"),
+          SizedBox(
+            width: double.infinity,
+            height: 46.h,
+            child: ElevatedButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _kDanger,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(26.r)),
+              ),
+              child: Text("Log out",
+                  style:
+                      TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700)),
+            ),
           ),
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text("Log out", style: TextStyle(color: Colors.red)),
+          SizedBox(
+            width: double.infinity,
+            child: TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: Text("Stay signed in",
+                  style: TextStyle(
+                      fontSize: 13.sp,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey.shade700)),
+            ),
           ),
         ],
       ),
@@ -293,10 +333,15 @@ class _ProfileScreenState extends State<ProfileScreen> with RefreshOnVisible<Pro
 
     if (!context.mounted) return;
 
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (context) => const LoginScreen()),
-          (route) => false,
-    );
+    // No navigation of our own. signOut() flips the status and AuthGate swaps
+    // its root to the login screen.
+    //
+    // pushAndRemoveUntil removed AuthGate from the tree entirely — and
+    // AuthGate is what listens for the session dying, so after one log-out
+    // and sign-in the multi-device sign-out stopped working. Popping back to
+    // the root is enough, and only when this screen was pushed.
+    final navigator = Navigator.of(context);
+    if (navigator.canPop()) navigator.popUntil((route) => route.isFirst);
   }
 
   @override
@@ -608,8 +653,9 @@ class _ProfileScreenState extends State<ProfileScreen> with RefreshOnVisible<Pro
                         ),
                         _menuDivider(),
                         _ProfileMenuItem(
-                          label: "Share this app",
-                          onTap: () => ShareAppSheet.show(context),
+                          label: "Privacy Policy",
+                          onTap: () => Navigator.push(context,
+                              MaterialPageRoute(builder: (_) => const PrivacyPolicyScreen())),
                         ),
                       ],
                     ),

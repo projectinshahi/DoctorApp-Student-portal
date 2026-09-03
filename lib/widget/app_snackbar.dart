@@ -3,6 +3,7 @@
 // One definition for every in-app message, so a success and a failure cannot
 // drift into looking alike — or into looking like the OS.
 import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 const Color _kPrimary = Color(0xFF87986B);
 const Color _kDanger = Color(0xFFB03A2B);
@@ -32,13 +33,13 @@ void showAppSnackBar(
                 success
                     ? Icons.check_circle_rounded
                     : Icons.error_outline_rounded,
-                size: 18,
+                size: 18.sp,
                 color: Colors.white),
-            const SizedBox(width: 10),
+            SizedBox(width: 10.w),
             Expanded(
               child: Text(text,
-                  style: const TextStyle(
-                      fontSize: 13,
+                  style: TextStyle(
+                      fontSize: 13.sp,
                       fontWeight: FontWeight.w600,
                       color: Colors.white)),
             ),

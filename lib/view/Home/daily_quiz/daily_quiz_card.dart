@@ -30,7 +30,6 @@ import '../../../models/daily_quiz_model.dart';
 import '../../../repository/daily_quiz_provider.dart';
 import '../../../services/daily_quiz_service.dart';
 import '../../../widget/app_shimmer.dart';
-import 'daily_quiz_result_screen.dart';
 import 'daily_quiz_screen.dart';
 
 const Color _kPrimary = Color(0xFF87986B);
@@ -228,7 +227,14 @@ class _Body extends StatelessWidget {
           style: TextStyle(fontSize: 12.5.sp, color: Colors.grey.shade700));
     }
 
-    final question = quiz.current;
+    // Always the first question of today's set, never `quiz.current`.
+    //
+    // One question per day on the home screen, and the *same* one all day:
+    // it must not advance when answered, or the explanation the student just
+    // read would slide away and be replaced by a fresh question. The set is
+    // frozen by (courseId, date) server-side, so this is stable until
+    // midnight Gulf time and then changes on its own.
+    final question = quiz.questions.isEmpty ? null : quiz.questions.first;
     if (question == null) {
       return Text('Today\'s set is empty.',
           style: TextStyle(fontSize: 12.5.sp, color: Colors.grey.shade700));
@@ -240,16 +246,17 @@ class _Body extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // No "Question 2 of 10" and no counter: there is one question here,
+        // and a position out of ten only invites looking for the other nine.
         Row(
           children: [
-            Text('Question ${quiz.currentIndex + 1} of ${quiz.questions.length}',
-                style: TextStyle(fontSize: 11.sp, color: Colors.grey.shade600)),
-            const Spacer(),
-            Text('${quiz.answeredCount}/${quiz.totalQuestions} answered',
-                style: TextStyle(
-                    fontSize: 11.sp,
-                    fontWeight: FontWeight.w600,
-                    color: _kPrimary)),
+            Icon(Icons.event_available_rounded,
+                size: 13.sp, color: Colors.grey.shade600),
+            SizedBox(width: 5.w),
+            Text(
+              revealed ? 'Answered — new question tomorrow' : 'Today\'s question',
+              style: TextStyle(fontSize: 11.sp, color: Colors.grey.shade600),
+            ),
           ],
         ),
         SizedBox(height: 10.h),
@@ -280,38 +287,18 @@ class _Body extends StatelessWidget {
           SizedBox(height: 4.h),
           _Reveal(answer: answer),
         ],
-        SizedBox(height: 14.h),
-        Row(
-          children: [
-            if (quiz.currentIndex > 0)
-              _TextAction(label: 'Previous', onTap: quiz.previous),
-            const Spacer(),
-            if (!quiz.isLast)
-              _TextAction(
-                label: 'Next question',
-                onTap: quiz.next,
-                strong: true,
-              )
-            else if (quiz.result != null)
-              _TextAction(
-                label: 'See result',
-                strong: true,
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) =>
-                        DailyQuizResultScreen(result: quiz.result!),
-                  ),
-                ),
-              )
-            else
-              _TextAction(
-                label: 'Open full set',
-                strong: true,
-                onTap: () => _openFull(context),
-              ),
-          ],
-        ),
+        // Nothing to navigate to. The other nine questions live in the full
+        // set; this card is one question a day, answered once.
+        if (revealed) ...[
+          SizedBox(height: 12.h),
+          Center(
+            child: _TextAction(
+              label: 'Practise the full set',
+              strong: true,
+              onTap: () => _openFull(context),
+            ),
+          ),
+        ],
       ],
     );
   }

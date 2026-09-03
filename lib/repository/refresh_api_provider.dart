@@ -24,6 +24,17 @@ class AuthProvider extends ChangeNotifier {
   /// course. The gate shows the splash meanwhile — without it the selection
   /// screen flashes up for a student who has one.
   bool _resolvingSelection = false;
+
+  /// True from the moment a sign-in is accepted until the app is ready to
+  /// show what comes next. The gate renders the loading screen throughout.
+  bool _signingIn = false;
+
+  /// How long the welcome screen stays up at minimum.
+  ///
+  /// A *floor*, not an added delay: the real work runs during it, and only
+  /// the leftover is waited out. A fast sign-in would otherwise flash three
+  /// screens in under 200ms, which reads as a glitch rather than as speed.
+  static const _welcomeMinimum = Duration(seconds: 2);
   final AuthService _authService = AuthService();
 
   /// True once an authenticated request has succeeded in this run.
@@ -55,6 +66,7 @@ class AuthProvider extends ChangeNotifier {
   }
   bool get hasSelectedExam => _hasSelectedExam; // NEW
   bool get isResolvingSelection => _resolvingSelection;
+  bool get isSigningIn => _signingIn;
 
   /// Whether the account already has a course, asking the server when the
   /// local flag says no.
@@ -114,9 +126,12 @@ class AuthProvider extends ChangeNotifier {
   /// device" is the difference between a student understanding what happened
   /// and one who thinks the app is broken — and it is why the backend
   /// distinguishes SESSION_ENDED from a plain expiry at all.
-  void _onSessionExpired(String message) {
+  void _onSessionExpired(String? message) {
     _status = AuthStatus.unauthenticated;
-    _sessionMessage = message;
+    // Only overwrite when there is something to say. A null means the app
+    // simply has no session — after a logout, or on a fresh install — and
+    // the login screen needs no banner for that.
+    if (message != null) _sessionMessage = message;
     notifyListeners();
   }
 
@@ -139,6 +154,10 @@ class AuthProvider extends ChangeNotifier {
   /// rebuild. That was the "login, see the login screen, then it refreshes
   /// into home" flicker.
   Future<void> adoptSession(AuthResultModel result) async {
+    final startedAt = DateTime.now();
+    _signingIn = true;
+    notifyListeners();
+
     // Shown verbatim, and only when the server sent one. It is null on a new
     // account and on a same-device re-login — telling a student they were
     // signed out on "another device" when it was this phone is worse than
@@ -168,6 +187,16 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
 
     if (mustResolve) await resolveExamSelection();
+
+    // Whatever of the two seconds the work did not already use. A floor, not
+    // an addition: a slow sign-in is never made slower.
+    final elapsed = DateTime.now().difference(startedAt);
+    if (elapsed < _welcomeMinimum) {
+      await Future<void>.delayed(_welcomeMinimum - elapsed);
+    }
+
+    _signingIn = false;
+    notifyListeners();
   }
 
   /// Call this from ExamSelectionScreen right after a successful save,

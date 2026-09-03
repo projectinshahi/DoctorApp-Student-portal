@@ -15,14 +15,15 @@
 //    navigator key rather than this widget's context.
 import 'package:dr_app/view/Home/home_screen.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/constant/local_storage.dart';
 import '../../core/utils/app_navigator.dart';
+import '../../widget/app_loading_screen.dart';
 import '../../repository/daily_quiz_provider.dart';
 import '../../repository/refresh_api_provider.dart';
 import '../Authendication/login/login_screen.dart';
-import '../splash/splash_screen.dart';
 import '../subjectSelection/select_exam_screen.dart';
 
 class AuthGate extends StatefulWidget {
@@ -143,13 +144,13 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         icon: const Icon(Icons.devices_other_rounded,
             size: 34, color: Color(0xFF87986B)),
-        title: const Text('Signed out',
+        title: Text('Signed out',
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+            style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.w800)),
         // The server's wording, unchanged.
         content: Text(message,
             textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 13.5, height: 1.45)),
+            style: TextStyle(fontSize: 13.5.sp, height: 1.45)),
         actionsAlignment: MainAxisAlignment.center,
         actions: [
           ElevatedButton(
@@ -184,7 +185,7 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
             size: 32, color: Color(0xFF87986B)),
         content: Text(notice,
             textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 13.5, height: 1.45)),
+            style: TextStyle(fontSize: 13.5.sp, height: 1.45)),
         actionsAlignment: MainAxisAlignment.center,
         actions: [
           ElevatedButton(
@@ -212,15 +213,31 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
 
     return switch (auth.status) {
       AuthStatus.unauthenticated => const LoginScreen(),
-      AuthStatus.unknown => const SplashScreen(),
+      // Reading the stored token. Brief, but it is the very first frame and
+      // an empty screen there reads as a crash.
+      AuthStatus.unknown =>
+        const AppLoadingScreen(message: 'Starting up…'),
       AuthStatus.authenticated => _authenticated(auth),
     };
   }
 
   Widget _authenticated(AuthProvider auth) {
+    // Held for a moment after a sign-in is accepted, so the student sees one
+    // steady screen instead of three flashing past. The work happens during
+    // it, not after.
+    if (auth.isSigningIn) {
+      return const AppLoadingScreen(message: 'Signing you in…');
+    }
+
     // Still asking the server whether this account has a course. Showing the
     // picker here would flash it at a student who chose months ago.
-    if (auth.isResolvingSelection) return const SplashScreen();
+    //
+    // This is the wait right after signing in, and the longest one in the
+    // app — a cold Render instance can take several seconds. Naming it beats
+    // a bare spinner: the student knows the app is working, not stuck.
+    if (auth.isResolvingSelection) {
+      return const AppLoadingScreen(message: 'Loading your course…');
+    }
 
     if (auth.hasSelectedExam) return const Homescreen();
 
@@ -228,7 +245,9 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
     return FutureBuilder<Map<String, String?>>(
       future: _tokens,
       builder: (context, snapshot) {
-        if (!snapshot.hasData) return const SplashScreen();
+        if (!snapshot.hasData) {
+          return const AppLoadingScreen(message: 'Loading your course…');
+        }
         final data = snapshot.data!;
         return ExamSelectionScreen(
           accessToken: data['accessToken'] ?? '',

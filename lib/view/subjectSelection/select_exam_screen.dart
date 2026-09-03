@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 import '../../repository/refresh_api_provider.dart';
 import 'package:provider/provider.dart';
@@ -172,11 +173,11 @@ class _ExamSelectionScreenState extends State<ExamSelectionScreen> {
           backgroundColor: Colors.transparent,
           elevation: 0,
           automaticallyImplyLeading: false,
-          title: const Text(
+          title: Text(
             "Your courses",
             style: TextStyle(
               color: Colors.black,
-              fontSize: 20,
+              fontSize: 20.sp,
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -199,19 +200,19 @@ class _ExamSelectionScreenState extends State<ExamSelectionScreen> {
                       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                     ),
                     child: selectionProvider.isSaving
-                        ? const SizedBox(
-                      width: 18,
-                      height: 18,
+                        ? SizedBox(
+                      width: 18.w,
+                      height: 18.h,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
                         color: Colors.white,
                       ),
                     )
-                        : const Text(
+                        : Text(
                       "Done",
                       style: TextStyle(
                         fontWeight: FontWeight.w600,
-                        fontSize: 16,
+                        fontSize: 16.sp,
                       ),
                     ),
                   );
@@ -237,9 +238,9 @@ class _ExamSelectionScreenState extends State<ExamSelectionScreen> {
                       Text(
                         provider.coursesErrorMessage!,
                         textAlign: TextAlign.center,
-                        style: const TextStyle(color: Colors.red, fontSize: 16),
+                        style: TextStyle(color: Colors.red, fontSize: 16.sp),
                       ),
-                      const SizedBox(height: 16),
+                      SizedBox(height: 16.h),
                       ElevatedButton(
                         onPressed: () => provider.fetchCourses(),
                         child: const Text("Retry"),
@@ -259,10 +260,10 @@ class _ExamSelectionScreenState extends State<ExamSelectionScreen> {
             }).toList();
 
             if (visibleCourses.isEmpty) {
-              return const Center(
+              return Center(
                 child: Text(
                   "No courses available.",
-                  style: TextStyle(fontSize: 16, color: Colors.grey),
+                  style: TextStyle(fontSize: 16.sp, color: Colors.grey),
                 ),
               );
             }
@@ -304,8 +305,8 @@ class _ExamSelectionScreenState extends State<ExamSelectionScreen> {
               Expanded(
                 child: Text(
                   course.title,
-                  style: const TextStyle(
-                    fontSize: 18,
+                  style: TextStyle(
+                    fontSize: 18.sp,
                     fontWeight: FontWeight.bold,
                     color: Colors.black,
                   ),
@@ -327,7 +328,7 @@ class _ExamSelectionScreenState extends State<ExamSelectionScreen> {
                   child: Text(
                     course.description!,
                     style: TextStyle(
-                      fontSize: 14,
+                      fontSize: 14.sp,
                       color: Colors.grey.shade600,
                     ),
                   ),
@@ -346,14 +347,14 @@ class _ExamSelectionScreenState extends State<ExamSelectionScreen> {
                     children: [
                       Icon(
                         Icons.auto_awesome,
-                        size: 11,
+                        size: 11.sp,
                         color: Colors.grey.shade600,
                       ),
                       const SizedBox(width: 2),
                       Text(
                         "AI",
                         style: TextStyle(
-                          fontSize: 11,
+                          fontSize: 11.sp,
                           fontWeight: FontWeight.w500,
                           color: Colors.grey.shade600,
                         ),
@@ -365,12 +366,12 @@ class _ExamSelectionScreenState extends State<ExamSelectionScreen> {
             ),
           ],
           if (hasCourseTypes) ...[
-            const SizedBox(height: 16),
+            SizedBox(height: 16.h),
             ListView.separated(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               itemCount: publishedTypes.length, // CHANGED
-              separatorBuilder: (_, __) => const SizedBox(height: 14),
+              separatorBuilder: (_, __) => SizedBox(height: 14.h),
               itemBuilder: (context, index) {
                 final courseType = publishedTypes[index]; // CHANGED
                 final bool isSelected = selectedCourseTypeId == courseType.id;
@@ -383,8 +384,8 @@ class _ExamSelectionScreenState extends State<ExamSelectionScreen> {
                       Expanded(
                         child: Text(
                           courseType.title,
-                          style: const TextStyle(
-                            fontSize: 15,
+                          style: TextStyle(
+                            fontSize: 15.sp,
                             color: Colors.black87,
                             fontWeight: FontWeight.w400,
                           ),
@@ -411,8 +412,8 @@ class _SelectionCircle extends StatelessWidget {
   Widget build(BuildContext context) {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 250),
-      width: 28,
-      height: 28,
+      width: 28.w,
+      height: 28.h,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         color: isSelected ? const Color(0xFFDCDCDC) : const Color(0xFFE5E5E5),
@@ -422,7 +423,7 @@ class _SelectionCircle extends StatelessWidget {
         ),
       ),
       child: isSelected
-          ? const Icon(Icons.check, color: Colors.black87, size: 16)
+          ? Icon(Icons.check, color: Colors.black87, size: 16.sp)
           : null,
     );
   }

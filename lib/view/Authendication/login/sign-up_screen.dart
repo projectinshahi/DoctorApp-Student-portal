@@ -7,7 +7,6 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 import 'package:dr_app/core/constant/app_size.dart';
 import '../../../core/theam /app_color.dart';
-import '../../../core/utils/device_id_helper.dart';
 import '../../../repository/google_sign_in_provider.dart';
 
 class SignupScreen extends StatefulWidget {
@@ -49,30 +48,19 @@ class _SignupScreenState extends State<SignupScreen> {
           ),
           child: Column(
             children: [
-              FutureBuilder<String>(
-                future: DeviceIdHelper.getDeviceId(),
-                builder: (context, snapshot) {
-                  if (!snapshot.hasData) {
-                    return const SizedBox.shrink();
-                  }
-                  return Padding(
-                    padding: EdgeInsets.only(bottom: 8.h),
-                    child: Text(
-                      'Device ID: ${snapshot.data}',
-                      style: TextStyle(fontSize: 10.sp, color: Colors.grey),
-                    ),
-                  );
-                },
-              ),
-              SizedBox(height: 400.h),
+              // A Spacer, not SizedBox(height: 400.h). A fixed spacer that
+              // large claims 42% of the design height whatever the screen
+              // actually is — it overflowed on short devices and left a gap
+              // on tall ones. This takes whatever is left instead.
+              const Spacer(),
 
               SizedBox(
-                width: 400.w,
+                width: double.infinity,
                 height: 134.h,
                 child: Column(
                   children: [
                     Container(
-                      width: 400.w,
+                      width: double.infinity,
                       height: 60.h,
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(12.r),
@@ -106,7 +94,7 @@ class _SignupScreenState extends State<SignupScreen> {
                     ),
                     SizedBox(height: AppSize.gap),
                     Container(
-                      width: 400.w,
+                      width: double.infinity,
                       height: 60.h,
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(12.r),
@@ -134,7 +122,7 @@ class _SignupScreenState extends State<SignupScreen> {
               SizedBox(height: 80.h),
 
               SizedBox(
-                width: 400.w,
+                width: double.infinity,
                 height: 20.h,
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -160,7 +148,7 @@ class _SignupScreenState extends State<SignupScreen> {
               SizedBox(height: 40.h),
 
               SizedBox(
-                width: 400.w,
+                width: double.infinity,
                 height: 60.h,
                 child: Row(
                   children: [

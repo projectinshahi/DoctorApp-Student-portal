@@ -340,18 +340,90 @@ class TermsScreen extends StatelessWidget {
 }
 
 // ── Share this app ───────────────────────────────────────────
-class ShareAppSheet {
-  /// The store link. **Placeholder** — point it at the real listing before
-  /// release, or students will share a link to nothing.
-  static const link = 'https://play.google.com/store/apps/details?id='
-      'com.keerthana.dr_app';
+// ── Privacy Policy ───────────────────────────────────────────
+class PrivacyPolicyScreen extends StatelessWidget {
+  const PrivacyPolicyScreen({super.key});
 
-  /// Copies rather than opening the system share sheet: `share_plus` is not a
-  /// dependency, and adding one for a single button is not worth the weight.
-  static Future<void> show(BuildContext context) async {
-    await Clipboard.setData(const ClipboardData(text: link));
-    if (context.mounted) {
-      showAppSnackBar(context, 'App link copied — paste it anywhere to share.');
-    }
+  @override
+  Widget build(BuildContext context) {
+    return _InfoScaffold(
+      title: 'Privacy Policy',
+      children: [
+        Container(
+          padding: EdgeInsets.all(14.w),
+          decoration: BoxDecoration(
+            color: const Color(0xFFE8A33D).withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(12.r),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.info_outline_rounded,
+                  size: 17.sp, color: const Color(0xFF9A6B18)),
+              SizedBox(width: 9.w),
+              Expanded(
+                child: Text(
+                  // Same warning the Terms screen carries, and for the same
+                  // reason: this is a legal document, and app stores reject
+                  // builds whose privacy policy does not match what the app
+                  // actually collects.
+                  'Placeholder text. Replace with the academy\'s own policy, '
+                  'reviewed against what the app actually collects, before '
+                  'release.',
+                  style: TextStyle(
+                      fontSize: 11.5.sp,
+                      height: 1.4,
+                      fontWeight: FontWeight.w600,
+                      color: const Color(0xFF8A5B18)),
+                ),
+              ),
+            ],
+          ),
+        ),
+        SizedBox(height: 12.h),
+        _Panel(children: [
+          _heading('What we collect'),
+          _body('Your name and email address, from the Google account you '
+              'sign in with.\n\n'
+              'A device identifier, so the app can tell your devices apart '
+              'and keep one session signed in at a time.\n\n'
+              'Your study activity: which lessons you have watched and how '
+              'far, your question and test answers, scores, and bookmarks.'),
+        ]),
+        SizedBox(height: 12.h),
+        _Panel(children: [
+          _heading('What we use it for'),
+          _body('To show your progress and pick up where you left off, to '
+              'mark your tests and place you on the leaderboard, and to keep '
+              'your account to one device at a time.\n\n'
+              'We do not sell your data, and we do not use it for '
+              'advertising.'),
+        ]),
+        SizedBox(height: 12.h),
+        _Panel(children: [
+          _heading('What is stored on your phone'),
+          _body('Your sign-in tokens, the device identifier, and small '
+              'preferences such as your default playback speed.\n\n'
+              'Signing out removes the tokens. The device identifier stays, '
+              'because it identifies the phone rather than you.'),
+        ]),
+        SizedBox(height: 12.h),
+        _Panel(children: [
+          _heading('Content protection'),
+          _body('Screenshots and screen recording are blocked on course '
+              'content, and playback stops if recording or screen mirroring '
+              'is detected. The app checks whether the device is rooted or '
+              'jailbroken.\n\n'
+              'These checks look at the device, not at anything else on it. '
+              'The app does not read your files, messages, contacts or other '
+              'apps.'),
+        ]),
+        SizedBox(height: 12.h),
+        _Panel(children: [
+          _heading('Your choices'),
+          _body('To have your account and study history deleted, contact us '
+              'from the Contact us screen using your registered email.'),
+        ]),
+      ],
+    );
   }
 }

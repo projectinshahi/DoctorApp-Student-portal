@@ -60,12 +60,12 @@ class _SignInScreenState extends State<SignInScreen> {
               SizedBox(height: 380.h),
 
               SizedBox(
-                width: 400.w,
+                width: double.infinity,
                 height: 134.h,
                 child: Column(
                   children: [
                     Container(
-                      width: 400.w,
+                      width: double.infinity,
                       height: 60.h,
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(12.r),
@@ -112,7 +112,7 @@ class _SignInScreenState extends State<SignInScreen> {
                     ),
                     SizedBox(height: AppSize.gap),
                     Container(
-                      width: 400.w,
+                      width: double.infinity,
                       height: 60.h,
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(12.r),
@@ -148,7 +148,7 @@ class _SignInScreenState extends State<SignInScreen> {
               SizedBox(height: 80.h),
 
               SizedBox(
-                width: 400.w,
+                width: double.infinity,
                 height: 20.h,
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -174,7 +174,7 @@ class _SignInScreenState extends State<SignInScreen> {
               SizedBox(height: 40.h),
 
               SizedBox(
-                width: 400.w,
+                width: double.infinity,
                 height: 60.h,
                 child: Row(
                   children: [

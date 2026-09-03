@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:video_player/video_player.dart';
 
 /// Fullscreen page for direct (non-YouTube) video playback, with a
@@ -48,8 +49,8 @@ class _FullscreenVideoPageState extends State<FullscreenVideoPage> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const SizedBox(height: 14),
-              const Text('Playback speed', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 15)),
+              SizedBox(height: 14.h),
+              Text('Playback speed', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 15.sp)),
               const SizedBox(height: 6),
               for (final speed in _speedOptions)
                 ListTile(
@@ -121,7 +122,7 @@ class _FullscreenVideoPageState extends State<FullscreenVideoPage> {
               icon: Icon(
                 widget.controller.value.isPlaying ? Icons.pause_circle_filled : Icons.play_circle_filled,
                 color: Colors.white,
-                size: 56,
+                size: 56.sp,
               ),
               onPressed: () {
                 setState(() {

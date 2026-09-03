@@ -5,6 +5,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+const _second = {
+  'id': 16,
+  'questionText': 'Which organism most commonly causes pneumonia?',
+  'options': [
+    {'id': 5, 'optionText': 'Streptococcus pneumoniae', 'displayOrder': 0},
+    {'id': 6, 'optionText': 'Aspergillus fumigatus', 'displayOrder': 1},
+  ],
+};
+
 const _question = {
   'id': 15,
   'questionText':
@@ -26,12 +35,12 @@ class _FakeService extends DailyQuizService {
   @override
   Future<DailyQuizSet> fetchToday(int courseId) async => DailyQuizSet.fromJson({
         'date': '2026-09-02',
-        'totalQuestions': 1,
+        'totalQuestions': 2,
         'answeredCount': 0,
-        'remainingCount': 1,
+        'remainingCount': 2,
         'completed': false,
         'currentStreak': 3,
-        'questions': [_question],
+        'questions': [_question, _second],
         'answers': const [],
       });
 
@@ -152,5 +161,44 @@ void main() {
     // so opening the app now starts today's quiz.
     expect(find.textContaining('multifactorial inheritance'), findsOneWidget);
     expect(find.text('Start today\'s set'), findsNothing);
+  });
+
+  testWidgets('one question a day — it never advances after answering',
+      (tester) async {
+    await _pump(tester);
+
+    // Only today's question is on the card, even though the set has more.
+    expect(find.textContaining('multifactorial inheritance'), findsOneWidget);
+    expect(find.textContaining('causes pneumonia'), findsNothing);
+
+    await tester.tap(find.text('Cleft lip'));
+    await tester.pumpAndSettle();
+
+    // Still the same question, with its explanation. Advancing here would
+    // slide the answer the student just read out from under them and put a
+    // fresh question in its place.
+    expect(find.textContaining('multifactorial inheritance'), findsOneWidget);
+    expect(find.text('Correct'), findsOneWidget);
+    expect(find.textContaining('causes pneumonia'), findsNothing);
+  });
+
+  testWidgets('no question counter and nothing to navigate with',
+      (tester) async {
+    await _pump(tester);
+
+    // "Question 1 of 10" only invites hunting for the other nine.
+    expect(find.textContaining('of 10'), findsNothing);
+    expect(find.text('Next question'), findsNothing);
+    expect(find.text('Previous'), findsNothing);
+    expect(find.text("Today's question"), findsOneWidget);
+  });
+
+  testWidgets('after answering it says the next one is tomorrow',
+      (tester) async {
+    await _pump(tester);
+    await tester.tap(find.text('Achondroplasia'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Answered — new question tomorrow'), findsOneWidget);
   });
 }

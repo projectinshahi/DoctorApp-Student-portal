@@ -91,4 +91,28 @@ void main() {
     expect(message, live);
     expect(decide(401, body), AuthAction.endSession);
   });
+
+  group('what deserves a message on the login screen', () {
+    /// Mirrors ApiClient: only a session that was *taken away* carries a
+    /// sentence. Having no session is not an event.
+    String? bannerFor({required bool hadToken, String? serverMessage}) =>
+        hadToken ? serverMessage : null;
+
+    test('a deliberate logout says nothing', () {
+      // A background request fires with no token right after signing out.
+      // "Please log in to continue" there tells the student to undo the
+      // thing they just chose to do.
+      expect(bannerFor(hadToken: false), isNull);
+    });
+
+    test('a fresh install says nothing', () {
+      expect(bannerFor(hadToken: false), isNull);
+    });
+
+    test('a session taken away still explains itself', () {
+      const message = 'You were signed out because your account was accessed '
+          'on another device.';
+      expect(bannerFor(hadToken: true, serverMessage: message), message);
+    });
+  });
 }

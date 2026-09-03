@@ -60,7 +60,7 @@ class _CommentsViewState extends State<_CommentsView> {
     if (provider.isLoading) {
       return Padding(
         padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
-        child: const AppShimmer(child: ShimmerBox(width: double.infinity, height: 120)),
+        child: AppShimmer(child: ShimmerBox(width: double.infinity, height: 120.h)),
       );
     }
 

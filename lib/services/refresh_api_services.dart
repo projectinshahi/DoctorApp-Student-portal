@@ -17,7 +17,12 @@ class ApiClient {
   /// another device" tells the student something a generic "session expired"
   /// does not, and it is the whole reason the backend distinguishes these
   /// codes.
-  static void Function(String message)? onSessionExpired;
+  /// Null message means "no session", not "your session ended".
+  ///
+  /// Signing out, or opening the app with nothing stored, is not an event
+  /// worth explaining — the login screen already says where you are. Only a
+  /// session that was taken away carries a sentence.
+  static void Function(String? message)? onSessionExpired;
 
   /// Fired the first time an authenticated request actually succeeds.
   ///
@@ -65,7 +70,11 @@ class ApiClient {
     final accessToken = await LocalStorage.getAccessToken();
 
     if (accessToken == null) {
-      _handleSessionExpired("Please log in to continue.");
+      // No token at all: nothing ended, so nothing to announce. Without
+      // this, a background request firing just after a deliberate logout put
+      // "Please log in to continue" on the login screen the student had
+      // chosen to go to.
+      _handleSessionExpired(null);
       throw SessionExpiredException("Not logged in");
     }
 
@@ -190,7 +199,7 @@ class ApiClient {
     );
   }
 
-  static void _handleSessionExpired(String message) {
+  static void _handleSessionExpired(String? message) {
     onSessionExpired?.call(message);
   }
 }
