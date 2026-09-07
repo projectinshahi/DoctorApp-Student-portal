@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart';
 
@@ -13,17 +14,51 @@ import '../core/constant/local_storage.dart';
 class AuthService {
   AuthService();
 
+  /// The iOS OAuth client, from Google Cloud Console → Credentials, created
+  /// against the bundle id `com.keerthana.drApp`.
+  ///
+  /// iOS needs its own client — Android's does not work, and there is no
+  /// GoogleService-Info.plist in this project to read one from. Passing it
+  /// here rather than as `GIDClientID` in Info.plist is deliberate: with a
+  /// clientId present the plugin builds a real GIDConfiguration and applies
+  /// [_serverClientId] with it. Configure through Info.plist alone and the
+  /// serverClientId below is silently dropped on iOS.
+  ///
+  /// Its reverse also has to be registered as a URL scheme in
+  /// ios/Runner/Info.plist, or the OAuth redirect cannot get back into the
+  /// app.
+  static const String _iosClientId =
+      '125167391971-fp3tvkdoq4asja9jgs02k9o27dks2jse.apps.googleusercontent.com';
+
+  /// The backend's own client. The id token the app posts to /auth/google
+  /// carries this as its audience, which is what the server verifies.
+  static const String _serverClientId =
+      '125167391971-djufjjsm3gp8vms4id65rdb3bg72hciv.apps.googleusercontent.com';
+
+  static bool get _isIosUnconfigured => Platform.isIOS && _iosClientId.isEmpty;
+
   final GoogleSignIn _googleSignIn = GoogleSignIn(
     scopes: [
       'email',
       'profile',
       'openid',
     ],
-    serverClientId:
-    '125167391971-djufjjsm3gp8vms4id65rdb3bg72hciv.apps.googleusercontent.com',
+    clientId: Platform.isIOS && _iosClientId.isNotEmpty ? _iosClientId : null,
+    serverClientId: _serverClientId,
   );
 
   Future<AuthResultModel> signInWithGoogle() async {
+    // Checked before the call, not caught after it. With no client id
+    // GIDSignIn raises an Objective-C exception from signInWithOptions:,
+    // which is not a Dart error — it aborts the process, so the app vanishes
+    // instead of showing anything. A thrown Exception here is catchable.
+    if (_isIosUnconfigured) {
+      throw Exception(
+        'Google sign-in is not set up for iOS yet. Use email sign-in, or add '
+        'the iOS OAuth client id to AuthService._iosClientId.',
+      );
+    }
+
     try {
 
 

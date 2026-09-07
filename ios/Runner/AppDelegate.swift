@@ -20,7 +20,7 @@ import UIKit
 
     let channel = FlutterEventChannel(
       name: AppDelegate.screenRecordingChannel,
-      binaryMessenger: engineBridge.applicationBinaryMessenger
+      binaryMessenger: engineBridge.applicationRegistrar.messenger()
     )
     channel.setStreamHandler(self)
   }
