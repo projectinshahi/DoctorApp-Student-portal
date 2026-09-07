@@ -49,11 +49,14 @@ class ContinueLearningRow extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Continue Learning',
-            style: TextStyle(
-                fontSize: 16.sp,
-                fontWeight: FontWeight.w700,
-                color: Colors.black87)),
+        Text(
+          'Continue Learning',
+          style: TextStyle(
+            fontSize: 16.sp,
+            fontWeight: FontWeight.w700,
+            color: Colors.black87,
+          ),
+        ),
         SizedBox(height: 12.h),
         Row(
           // Not `stretch`. This Row lives in a scroll view, so its height is
@@ -98,68 +101,117 @@ class _LearningCard extends StatelessWidget {
       onTap: onTap,
       child: Container(
         height: 150.h,
-        padding: EdgeInsets.all(14.w),
         decoration: BoxDecoration(
+          // Stays behind the poster: it is what shows while the image loads,
+          // if it fails, and on a lesson that has no thumbnail at all.
           color: _kPrimary,
           borderRadius: BorderRadius.circular(16.r),
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 34.w,
-                  height: 34.w,
-                  alignment: Alignment.center,
-                  decoration: const BoxDecoration(
-                      color: Colors.white, shape: BoxShape.circle),
-                  child: Icon(
-                    // Locked opens the paywall, not the player — and the
-                    // card says so before the tap.
-                    lesson.locked
-                        ? Icons.lock_rounded
-                        : lesson.isVideo
-                            ? Icons.play_arrow_rounded
-                            : Icons.description_outlined,
-                    size: 17.sp,
-                    color: _kPrimary,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16.r),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              if (lesson.thumbnailUrl != null)
+                Image.network(
+                  lesson.thumbnailUrl!,
+                  fit: BoxFit.cover,
+                  // A dead thumbnail must not take the card down with it —
+                  // the green underneath is a perfectly good card.
+                  errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                ),
+              // Every poster is a different brightness, and the title and
+              // Resume pill are white on all of them. The scrim is what makes
+              // that safe rather than lucky.
+              if (lesson.thumbnailUrl != null)
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.black.withValues(alpha: 0.25),
+                        Colors.black.withValues(alpha: 0.72),
+                      ],
+                    ),
                   ),
                 ),
-                const Spacer(),
-                if (item.isResume)
-                  Container(
-                    padding:
-                        EdgeInsets.symmetric(horizontal: 8.w, vertical: 3.h),
-                    decoration: BoxDecoration(
-                      color: Colors.white24,
-                      borderRadius: BorderRadius.circular(20.r),
+              Padding(
+                padding: EdgeInsets.all(14.w),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 34.w,
+                          height: 34.w,
+                          alignment: Alignment.center,
+                          decoration: const BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            // Locked opens the paywall, not the player — and the
+                            // card says so before the tap.
+                            lesson.locked
+                                ? Icons.lock_rounded
+                                : lesson.isVideo
+                                ? Icons.play_arrow_rounded
+                                : Icons.description_outlined,
+                            size: 17.sp,
+                            color: _kPrimary,
+                          ),
+                        ),
+                        const Spacer(),
+                        if (item.isResume)
+                          Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 8.w,
+                              vertical: 3.h,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white24,
+                              borderRadius: BorderRadius.circular(20.r),
+                            ),
+                            child: Text(
+                              'Resume',
+                              style: TextStyle(
+                                fontSize: 9.sp,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
-                    child: Text('Resume',
+                    const Spacer(),
+                    Text(
+                      lesson.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 13.sp,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                        height: 1.3,
+                      ),
+                    ),
+                    if (item.resumeAt != null) ...[
+                      SizedBox(height: 5.h),
+                      Text(
+                        'at ${item.resumeAt}',
                         style: TextStyle(
-                            fontSize: 9.sp,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white)),
-                  ),
-              ],
-            ),
-            const Spacer(),
-            Text(
-              lesson.title,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                  fontSize: 13.sp,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white,
-                  height: 1.3),
-            ),
-            if (item.resumeAt != null) ...[
-              SizedBox(height: 5.h),
-              Text('at ${item.resumeAt}',
-                  style: TextStyle(fontSize: 10.sp, color: Colors.white70)),
+                          fontSize: 10.sp,
+                          color: Colors.white70,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
             ],
-          ],
+          ),
         ),
       ),
     );
@@ -182,11 +234,13 @@ List<LearningItem> pickLearningItems({
   if (inProgress.isNotEmpty) {
     final video = inProgress.first;
     taken.add(video.lessonId);
-    items.add(LearningItem(
-      // Built from /home, so it already carries videoUrl and the position.
-      lesson: lessonFromHomeVideo(video),
-      resumeAt: video.resumeLabel,
-    ));
+    items.add(
+      LearningItem(
+        // Built from /home, so it already carries videoUrl and the position.
+        lesson: lessonFromHomeVideo(video),
+        resumeAt: video.resumeLabel,
+      ),
+    );
   }
 
   for (final chapter in content?.chapters ?? const <StudentChapterModel>[]) {
@@ -199,12 +253,14 @@ List<LearningItem> pickLearningItems({
       if (lesson.completed || taken.contains(lesson.id)) continue;
 
       taken.add(lesson.id);
-      items.add(LearningItem(
-        lesson: lesson,
-        resumeAt: lesson.lastPositionSeconds > 0
-            ? _clock(lesson.lastPositionSeconds)
-            : null,
-      ));
+      items.add(
+        LearningItem(
+          lesson: lesson,
+          resumeAt: lesson.lastPositionSeconds > 0
+              ? _clock(lesson.lastPositionSeconds)
+              : null,
+        ),
+      );
     }
   }
 

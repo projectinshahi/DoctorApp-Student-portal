@@ -13,7 +13,7 @@ import '../../../repository/saved_provider.dart';
 import '../../../repository/daily_quiz_provider.dart';
 import '../../../repository/selection_content_provider.dart';
 import '../../../services/lesson_progress_service.dart';
-import '../../../widget/app_shimmer.dart';
+import '../../../widget/app_loading.dart';
 import '../../../widget/pro_plan_dialog.dart';
 import '../Qbank/quiz_screen.dart';    // adjust path to wherever you place this file
 import '../lessons/comments_section.dart';
@@ -83,7 +83,7 @@ class _StudentLessonDetailScreenState extends State<StudentLessonDetailScreen> {
     // to the paywall instead, the same way the quiz screen does.
     // Same rule as QBank: refetch on entry. Watch position, completion and
     // unlock state all change elsewhere, and this screen renders from the
-    // tree. Silent — the shimmer only shows on a cold load.
+    // tree. Silent — the spinner only shows on a cold load.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final content = context.read<SelectionContentProvider>();
@@ -484,10 +484,9 @@ class _StudentLessonDetailScreenState extends State<StudentLessonDetailScreen> {
       );
     }
     if (_ytController == null) {
-      // Same rule as the direct player: a known-size block greys out rather
-      // than showing a spinner on black.
-      return const AppShimmer(
-        child: ShimmerBox(width: double.infinity, height: double.infinity, radius: 0),
+      return const ColoredBox(
+        color: Colors.black,
+        child: AppLoading(color: Colors.white),
       );
     }
     return YoutubePlayer(
@@ -513,16 +512,12 @@ class _StudentLessonDetailScreenState extends State<StudentLessonDetailScreen> {
         ),
       );
     } else if (_isInitializing || _controller == null || !_controller!.value.isInitialized) {
-      // Shimmer, not a spinner: the player is a known-size block, so the
-      // loader should be that block greying rather than a dot on black.
       content = Stack(
         fit: StackFit.expand,
         children: [
           if (_lesson.thumbnailUrl != null) Image.network(_lesson.thumbnailUrl!, fit: BoxFit.cover),
           Container(color: Colors.black45),
-          const AppShimmer(
-            child: ShimmerBox(width: double.infinity, height: double.infinity, radius: 0),
-          ),
+          const AppLoading(color: Colors.white),
         ],
       );
     } else if (!_started) {
@@ -591,7 +586,7 @@ class _StudentLessonDetailScreenState extends State<StudentLessonDetailScreen> {
                               ),
                             ),
                             const Spacer(),
-                            // ── Speed badge, next to the AI badge ──
+                            // ── Speed badge ──
                             GestureDetector(
                               onTap: _openSpeedSelector,
                               child: Container(
@@ -607,7 +602,6 @@ class _StudentLessonDetailScreenState extends State<StudentLessonDetailScreen> {
                                 ),
                               ),
                             ),
-                            _aiBadge(),
                           ],
                         ),
                       ),
@@ -700,27 +694,6 @@ class _StudentLessonDetailScreenState extends State<StudentLessonDetailScreen> {
     }
 
     return content;
-  }
-
-  /// The "✦ AI" pill. Used by the app bar and by the in-player overlay, so
-  /// there is one definition rather than two that drift.
-  Widget _aiBadge() {
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.85),
-        borderRadius: BorderRadius.circular(10.r),
-        border: Border.all(color: kPrimary.withValues(alpha: 0.25)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.auto_awesome, size: 11.sp, color: kPrimary),
-          SizedBox(width: 3.w),
-          Text('AI', style: TextStyle(fontSize: 10.sp, fontWeight: FontWeight.w700, color: kPrimary)),
-        ],
-      ),
-    );
   }
 
   Widget _buildVideoPlayer() {
@@ -1030,13 +1003,6 @@ class _StudentLessonDetailScreenState extends State<StudentLessonDetailScreen> {
           style: TextStyle(color: Colors.black87, fontSize: 16.sp, fontWeight: FontWeight.w700),
         ),
         centerTitle: true,
-        actions: [
-          if (isVideoAvailable)
-            Padding(
-              padding: EdgeInsets.only(right: 14.w),
-              child: Center(child: _aiBadge()),
-            ),
-        ],
       ),
       body: SafeArea(
         top: false,

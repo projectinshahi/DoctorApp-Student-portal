@@ -29,7 +29,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../../../models/daily_quiz_model.dart';
 import '../../../repository/daily_quiz_provider.dart';
 import '../../../services/daily_quiz_service.dart';
-import '../../../widget/app_shimmer.dart';
+import '../../../widget/app_loading.dart';
 import 'daily_quiz_screen.dart';
 
 const Color _kPrimary = Color(0xFF87986B);
@@ -64,15 +64,6 @@ class DailyQuizCard extends StatefulWidget {
 class _DailyQuizCardState extends State<DailyQuizCard> {
   DailyQuizProvider? _quiz;
 
-  /// The shimmer stays up for at least a second.
-  ///
-  /// A *floor*, not an added delay: the fetch runs during it and only the
-  /// leftover is waited out, so a slow request is never made slower. Without
-  /// it a cached question snapped in within a frame or two, which reads as a
-  /// flicker rather than as speed.
-  static const _minimumShimmer = Duration(seconds: 1);
-  bool _shimmerHeld = true;
-
   @override
   void initState() {
     super.initState();
@@ -103,15 +94,9 @@ class _DailyQuizCardState extends State<DailyQuizCard> {
         DailyQuizProvider(courseId: widget.courseId, service: widget.service);
     setState(() => _quiz = provider);
 
-    final startedAt = DateTime.now();
-    provider.load().then((_) async {
-      final elapsed = DateTime.now().difference(startedAt);
-      if (elapsed < _minimumShimmer) {
-        await Future<void>.delayed(_minimumShimmer - elapsed);
-      }
-      if (!mounted) return;
-      setState(() => _shimmerHeld = false);
-      widget.onChanged();
+    // The spinner ends when the response lands — no timer.
+    provider.load().then((_) {
+      if (mounted) widget.onChanged();
     });
   }
 
@@ -143,12 +128,11 @@ class _DailyQuizCardState extends State<DailyQuizCard> {
         children: [
           _Header(summary: widget.summary, quiz: quiz),
           SizedBox(height: 14.h),
-          if (quiz == null || _shimmerHeld)
-            AppShimmer(
-              child: ShimmerBox(
-                  width: double.infinity, height: 180.h, radius: 12.r),
-            )
+          if (quiz == null)
+            AppLoading(height: 180.h)
           else
+            // _Body shows the spinner while quiz.isLoading, so it stays up
+            // until the response lands and not a millisecond longer.
             ListenableBuilder(
               listenable: quiz,
               builder: (context, _) => _Body(
@@ -226,9 +210,7 @@ class _Body extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (quiz.isLoading) {
-      return AppShimmer(
-        child: ShimmerBox(width: double.infinity, height: 180.h, radius: 12.r),
-      );
+      return AppLoading(height: 180.h);
     }
 
     if (quiz.failure != null) {

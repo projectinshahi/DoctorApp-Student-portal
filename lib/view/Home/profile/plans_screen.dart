@@ -10,7 +10,7 @@ import '../../../core/theam /app_color.dart';
 import '../../../repository/plan_provider.dart';
 import '../../../repository/profile_provider.dart';
 import '../../../repository/selection_content_provider.dart';
-import '../../../widget/app_shimmer.dart';
+import '../../../widget/app_loading.dart';
 
 class PlansScreen extends StatefulWidget {
   final int courseId;
@@ -54,6 +54,9 @@ class _PlansScreenState extends State<PlansScreen> {
     }
 
     // Refresh both so the profile badge and the lesson lock icons update.
+    // The tree is invalidated first: every lesson in the cached copy still
+    // says locked, and that is the one thing this purchase just changed.
+    context.read<SelectionContentProvider>().invalidate();
     await Future.wait([
       context.read<ProfileProvider>().loadProfile(),
       context.read<SelectionContentProvider>().loadContent(),
@@ -84,7 +87,7 @@ class _PlansScreenState extends State<PlansScreen> {
       body: Consumer<PlanProvider>(
         builder: (context, planProvider, _) {
           if (planProvider.isLoadingPlans) {
-            return const ScreenShimmer(layout: ShimmerLayout.cards);
+            return const AppLoading();
           }
           if (planProvider.plansErrorMessage != null && planProvider.plans.isEmpty) {
             return Center(child: Text(planProvider.plansErrorMessage!));

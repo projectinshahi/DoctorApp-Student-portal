@@ -42,8 +42,13 @@ class CommentProvider extends ChangeNotifier {
   bool get isEmpty => comments.isEmpty;
 
   // ── Loading ──────────────────────────────────────────────────
+  /// The lesson the loaded comments belong to. Showing one lesson's thread
+  /// under another lesson would be worse than a spinner.
+  int? _loadedLessonId;
+
   Future<void> load(int lessonId) async {
-    isLoading = true;
+    isLoading = comments.isEmpty || _loadedLessonId != lessonId;
+    _loadedLessonId = lessonId;
     failure = null;
     notifyListeners();
 

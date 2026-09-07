@@ -29,16 +29,6 @@ class AuthProvider extends ChangeNotifier {
   /// show what comes next. The gate renders the loading screen throughout.
   bool _signingIn = false;
 
-  /// How long the welcome screen stays up at minimum.
-  ///
-  /// A *floor*, not an added delay: the real work runs during it, and only
-  /// the leftover is waited out, so a slow sign-in is never made slower.
-  ///
-  /// One second. Long enough that a fast sign-in does not flash three
-  /// screens past in under 200ms — which reads as a glitch rather than as
-  /// speed — and short enough not to feel like waiting. It was two, and that
-  /// was too long.
-  static const _welcomeMinimum = Duration(seconds: 1);
   final AuthService _authService = AuthService();
 
   /// True once an authenticated request has succeeded in this run.
@@ -158,7 +148,6 @@ class AuthProvider extends ChangeNotifier {
   /// rebuild. That was the "login, see the login screen, then it refreshes
   /// into home" flicker.
   Future<void> adoptSession(AuthResultModel result) async {
-    final startedAt = DateTime.now();
     _signingIn = true;
     notifyListeners();
 
@@ -192,13 +181,9 @@ class AuthProvider extends ChangeNotifier {
 
     if (mustResolve) await resolveExamSelection();
 
-    // Whatever of the two seconds the work did not already use. A floor, not
-    // an addition: a slow sign-in is never made slower.
-    final elapsed = DateTime.now().difference(startedAt);
-    if (elapsed < _welcomeMinimum) {
-      await Future<void>.delayed(_welcomeMinimum - elapsed);
-    }
-
+    // No floor: the loading screen ends the moment the work does. A fast
+    // sign-in will flash it briefly, which is the trade for never making
+    // anyone wait on a timer rather than on the server.
     _signingIn = false;
     notifyListeners();
   }

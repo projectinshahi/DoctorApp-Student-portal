@@ -8,7 +8,7 @@ import 'package:provider/provider.dart';
 
 import '../../../models/saved_model.dart';
 import '../../../repository/saved_provider.dart';
-import '../../../widget/app_shimmer.dart';
+import '../../../widget/app_loading.dart';
 import '../lessons/student_lesson_detail_screen.dart';
 import '../../../core/utils/refresh_on_visible.dart';
 
@@ -125,11 +125,9 @@ class _BookmarksScreenState extends State<BookmarksScreen>
   }
 
   Widget _list(BuildContext context, SavedProvider provider, _Filter filter) {
-    // Shimmer on every fetch, not only the first. This screen is opened
-    // deliberately to read a list, so waiting on a stale one is worse than a
-    // moment of shimmer — the opposite trade-off to a background refresh
-    // under content the student is already reading.
-    if (provider.isLoading) return const _BookmarksShimmer();
+    // isLoading is now true only before the first answer arrives, so a
+    // reopened Bookmarks shows the list it had and updates underneath.
+    if (provider.isLoading) return const AppLoading();
 
     if (filter.type == 'question') {
       final questions = provider.questions;
@@ -500,55 +498,6 @@ class _OptionRow extends StatelessWidget {
             SizedBox(width: 6.w),
           ],
         ],
-      ),
-    );
-  }
-}
-
-/// Loading state shaped like the cards it replaces — same height, same
-/// corner radius, same bookmark square on the right. A generic row shimmer
-/// would settle into a visibly different layout.
-class _BookmarksShimmer extends StatelessWidget {
-  const _BookmarksShimmer();
-
-  @override
-  Widget build(BuildContext context) {
-    return AppShimmer(
-      child: ListView.separated(
-        padding: EdgeInsets.fromLTRB(16.w, 4.h, 16.w, 24.h),
-        // Enough to fill a phone; the real list replaces it either way.
-        itemCount: 5,
-        physics: const NeverScrollableScrollPhysics(),
-        separatorBuilder: (_, __) => SizedBox(height: 12.h),
-        itemBuilder: (context, index) => Container(
-          padding: EdgeInsets.fromLTRB(16.w, 16.h, 16.w, 16.h),
-          decoration: BoxDecoration(
-            color: _kCard,
-            borderRadius: BorderRadius.circular(16.r),
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    ShimmerBox(width: double.infinity, height: 12.h, radius: 6.r),
-                    SizedBox(height: 8.h),
-                    ShimmerBox(width: double.infinity, height: 12.h, radius: 6.r),
-                    SizedBox(height: 8.h),
-                    // Short last line, the way wrapped text actually ends.
-                    ShimmerBox(width: 160.w, height: 12.h, radius: 6.r),
-                    SizedBox(height: 14.h),
-                    ShimmerBox(width: 90.w, height: 11.h, radius: 6.r),
-                  ],
-                ),
-              ),
-              SizedBox(width: 12.w),
-              ShimmerBox(width: 18.w, height: 22.h, radius: 4.r),
-            ],
-          ),
-        ),
       ),
     );
   }

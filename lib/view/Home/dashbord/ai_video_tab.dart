@@ -6,7 +6,7 @@ import 'package:provider/provider.dart';
 import '../../../models/selection_content_model.dart';
 import '../../../repository/saved_provider.dart';
 import '../../../repository/selection_content_provider.dart';
-import '../../../widget/app_shimmer.dart';
+import '../../../widget/app_loading.dart';
 import '../lessons/student_lesson_detail_screen.dart';
 import '../../../core/utils/refresh_on_visible.dart';
 import '../../../widget/lesson_watch_indicator.dart';
@@ -49,7 +49,7 @@ class _AiVideoTabState extends State<AiVideoTab> with RefreshOnVisible<AiVideoTa
   /// Refetch on every entry, not just the first.
   ///
   /// Watch position and completion change while the student is inside a
-  /// lesson, and these rows render them from the tree. Silent: the shimmer
+  /// lesson, and these rows render them from the tree. Silent: the spinner
   /// shows only on a cold load, so this swaps the data underneath.
   @override
   Future<void> onRefresh() async {
@@ -117,9 +117,9 @@ class _AiVideoTabState extends State<AiVideoTab> with RefreshOnVisible<AiVideoTa
       body: Consumer<SelectionContentProvider>(
         builder: (context, provider, _) {
           // Every fetch, not only the cold one — the screen just became
-          // visible, so stale rows are worse than a moment of shimmer.
+          // visible, so stale rows are worse than a moment of the spinner.
           if (provider.isLoading) {
-            return const ScreenShimmer(layout: ShimmerLayout.rows);
+            return const AppLoading();
           }
 
           if (provider.errorMessage != null && provider.content == null) {

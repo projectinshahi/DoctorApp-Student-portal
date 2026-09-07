@@ -1,3 +1,4 @@
+import 'package:dr_app/repository/daily_quiz_provider.dart';
 import 'package:dr_app/repository/profile_provider.dart';
 import 'package:dr_app/repository/saved_provider.dart';
 import 'package:dr_app/repository/selection_content_provider.dart';
@@ -28,6 +29,9 @@ void main() {
           // throws ProviderNotFoundException before the nav bar even builds.
           ChangeNotifierProvider<ProfileProvider>(create: (_) => ProfileProvider()),
           ChangeNotifierProvider<SavedProvider>(create: (_) => SavedProvider()),
+          // The MCQ-of-the-Day card reads this on the first frame too.
+          ChangeNotifierProvider<HomeSummaryProvider>(
+              create: (_) => HomeSummaryProvider()),
         ],
         child: ScreenUtilInit(
           designSize: const Size(440, 956),
@@ -39,7 +43,11 @@ void main() {
     );
 
     await tester.tap(find.text('Profile'));
-    await tester.pumpAndSettle();
+
+    // Not pumpAndSettle: the loading spinner animates forever, so "settled"
+    // never arrives. Two pumps are enough to run the route transition.
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
 
     expect(find.byType(ProfileScreen), findsOneWidget);
   });

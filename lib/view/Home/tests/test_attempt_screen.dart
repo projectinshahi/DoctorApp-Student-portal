@@ -9,7 +9,7 @@ import 'package:provider/provider.dart';
 import '../../../models/quiz_model.dart' show QuizErrorKind;
 import '../../../models/test_model.dart';
 import '../../../repository/test_provider.dart';
-import '../../../widget/app_shimmer.dart';
+import '../../../widget/app_loading.dart';
 import 'test_question_palette.dart';
 import 'test_result_screen.dart';
 
@@ -197,7 +197,7 @@ class _AttemptViewState extends State<_AttemptView> {
   }
 
   Widget _body(BuildContext context, TestProvider provider) {
-    if (provider.isLoading) return const ScreenShimmer(layout: ShimmerLayout.quiz);
+    if (provider.isLoading) return const AppLoading();
 
     final failure = provider.failure;
     if (failure != null) {
@@ -420,7 +420,7 @@ class _Image extends StatelessWidget {
         fit: BoxFit.contain,
         loadingBuilder: (context, child, progress) => progress == null
             ? child
-            : AppShimmer(child: ShimmerBox(width: double.infinity, height: 160.h, radius: 12.r)),
+            : AppLoading(height: 160.h),
         // A missing image must not take the question down with it — the
         // student can still read the options and answer.
         errorBuilder: (context, _, __) => Container(

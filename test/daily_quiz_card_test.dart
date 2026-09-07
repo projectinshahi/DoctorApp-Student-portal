@@ -202,10 +202,8 @@ void main() {
     expect(find.text('Answered — new question tomorrow'), findsOneWidget);
   });
 
-  testWidgets('the shimmer holds for a second before the question appears',
+  testWidgets('the loader ends when the response lands, not on a timer',
       (tester) async {
-    // _pump ends on pumpAndSettle, which runs past the floor — so check the
-    // frames in between rather than the settled state.
     tester.view.physicalSize = const Size(440, 956);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
@@ -231,12 +229,13 @@ void main() {
       ),
     );
 
-    // The fake answers instantly, so without the floor the question would be
-    // on screen by now and the shimmer would have flickered past.
-    await tester.pump(const Duration(milliseconds: 400));
+    // Nothing yet: the fetch is in flight.
     expect(find.textContaining('multifactorial inheritance'), findsNothing);
 
-    await tester.pump(const Duration(milliseconds: 900));
+    // No simulated time passes here — pump() only flushes the microtask the
+    // fake resolved on. The question is up because the answer arrived, which
+    // is the whole point: there is no clock left to wait out.
+    await tester.pump();
     expect(find.textContaining('multifactorial inheritance'), findsOneWidget);
   });
 }

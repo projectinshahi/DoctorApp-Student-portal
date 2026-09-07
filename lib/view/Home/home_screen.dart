@@ -15,7 +15,7 @@ import 'continue_learning_row.dart';
 import 'lessons/student_lesson_detail_screen.dart';
 import '../../repository/daily_quiz_provider.dart';
 import 'daily_quiz/daily_quiz_card.dart';
-import '../../widget/app_shimmer.dart';
+import '../../widget/app_loading.dart';
 import '../../core/utils/refresh_on_visible.dart';
 
 
@@ -115,7 +115,7 @@ class _HomescreenState extends State<Homescreen> with RefreshOnVisible<Homescree
   @override
   Widget build(BuildContext context) {
     // The whole page, not a section of it. Half a home screen with a live
-    // header over a shimmering body reads as broken rather than loading.
+    // header over an empty body reads as broken rather than loading.
     // The nav bar stays put so the tabs are still reachable.
     final loading = context.watch<SelectionContentProvider>().isLoading ||
         context.watch<ProfileProvider>().isLoading;
@@ -126,7 +126,7 @@ class _HomescreenState extends State<Homescreen> with RefreshOnVisible<Homescree
       body: Column(
         children: [
           if (loading)
-            const Expanded(child: _HomeShimmer())
+            const Expanded(child: AppLoading())
           else
           Expanded(
             child: SingleChildScrollView(
@@ -285,7 +285,10 @@ class _HomescreenState extends State<Homescreen> with RefreshOnVisible<Homescree
 
                             return Container(
                               width: double.infinity,
-                              height: 165.h,
+                              // A minimum, not a cap. The name wraps and the
+                              // module count grows, and a fixed 165.h clipped
+                              // them — 69px off the bottom at design size.
+                              constraints: BoxConstraints(minHeight: 165.h),
                               padding: EdgeInsets.all(18.w),
                               decoration: BoxDecoration(
                                 color: const Color(0xFFE7E7E7),
@@ -316,6 +319,9 @@ class _HomescreenState extends State<Homescreen> with RefreshOnVisible<Homescree
                                                 children: [
                                                   Text(
                                                     "Welcome back $firstName",
+                                                    maxLines: 1,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
                                                     style: TextStyle(
                                                       fontSize: 18.sp,
                                                       fontWeight: FontWeight.w700,
@@ -668,130 +674,35 @@ class _NavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, size: 25.sp, color: isSelected ? Colors.white : Colors.white.withOpacity(0.55)),
-          SizedBox(height: 3.h),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 18.sp,
-              fontWeight: isSelected ? FontWeight.w700 : FontWeight.w400,
-              color: isSelected ? Colors.white : Colors.white.withOpacity(0.55),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Skeleton of the home screen, block for block.
-///
-/// A generic list shimmer settles into a visibly different page, which reads
-/// as the layout jumping rather than as content arriving. So this mirrors the
-/// real thing: the green header with its rounded bottom and search bar, the
-/// welcome card, the MCQ card, then the lesson grid — at the same sizes the
-/// live widgets use.
-class _HomeShimmer extends StatelessWidget {
-  const _HomeShimmer();
-
-  static const _kPrimary = Color(0xFF87986B);
-
-  @override
-  Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      // Not scrollable while loading: the skeleton is the whole page.
-      physics: const NeverScrollableScrollPhysics(),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // ── Header. Keeps its real colour so the page does not flash from
-          // grey to green when the data lands. ──
-          Container(
-            width: double.infinity,
-            height: 250.h,
-            padding: EdgeInsets.fromLTRB(20.w, 16.h, 20.w, 24.h),
-            decoration: BoxDecoration(
-              color: _kPrimary,
-              borderRadius: BorderRadius.vertical(bottom: Radius.circular(35.r)),
-            ),
-            child: SafeArea(
-              bottom: false,
-              child: AppShimmer(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        ShimmerBox(width: 44.w, height: 44.w, radius: 22.r),
-                        SizedBox(width: 12.w),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            ShimmerBox(width: 70.w, height: 12.h, radius: 6.r),
-                            SizedBox(height: 8.h),
-                            ShimmerBox(width: 130.w, height: 14.h, radius: 6.r),
-                          ],
-                        ),
-                        const Spacer(),
-                        ShimmerBox(width: 40.w, height: 40.w, radius: 20.r),
-                        SizedBox(width: 10.w),
-                        ShimmerBox(width: 40.w, height: 40.w, radius: 20.r),
-                      ],
-                    ),
-                    SizedBox(height: 28.h),
-                    ShimmerBox(width: double.infinity, height: 48.h, radius: 24.r),
-                  ],
+    // Expanded so five items divide whatever width there is, instead of
+    // each taking its natural size and running off the end — "AI Videos" at
+    // 18.sp overflowed by 156px even at the 440 design width.
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 25.sp, color: isSelected ? Colors.white : Colors.white.withOpacity(0.55)),
+            SizedBox(height: 3.h),
+            // scaleDown keeps 18.sp wherever it fits and shrinks only the
+            // labels that would not, so the bar adapts instead of clipping.
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                label,
+                maxLines: 1,
+                style: TextStyle(
+                  fontSize: 18.sp,
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w400,
+                  color: isSelected ? Colors.white : Colors.white.withOpacity(0.55),
                 ),
               ),
             ),
-          ),
-
-          Padding(
-            padding: EdgeInsets.fromLTRB(20.w, 44.h, 20.w, 0),
-            child: AppShimmer(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Welcome card — same 165.h the live one uses.
-                  ShimmerBox(width: double.infinity, height: 165.h, radius: 18.r),
-                  SizedBox(height: 26.h),
-
-                  // "Continue MCQs" heading, then its card.
-                  ShimmerBox(width: 130.w, height: 15.h, radius: 6.r),
-                  SizedBox(height: 12.h),
-                  ShimmerBox(width: double.infinity, height: 190.h, radius: 18.r),
-                  SizedBox(height: 28.h),
-
-                  // Lesson grid heading and two rows of cards.
-                  ShimmerBox(width: 160.w, height: 15.h, radius: 6.r),
-                  SizedBox(height: 12.h),
-                  Row(
-                    children: [
-                      Expanded(child: ShimmerBox(width: double.infinity, height: 120.h, radius: 14.r)),
-                      SizedBox(width: 12.w),
-                      Expanded(child: ShimmerBox(width: double.infinity, height: 120.h, radius: 14.r)),
-                    ],
-                  ),
-                  SizedBox(height: 12.h),
-                  Row(
-                    children: [
-                      Expanded(child: ShimmerBox(width: double.infinity, height: 120.h, radius: 14.r)),
-                      SizedBox(width: 12.w),
-                      Expanded(child: ShimmerBox(width: double.infinity, height: 120.h, radius: 14.r)),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

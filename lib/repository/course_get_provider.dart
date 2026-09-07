@@ -20,7 +20,7 @@ class CourseListGetProvider extends ChangeNotifier {
     int page = 1,
     int limit = 20,
   }) async {
-    isLoadingCourses = true;
+    isLoadingCourses = courses.isEmpty;
     coursesErrorMessage = null;
     notifyListeners();
 

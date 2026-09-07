@@ -47,18 +47,28 @@ class _SignInScreenState extends State<SignInScreen> {
         ),
       ),
       body: SafeArea(
-        child: Padding(
-          padding: EdgeInsets.symmetric(
-            horizontal: AppSize.screenHorizontal.w,
-            vertical: AppSize.screenVertical.h,
-          ),
-          child: Column(
+        // Scrolls only when it has to. The Spacer below fills a tall screen
+        // as before, but on a short one — an iPhone SE was 1.7px over — a
+        // Spacer cannot go negative and the column clips instead. minHeight
+        // keeps the fill behaviour; the scroll view absorbs the shortfall.
+        child: LayoutBuilder(
+          builder: (context, constraints) => SingleChildScrollView(
+            padding: EdgeInsets.symmetric(
+              horizontal: AppSize.screenHorizontal.w,
+              vertical: AppSize.screenVertical.h,
+            ),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                minHeight:
+                    constraints.maxHeight - (AppSize.screenVertical.h * 2),
+              ),
+              child: IntrinsicHeight(
+                child: Column(
             children: [
               SizedBox(height: 380.h),
 
               SizedBox(
                 width: double.infinity,
-                height: 134.h,
                 child: Column(
                   children: [
                     Container(
@@ -107,7 +117,7 @@ class _SignInScreenState extends State<SignInScreen> {
                         ),
                       ),
                     ),
-                    SizedBox(height: AppSize.gap),
+                    SizedBox(height: AppSize.gap.h),
                     Container(
                       width: double.infinity,
                       height: 60.h,
@@ -133,7 +143,7 @@ class _SignInScreenState extends State<SignInScreen> {
                   ],
                 ),
               ),
-              SizedBox(height: AppSize.gap),
+              SizedBox(height: AppSize.gap.h),
               
               Center(child: Text("Forgot Password", style: TextStyle(
                 fontWeight: FontWeight.w300,
@@ -144,28 +154,31 @@ class _SignInScreenState extends State<SignInScreen> {
 
               SizedBox(height: 80.h),
 
-              SizedBox(
-                width: double.infinity,
-                height: 20.h,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Container(width: 130.w, height: 0.5, color: Colors.grey),
-                    Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 8.w),
-                      child: Text(
-                        "Or sign-Up with",
-                        style: TextStyle(
-                          fontSize: 16.sp,
-                          fontWeight: FontWeight.w500,
-                          color: AppColor.Textcolor,
-                        ),
+              // The rules take whatever the label leaves, rather than two
+              // fixed 130.w bars that only happened to fit the design width.
+              // At 130 + 130 + the label this overflowed on any narrower
+              // screen — iPhone first, because iOS lays the text out wider.
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  const Expanded(
+                    child: Divider(color: Colors.grey, thickness: 0.5),
+                  ),
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 8.w),
+                    child: Text(
+                      "Or sign-Up with",
+                      style: TextStyle(
+                        fontSize: 16.sp,
+                        fontWeight: FontWeight.w500,
+                        color: AppColor.Textcolor,
                       ),
                     ),
-                    Container(width: 130.w, height: 0.5, color: Colors.grey),
-                  ],
-                ),
+                  ),
+                  const Expanded(
+                    child: Divider(color: Colors.grey, thickness: 0.5),
+                  ),
+                ],
               ),
 
               SizedBox(height: 40.h),
@@ -287,7 +300,10 @@ class _SignInScreenState extends State<SignInScreen> {
                   ],
                 ),
               ),
-            ],
+                  ],
+                ),
+              ),
+            ),
           ),
         ),
       ),

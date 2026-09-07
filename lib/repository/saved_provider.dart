@@ -33,6 +33,21 @@ class SavedProvider extends ChangeNotifier {
 
   bool _loadedOnce = false;
 
+  /// A fetch has come back. Distinct from [_loadedOnce], which only means one
+  /// was started — the spinner has to wait for the answer, not the request.
+  /// Kept separate from `questions.isEmpty` so an account with no bookmarks
+  /// at all stops spinning too.
+  bool _fetched = false;
+
+  /// A save happened and the cached lists no longer match the server.
+  ///
+  /// Unsaving drops the row locally, so the list stays right. Saving cannot:
+  /// a toggle knows only an id, not the question text or the lesson title, so
+  /// there is no row to insert. Rather than show a list that is missing what
+  /// the student just saved, this marks the cache wrong and the next load
+  /// spins — the one case where the spinner is still the honest answer.
+  bool _staleLists = false;
+
   /// The full counts map from the server: all, question, video, text, quiz,
   /// lesson. The Bookmarks chips bind to this rather than to list lengths,
   /// so filtering to videos does not make the MCQ chip read zero.
@@ -51,8 +66,10 @@ class SavedProvider extends ChangeNotifier {
   /// version. Cheaper, and the counts come back consistent with each other
   /// instead of from two responses taken a moment apart.
   Future<void> loadAll() async {
-    isLoadingQuestions = true;
-    isLoadingLessons = true;
+    // The lists stay up while the refetch runs. This screen is opened and
+    // closed constantly, and a spinner between every visit is the flicker.
+    isLoadingQuestions = !_fetched || _staleLists;
+    isLoadingLessons = !_fetched || _staleLists;
     errorMessage = null;
     notifyListeners();
 
@@ -71,6 +88,8 @@ class SavedProvider extends ChangeNotifier {
       _savedLessonIds
         ..clear()
         ..addAll(bundle.lessons.map((l) => l.lessonId));
+      _fetched = true;
+      _staleLists = false;
     } on QuizException catch (e) {
       errorMessage = e.message;
     }
@@ -142,9 +161,9 @@ class SavedProvider extends ChangeNotifier {
       // than displaying a wrong number.
       if (count >= 0) questionCount = count;
 
-      // The cached list is now stale either way — drop the row on unsave, and
-      // let the next open refetch for a save.
-      if (!saving) {
+      if (saving) {
+        _staleLists = true;
+      } else {
         questions = questions.where((q) => q.questionId != questionId).toList();
       }
     } on QuizException catch (e) {
@@ -193,7 +212,9 @@ class SavedProvider extends ChangeNotifier {
           : await _service.unsaveLesson(lessonId);
       if (count >= 0) lessonCount = count;
 
-      if (!saving) {
+      if (saving) {
+        _staleLists = true;
+      } else {
         lessons = lessons.where((l) => l.lessonId != lessonId).toList();
       }
     } on QuizException catch (e) {
@@ -209,6 +230,8 @@ class SavedProvider extends ChangeNotifier {
   /// Sign-out: bookmarks belong to the account that was signed in.
   void clear() {
     _loadedOnce = false;
+    _fetched = false;
+    _staleLists = false;
     questionCount = 0;
     lessonCount = 0;
     questions = const [];

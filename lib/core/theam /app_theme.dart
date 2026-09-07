@@ -92,9 +92,12 @@ class AppTheme {
         ),
       ),
 
+      // No `filled`/`fillColor` here on purpose. Every field in the app
+      // either draws its own container (the sign-in and search fields set
+      // InputBorder.none inside a decorated Container) or declares its own
+      // fill. A global white fill painted a white box inside those
+      // containers, which is the only thing the theme could not know about.
       inputDecorationTheme: InputDecorationTheme(
-        filled: true,
-        fillColor: Colors.white,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide.none,

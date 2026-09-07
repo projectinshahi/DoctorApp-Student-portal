@@ -15,7 +15,9 @@ class ProfileProvider extends ChangeNotifier {
   ProfileModel? profile;
 
   Future<void> loadProfile() async {
-    isLoading = true;
+    // Only when there is nothing to show. A reopened Profile keeps the name
+    // and photo on screen while the refetch runs behind them.
+    isLoading = profile == null;
     errorMessage = null;
     notifyListeners();
 

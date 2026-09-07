@@ -9,7 +9,8 @@ import 'package:provider/provider.dart';
 import '../../View_model/Course_get_model.dart';
 import '../../repository/course_get_provider.dart';
 import '../../repository/selection_provider.dart';
-import '../../widget/course_card_shimmer.dart';
+import '../../repository/selection_content_provider.dart';
+import '../../widget/app_loading.dart';
 import 'package:flutter/services.dart';
 
 /// The app's red, not Material's — Colors.red is far louder than this
@@ -127,6 +128,10 @@ class _ExamSelectionScreenState extends State<ExamSelectionScreen> {
     if (success) {
       debugPrint('Selection saved successfully.');
 
+      // The cached tree is the previous course's. Home would open on it and
+      // swap a moment later, which reads as the wrong course loading.
+      context.read<SelectionContentProvider>().invalidate();
+
       // Tell AuthProvider first: AuthGate is watching, and it swaps its own
       // root to the home screen.
       //
@@ -235,9 +240,8 @@ class _ExamSelectionScreenState extends State<ExamSelectionScreen> {
         ),
         body: Consumer<CourseListGetProvider>(
           builder: (context, provider, child) {
-            // CHANGED: shimmer instead of a spinner while loading
             if (provider.isLoadingCourses) {
-              return const CourseCardShimmer();
+              return const AppLoading();
             }
 
             if (provider.coursesErrorMessage != null) {

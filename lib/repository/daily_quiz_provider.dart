@@ -116,7 +116,7 @@ class DailyQuizProvider extends ChangeNotifier {
 
   /// Opens today's set. Safe to call again — the set is frozen server-side.
   Future<void> load() async {
-    isLoading = true;
+    isLoading = set == null;
     failure = null;
     notifyListeners();
 

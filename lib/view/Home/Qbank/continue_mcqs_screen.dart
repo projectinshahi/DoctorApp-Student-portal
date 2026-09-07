@@ -4,7 +4,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 import '../../../models/quiz_model.dart';
 import '../../../services/quiz_service.dart';
-import '../../../widget/app_shimmer.dart';
+import '../../../widget/app_loading.dart';
 import 'quiz_screen.dart';
 
 const Color _kPrimary = Color(0xFF87986B);
@@ -94,7 +94,7 @@ class _ContinueMcqsScreenState extends State<ContinueMcqsScreen> {
   }
 
   Widget _body() {
-    if (_loading) return const ScreenShimmer(layout: ShimmerLayout.rows);
+    if (_loading) return const AppLoading();
 
     if (_error != null) {
       return _Message(

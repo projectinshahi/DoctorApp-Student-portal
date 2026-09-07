@@ -17,7 +17,7 @@ import '../../../core/constant/app_size.dart';
 import '../../../core/theam /app_color.dart';
 import '../../../repository/profile_provider.dart';
 import '../../../repository/refresh_api_provider.dart';
-import '../../../widget/profile_shimmer.dart';
+import '../../../widget/app_loading.dart';
 import '../Qbank/bookmarks_screen.dart';
 import '../../../core/utils/refresh_on_visible.dart';
 
@@ -352,7 +352,7 @@ class _ProfileScreenState extends State<ProfileScreen> with RefreshOnVisible<Pro
         child: Consumer<ProfileProvider>(
           builder: (context, provider, child) {
             if (provider.isLoading) {
-              return const ProfileShimmer();
+              return const AppLoading();
             }
 
             if (provider.profile == null) {

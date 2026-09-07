@@ -11,11 +11,13 @@ StudentLessonModel _lesson({
   bool completed = false,
   bool locked = false,
   int position = 0,
+  String? thumbnail,
 }) =>
     StudentLessonModel.fromJson({
       'id': id,
       'title': title,
       'type': 'video',
+      'thumbnailUrl': thumbnail,
       'videoUrl': locked ? null : 'https://x/v.mp4',
       'displayOrder': id,
       'isFreePreview': !locked,
@@ -148,6 +150,46 @@ void main() {
       expect(items.single.lesson.locked, isTrue);
       expect(items.single.lesson.videoUrl, isNull);
       expect(items.single.resumeAt, '0:40');
+    });
+  });
+
+  group('the card is a poster', () {
+    testWidgets('a lesson with a thumbnail paints it behind the title',
+        (tester) async {
+      await _pumpInScrollView(tester, [
+        LearningItem(lesson: _lesson(thumbnail: 'https://x/thumb.jpg')),
+      ]);
+
+      expect(find.byType(Image), findsOneWidget);
+      expect(find.text('Cardiology'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('a lesson without one still renders, on the plain card',
+        (tester) async {
+      // Not every lesson has artwork, and the green card is the fallback —
+      // an Image with a null url would throw.
+      await _pumpInScrollView(tester, [LearningItem(lesson: _lesson())]);
+
+      expect(find.byType(Image), findsNothing);
+      expect(find.text('Cardiology'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('a broken thumbnail url does not take the card down',
+        (tester) async {
+      // Image.network fails in tests by design, which exercises the
+      // errorBuilder: the card must survive it and keep its text.
+      await _pumpInScrollView(tester, [
+        LearningItem(
+            lesson: _lesson(thumbnail: 'https://x/missing.jpg'),
+            resumeAt: '1:35'),
+      ]);
+      await tester.pump();
+
+      expect(find.text('Cardiology'), findsOneWidget);
+      expect(find.text('Resume'), findsOneWidget);
+      expect(tester.takeException(), isNull);
     });
   });
 }

@@ -8,7 +8,7 @@ import 'package:provider/provider.dart';
 
 import '../../../models/daily_quiz_model.dart';
 import '../../../repository/daily_quiz_provider.dart';
-import '../../../widget/app_shimmer.dart';
+import '../../../widget/app_loading.dart';
 import 'daily_quiz_result_screen.dart';
 
 const Color _kPrimary = Color(0xFF87986B);
@@ -137,7 +137,7 @@ class _QuizView extends StatelessWidget {
   }
 
   Widget _body(BuildContext context, DailyQuizProvider provider) {
-    if (provider.isLoading) return const ScreenShimmer(layout: ShimmerLayout.quiz);
+    if (provider.isLoading) return const AppLoading();
 
     final failure = provider.failure;
     if (failure != null) return _Message(text: failure.message);
@@ -500,9 +500,7 @@ class _Image extends StatelessWidget {
         fit: BoxFit.contain,
         loadingBuilder: (context, child, progress) => progress == null
             ? child
-            : AppShimmer(
-                child: ShimmerBox(
-                    width: double.infinity, height: 150.h, radius: 12.r)),
+            : AppLoading(height: 150.h),
         // A missing image must not take the question down with it.
         errorBuilder: (context, _, __) => Container(
           height: 80.h,

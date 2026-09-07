@@ -23,6 +23,8 @@ import '../../core/utils/app_navigator.dart';
 import '../../widget/app_loading_screen.dart';
 import '../../repository/daily_quiz_provider.dart';
 import '../../repository/refresh_api_provider.dart';
+import '../../repository/saved_provider.dart';
+import '../../repository/selection_content_provider.dart';
 import '../Authendication/login/login_screen.dart';
 import '../subjectSelection/select_exam_screen.dart';
 
@@ -107,6 +109,15 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
 
     // Only the transition out of a signed-in state, and only once.
     if (status != AuthStatus.unauthenticated || !wasSignedIn) return;
+
+    // Every cached list belongs to the account that just left. Now that
+    // screens show what they have before refetching, the next account would
+    // open on the previous one's bookmarks and course tree until the fetch
+    // lands. Done here rather than in the logout button because a session
+    // also ends from another device signing in and from an account being
+    // blocked — all three arrive as this one transition.
+    context.read<SavedProvider>().clear();
+    context.read<SelectionContentProvider>().invalidate();
 
     // The session can die while a quiz, a test paper or the player is on
     // top. Swapping this root does not remove those, and without the reset

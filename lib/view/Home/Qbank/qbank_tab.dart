@@ -12,7 +12,7 @@ import '../../../repository/selection_content_provider.dart';
 import 'continue_mcqs_screen.dart';
 import 'qbank_subjects_screen.dart';
 import 'bookmarks_screen.dart';
-import '../../../widget/app_shimmer.dart';
+import '../../../widget/app_loading.dart';
 import '../../../core/utils/refresh_on_visible.dart';
 
 const Color _kPrimary = Color(0xFF87986B);
@@ -111,9 +111,9 @@ class _QbankTabState extends State<QbankTab> with RefreshOnVisible<QbankTab> {
       body: Consumer<SelectionContentProvider>(
         builder: (context, provider, _) {
           // Every fetch, not only the cold one — the screen just became
-          // visible, so stale rows are worse than a moment of shimmer.
+          // visible, so stale rows are worse than a moment of the spinner.
           if (provider.isLoading) {
-            return const ScreenShimmer(layout: ShimmerLayout.rows);
+            return const AppLoading();
           }
 
           if (provider.errorMessage != null && provider.content == null) {

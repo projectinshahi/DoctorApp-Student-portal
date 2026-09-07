@@ -12,15 +12,29 @@ class SelectionContentProvider extends ChangeNotifier {
   bool sessionExpired = false;
   SelectionContentModel? content;
 
-  /// Refetches the whole tree. Callers can fire this on every screen entry:
-  /// the shimmer only shows on a cold load, so a refresh over content that is
-  /// already on screen swaps it silently instead of flashing.
-  /// [silent] keeps the current tree on screen while it refetches — used for
-  /// background top-ups. The default shows the loading state, which is what a
-  /// screen becoming visible wants: the student is looking straight at it and
-  /// stale numbers are worse than a moment of shimmer.
-  Future<void> loadContent({bool silent = false}) async {
-    isLoading = silent ? content == null : true;
+  /// True once a fetch has come back. What separates "nothing here yet" from
+  /// "here is what we have, and a newer copy is on the way".
+  bool _loadedOnce = false;
+
+  /// Throws the cached tree away, so the next load spins instead of showing
+  /// what it has.
+  ///
+  /// For changes the cache cannot survive rather than merely lag behind:
+  /// subscribing unlocks every lesson, and switching course replaces the tree
+  /// with a different one. Showing the old answer there is wrong, not stale.
+  void invalidate() {
+    content = null;
+    _loadedOnce = false;
+    notifyListeners();
+  }
+
+  /// Refetches the whole tree. Safe to fire on every screen entry.
+  ///
+  /// The spinner shows only on the very first load. After that the fetch runs
+  /// underneath whatever is already on screen and swaps the content in when
+  /// it lands, so returning to a tab shows the tab, not a loading state.
+  Future<void> loadContent() async {
+    isLoading = !_loadedOnce;
     errorMessage = null;
     sessionExpired = false;
     notifyListeners();
@@ -30,6 +44,7 @@ class SelectionContentProvider extends ChangeNotifier {
     isLoading = false;
     if (result.isSuccess) {
       content = result.content;
+      _loadedOnce = true;
     } else {
       errorMessage = result.errorMessage;
       sessionExpired = result.sessionExpired;

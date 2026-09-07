@@ -8,7 +8,7 @@ import 'package:provider/provider.dart';
 import '../../../models/comment_model.dart';
 import '../../../repository/comment_provider.dart';
 import '../../../services/comment_service.dart';
-import '../../../widget/app_shimmer.dart';
+import '../../../widget/app_loading.dart';
 
 const Color _kPrimary = Color(0xFF87986B);
 const Color _kBg = Color(0xFFEFF4E2);
@@ -60,7 +60,7 @@ class _CommentsViewState extends State<_CommentsView> {
     if (provider.isLoading) {
       return Padding(
         padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
-        child: AppShimmer(child: ShimmerBox(width: double.infinity, height: 120.h)),
+        child: AppLoading(height: 120.h),
       );
     }
 

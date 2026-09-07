@@ -17,7 +17,7 @@ import '../../../models/quiz_model.dart' show QuizException;
 import '../../../models/test_model.dart';
 import '../../../repository/selection_content_provider.dart';
 import '../../../services/test_service.dart';
-import '../../../widget/app_shimmer.dart';
+import '../../../widget/app_loading.dart';
 import 'test_attempt_screen.dart';
 import 'test_instructions_screen.dart';
 import 'test_result_screen.dart';
@@ -72,7 +72,7 @@ class _TestsTabState extends State<TestsTab> with RefreshOnVisible<TestsTab> {
     if (courseId == null) {
       setState(() {
         // On a cold start this tab can open before the course has arrived.
-        // Staying on the shimmer is the honest state — telling the student to
+        // Staying on the spinner is the honest state — telling the student to
         // "select a course" is telling them to redo something they have
         // already done. build() refetches the moment it lands.
         _loading = content.isLoading;
@@ -81,10 +81,14 @@ class _TestsTabState extends State<TestsTab> with RefreshOnVisible<TestsTab> {
       return;
     }
 
+    // Only when there is nothing to show, or when the course changed and the
+    // list on screen belongs to the wrong one. Returning from a submitted
+    // paper refetches under the list rather than blanking it.
+    final cold = _tests.isEmpty || _loadedCourseId != courseId;
     _loadedCourseId = courseId;
 
     setState(() {
-      _loading = true;
+      _loading = cold;
       _error = null;
     });
 
@@ -181,7 +185,7 @@ class _TestsTabState extends State<TestsTab> with RefreshOnVisible<TestsTab> {
   }
 
   Widget _list(List<TestSummary> tests, {required String emptyText}) {
-    if (_loading) return const ScreenShimmer(layout: ShimmerLayout.rows);
+    if (_loading) return const AppLoading();
     if (_error != null) return _message(_error!, onRetry: onRefresh);
     if (tests.isEmpty) return _message(emptyText);
 

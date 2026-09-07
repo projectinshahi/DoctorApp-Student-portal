@@ -8,7 +8,7 @@ import '../../../models/quiz_model.dart';
 import '../../../repository/quiz_provider.dart';
 import '../../../repository/saved_provider.dart';
 import '../../subjectSelection/select_exam_screen.dart';
-import '../../../widget/app_shimmer.dart';
+import '../../../widget/app_loading.dart';
 import '../../../widget/pro_plan_dialog.dart';
 
 const Color _kPrimary = Color(0xFF87986B);
@@ -90,7 +90,7 @@ class _QuizView extends StatelessWidget {
 
   Widget _body(BuildContext context, QuizProvider provider) {
     if (provider.isLoading) {
-      return const ScreenShimmer(layout: ShimmerLayout.quiz);
+      return const AppLoading();
     }
 
     if (provider.failure != null) {

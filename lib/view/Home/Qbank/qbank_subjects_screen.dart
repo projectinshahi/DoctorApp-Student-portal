@@ -5,7 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../../../models/selection_content_model.dart';
 import '../../../repository/selection_content_provider.dart';
-import '../../../widget/app_shimmer.dart';
+import '../../../widget/app_loading.dart';
 import 'quiz_screen.dart';
 import '../../../core/utils/refresh_on_visible.dart';
 
@@ -33,7 +33,7 @@ class _QbankSubjectsScreenState extends State<QbankSubjectsScreen>
   ///
   /// Scores and attempt state change while the student is off in a quiz — or
   /// on another device — and `lesson.attempt` from the tree is the only thing
-  /// these rows render from. Silent: the shimmer shows only on a cold load, so
+  /// these rows render from. Silent: the spinner shows only on a cold load, so
   /// this swaps the data underneath instead of flashing the list away.
   @override
   Future<void> onRefresh() =>
@@ -73,7 +73,7 @@ class _QbankSubjectsScreenState extends State<QbankSubjectsScreen>
     // Only while there is genuinely nothing to show. A refresh over rows that
     // are already on screen stays silent — flashing them away on every entry
     // would be worse than a moment of stale numbers.
-    final showShimmer = content.isLoading;
+    final showLoading = content.isLoading;
 
     return Scaffold(
       backgroundColor: _kBg,
@@ -93,8 +93,8 @@ class _QbankSubjectsScreenState extends State<QbankSubjectsScreen>
           style: TextStyle(fontSize: 17.sp, fontWeight: FontWeight.w700, color: Colors.black),
         ),
       ),
-      body: showShimmer
-          ? const ScreenShimmer(layout: ShimmerLayout.rows)
+      body: showLoading
+          ? const AppLoading()
           : subjects.isEmpty
           ? Center(
               child: Padding(

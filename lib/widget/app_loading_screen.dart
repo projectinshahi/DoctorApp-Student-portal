@@ -3,10 +3,9 @@
 // The screen a student looks at while the app is working out where to send
 // them — after signing in, and on a cold start with a saved token.
 //
-// Not the shimmer used elsewhere. Shimmer means "content is coming here",
-// and it reads as a page that has half-rendered; after tapping Sign in, grey
-// boxes look like something went wrong. A mark, a spinner and a line of text
-// say what is actually happening.
+// Not the plain AppLoading spinner used elsewhere: this one is the whole
+// screen with nothing behind it, so it carries the mark and a line of text
+// saying what is actually happening.
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 

@@ -7,7 +7,7 @@ import 'package:provider/provider.dart';
 
 import '../../../models/test_model.dart';
 import '../../../repository/test_provider.dart';
-import '../../../widget/app_shimmer.dart';
+import '../../../widget/app_loading.dart';
 import 'test_review_screen.dart';
 
 const Color _kPrimary = Color(0xFF87986B);
@@ -86,7 +86,7 @@ class _ResultView extends StatelessWidget {
           ),
         ),
         body: provider.isLoading
-            ? const ScreenShimmer(layout: ShimmerLayout.rows)
+            ? const AppLoading()
             : TabBarView(
                 children: [
                   _ResultTab(provider: provider),
