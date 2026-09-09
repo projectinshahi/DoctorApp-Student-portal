@@ -8,6 +8,23 @@ class LocalStorage {
   static const String _refreshTokenKey = 'refresh_token';
   static const String _kHasSelectedExamKey = 'has_selected_exam';
 
+  /// The last course tree, as the server sent it.
+  ///
+  /// Kept so the app paints chapters on launch instead of a spinner. It is
+  /// content, not credentials — but it is *this account's* content, so it
+  /// goes with the tokens in clearAll().
+  static const String _kCourseTreeKey = 'course_tree_json';
+
+  /// Other screens' last-known payloads, same idea as the tree: paint what we
+  /// had, refresh underneath. Measured cold on device, /home took 5459ms and
+  /// /saved 5010ms — the whole of which the student spent on a spinner.
+  static const String homeSummaryKey = 'cache_home_summary';
+  static const String savedKey = 'cache_saved';
+
+
+  /// Everything written by [saveCached], so clearAll can take them all.
+  static const List<String> _cacheKeys = [homeSummaryKey, savedKey];
+
   // ---- Device ID ----
   /// Delegates to [DeviceIdHelper], which is the single source of truth.
   ///
@@ -51,10 +68,54 @@ class LocalStorage {
   }
 
   // ---- Clear all (for sign-out) ----
+  /// Content caches. Never credentials — these are cleared with the tokens
+  /// because they are *this account's* content.
+  static Future<void> saveCached(String key, String json) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(key, json);
+    } catch (_) {
+      // Caching is an optimisation; a storage failure must not fail the call
+      // that produced the data.
+    }
+  }
+
+  static Future<String?> getCached(String key) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getString(key);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static Future<void> saveCourseTree(String json) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_kCourseTreeKey, json);
+  }
+
+  static Future<String?> getCourseTree() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_kCourseTreeKey);
+  }
+
+  static Future<void> clearCourseTree() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_kCourseTreeKey);
+  }
+
   static Future<void> clearAll() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_accessTokenKey);
     await prefs.remove(_refreshTokenKey);
+
+    // Cached content belongs to the account that just left. Without this the
+    // next student on this phone would open on the previous one's chapters,
+    // home screen and bookmarks.
+    await prefs.remove(_kCourseTreeKey);
+    for (final key in _cacheKeys) {
+      await prefs.remove(key);
+    }
 
     // Goes with the tokens, because it answers a question about the
     // *account*, not the phone: "has this student picked a course?".

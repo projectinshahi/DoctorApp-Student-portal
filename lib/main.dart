@@ -4,6 +4,7 @@ import 'package:dr_app/repository/daily_quiz_provider.dart';
 import 'package:dr_app/repository/google_sign_in_provider.dart';
 import 'package:dr_app/repository/plan_provider.dart';
 import 'package:dr_app/repository/profile_provider.dart';
+import 'package:dr_app/repository/quiz_prefetch.dart';
 import 'package:dr_app/repository/saved_provider.dart';
 import 'package:dr_app/repository/refresh_api_provider.dart';
 import 'package:dr_app/repository/selection_content_provider.dart';
@@ -11,6 +12,7 @@ import 'package:dr_app/repository/selection_provider.dart';
 import 'package:dr_app/view/refresh_gate/auth_gate.dart';
 import 'package:dr_app/widget/screenshot_guard.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 import 'core/theam /app_theme.dart';
@@ -18,8 +20,15 @@ import 'core/utils/app_navigator.dart';
 import 'core/utils/refresh_on_visible.dart';
 import 'widget/integrity_gate.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Portrait everywhere. The one exception is fullscreen video, which asks
+  // for landscape on the way in and puts this back on the way out — both
+  // FullscreenVideoPage and youtube_player_flutter restore exactly this
+  // value, so there is a single orientation the app returns to.
+  await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+
   runApp(const MyApp());
 }
 
@@ -42,6 +51,7 @@ class MyApp extends StatelessWidget {
         // list all read the same counts, so there is one instance, not three.
         // Primed from HomeScreen, which is the first place a token exists.
         ChangeNotifierProvider(create: (_) => SavedProvider()),
+        ChangeNotifierProvider(create: (_) => QuizPrefetch()),
         // The home card's read-only summary. Separate from the quiz provider
         // on purpose: this one never starts the day's attempt.
         ChangeNotifierProvider(create: (_) => HomeSummaryProvider())

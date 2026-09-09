@@ -1,7 +1,10 @@
+import 'dart:convert';
 // lib/repository/daily_quiz_provider.dart
+import '../core/utils/load_timer.dart';
 import 'package:flutter/foundation.dart';
 
 import '../models/daily_quiz_model.dart';
+import '../core/constant/local_storage.dart';
 import '../models/home_summary_model.dart';
 import '../services/daily_quiz_service.dart';
 
@@ -12,7 +15,28 @@ class HomeSummaryProvider extends ChangeNotifier {
   final DailyQuizService _service;
 
   HomeSummaryProvider({DailyQuizService? service})
-      : _service = service ?? DailyQuizService();
+      : _service = service ?? DailyQuizService() {
+    _restore();
+  }
+
+  /// Paints the last known home screen before the network is asked.
+  ///
+  /// Measured cold on device, /home took 5459ms — all of it spent on an empty
+  /// screen. The stored copy is on screen in milliseconds and the fresh one
+  /// swaps in underneath.
+  Future<void> _restore() async {
+    if (home != null) return;
+    try {
+      final stored = await LocalStorage.getCached(LocalStorage.homeSummaryKey);
+      if (stored == null || stored.isEmpty || home != null) return;
+      home = HomeSummary.fromJson(jsonDecode(stored));
+      isLoading = false;
+      notifyListeners();
+    } catch (_) {
+      // Written by an older build, or storage unavailable. The fetch already
+      // under way covers it — restoring must never break the screen.
+    }
+  }
 
   bool isLoading = false;
   HomeSummary? home;
@@ -33,7 +57,8 @@ class HomeSummaryProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      home = await _service.fetchHome();
+      home = await timedLoad('home summary', _service.fetchHome,
+          detail: (h) => '${h?.inProgressVideos.length ?? 0} in progress');
     } on DailyQuizException {
       // The sections simply do not render. A failed summary is not worth an
       // error banner across a home screen that is otherwise fine.
@@ -100,6 +125,15 @@ class DailyQuizProvider extends ChangeNotifier {
 
   int currentIndex = 0;
 
+  /// The option tapped but not yet ruled on.
+  ///
+  /// The answer key is deliberately absent from the question payload — a
+  /// student could otherwise read every answer straight out of the response —
+  /// so correct or wrong genuinely cannot be known here until the server
+  /// says. This is what fills the gap: the choice registers instantly and
+  /// only the verdict waits.
+  int? pendingOptionId;
+
   bool _disposed = false;
 
   List<DailyQuizQuestion> get questions => set?.questions ?? const [];
@@ -121,7 +155,9 @@ class DailyQuizProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final today = await _service.fetchToday(courseId);
+      final today = await timedLoad(
+          'daily quiz', () => _service.fetchToday(courseId),
+          detail: (t) => '${t.questions.length} questions');
       set = today;
       answers
         ..clear()
@@ -150,6 +186,10 @@ class DailyQuizProvider extends ChangeNotifier {
     if (isSubmitting || isAnswered(questionId)) return false;
 
     isSubmitting = true;
+    // Recorded before the request, so the tile the student tapped lights up
+    // on the same frame as the tap. Only the correct/wrong reveal waits for
+    // the server, because only the server knows the answer.
+    pendingOptionId = optionId;
     actionError = null;
     notifyListeners();
 
@@ -172,6 +212,7 @@ class DailyQuizProvider extends ChangeNotifier {
       }
     }
 
+    pendingOptionId = null;
     isSubmitting = false;
     notifyListeners();
     return ok;

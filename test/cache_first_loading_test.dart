@@ -133,4 +133,32 @@ void _cacheRules() {
       expect(clearsCaches(wasSignedIn: false, nowSignedOut: false), isFalse);
     });
   });
+
+  group('a screen never blanks over data it already holds', () {
+    /// Mirrors QbankSubjectsScreen, QbankTab and AiVideoTab, which all bind
+    /// their loader to the shared tree's isLoading.
+    bool showsLoader({required bool isLoading, required bool hasSomething}) =>
+        isLoading && !hasSomething;
+
+    test('a cold load shows the loader', () {
+      expect(showsLoader(isLoading: true, hasSomething: false), isTrue);
+    });
+
+    test('a refresh over rows already on screen does not', () {
+      // This was the bug: the subjects screen is pushed with its chapter
+      // already in hand, so it always had rows to draw — and isLoading alone
+      // replaced them with a spinner on an empty page every time the shared
+      // tree refetched, which it does on entry to seven different screens.
+      expect(showsLoader(isLoading: true, hasSomething: true), isFalse);
+    });
+
+    test('settled with content shows content', () {
+      expect(showsLoader(isLoading: false, hasSomething: true), isFalse);
+    });
+
+    test('settled with nothing shows the empty state, not the loader', () {
+      // Not a spinner forever: the caller renders "no subjects yet" here.
+      expect(showsLoader(isLoading: false, hasSomething: false), isFalse);
+    });
+  });
 }

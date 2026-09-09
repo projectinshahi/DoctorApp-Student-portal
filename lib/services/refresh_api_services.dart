@@ -1,5 +1,7 @@
 // lib/services/api_client.dart
 import 'dart:convert';
+
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../core/constant/api_constant.dart';
@@ -78,7 +80,18 @@ class ApiClient {
       throw SessionExpiredException("Not logged in");
     }
 
+    final startedAt = DateTime.now();
     var response = await requestFn(accessToken);
+    if (kDebugMode) {
+      final ms = DateTime.now().difference(startedAt).inMilliseconds;
+      // Debug only, and never the body — it carries the tokens. Enough to
+      // tell a slow server from a slow app.
+      // The method matters: GET and POST on /quiz-attempts are the history
+      // fetch and the attempt start, and they are very different calls.
+      debugPrint('API ${ms}ms  ${response.request?.method}  '
+          '${response.statusCode}  ${response.bodyBytes.length}b  '
+          '${response.request?.url.path}');
+    }
 
     // 403 is its own ending: the account is disabled, and no amount of
     // refreshing fixes that. Without this the response fell through as if it

@@ -1,4 +1,5 @@
 // lib/provider/profile_provider.dart
+import '../core/utils/load_timer.dart';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import '../View_model/profile_model.dart';
@@ -22,7 +23,7 @@ class ProfileProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      profile = await _service.getProfile();
+      profile = await timedLoad('profile', _service.getProfile);
     } catch (e) {
       errorMessage = e.toString().replaceFirst('Exception: ', '');
     } finally {

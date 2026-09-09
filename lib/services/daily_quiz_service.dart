@@ -1,5 +1,8 @@
+import 'dart:async';
 // lib/services/daily_quiz_service.dart
 import 'dart:convert';
+
+import '../core/constant/local_storage.dart';
 
 import 'package:flutter/foundation.dart';
 
@@ -39,8 +42,13 @@ class DailyQuizService {
   /// Carries the daily-quiz summary and the in-progress videos together,
   /// each video with its own `videoUrl`, so a Continue Watching card can
   /// start playing without a second request.
-  Future<HomeSummary> fetchHome() async =>
-      HomeSummary.fromJson(await _send('GET', '$_base/home'));
+  Future<HomeSummary> fetchHome() async {
+    final json = await _send('GET', '$_base/home');
+    // Written for the *next* launch, not awaited: the caller has its data.
+    unawaited(
+        LocalStorage.saveCached(LocalStorage.homeSummaryKey, jsonEncode(json)));
+    return HomeSummary.fromJson(json);
+  }
 
   /// Today's set.
   ///

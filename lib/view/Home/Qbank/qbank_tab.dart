@@ -1,3 +1,4 @@
+import 'dart:async';
 // lib/view/Home/Qbank/qbank_tab.dart
 //
 // QBank entry point: the topics of the student's selected exam course.
@@ -8,6 +9,7 @@ import 'package:provider/provider.dart';
 
 import '../../../models/selection_content_model.dart';
 import '../../../repository/saved_provider.dart';
+import '../../../repository/quiz_prefetch.dart';
 import '../../../repository/selection_content_provider.dart';
 import 'continue_mcqs_screen.dart';
 import 'qbank_subjects_screen.dart';
@@ -52,6 +54,19 @@ class _QbankTabState extends State<QbankTab> with RefreshOnVisible<QbankTab> {
     await context.read<SelectionContentProvider>().loadContent();
     if (!mounted) return;
     await context.read<SavedProvider>().loadAll();
+    if (!mounted) return;
+
+    // Warm every started quiz in the course while the student is still on
+    // this list. By the time they drill into a subject and tap one, the
+    // questions are already here and the screen opens with no spinner.
+    //
+    // Read-only: only quizzes that already have an attempt are fetched, so
+    // nothing is started that the student did not start themselves.
+    final tree = context.read<SelectionContentProvider>().content;
+    if (tree == null) return;
+    unawaited(context.read<QuizPrefetch>().warm(
+          [for (final chapter in tree.chapters) ...chapter.lessons],
+        ));
   }
 
   /// The route observer refetches when this screen comes back into view, so
@@ -110,9 +125,10 @@ class _QbankTabState extends State<QbankTab> with RefreshOnVisible<QbankTab> {
       ),
       body: Consumer<SelectionContentProvider>(
         builder: (context, provider, _) {
-          // Every fetch, not only the cold one — the screen just became
-          // visible, so stale rows are worse than a moment of the spinner.
-          if (provider.isLoading) {
+          // Only when there is nothing behind the spinner. isLoading alone
+          // threw away a tree that was already on screen and replaced a
+          // usable page with an empty one on every entry.
+          if (provider.isLoading && provider.content == null) {
             return const AppLoading();
           }
 

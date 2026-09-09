@@ -116,9 +116,10 @@ class _AiVideoTabState extends State<AiVideoTab> with RefreshOnVisible<AiVideoTa
       ),
       body: Consumer<SelectionContentProvider>(
         builder: (context, provider, _) {
-          // Every fetch, not only the cold one — the screen just became
-          // visible, so stale rows are worse than a moment of the spinner.
-          if (provider.isLoading) {
+          // Only when there is nothing behind the spinner. isLoading alone
+          // threw away a tree that was already on screen and replaced a
+          // usable page with an empty one on every entry.
+          if (provider.isLoading && provider.content == null) {
             return const AppLoading();
           }
 

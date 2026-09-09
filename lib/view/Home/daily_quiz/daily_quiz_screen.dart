@@ -260,6 +260,7 @@ class _QuestionBody extends StatelessWidget {
             selectedId: answer?.selectedOptionId,
             correctId: answer?.correctOptionId,
             revealed: revealed,
+            pending: provider.pendingOptionId == question.options[i].id,
             onTap: () => provider.answer(question.id, question.options[i].id),
           ),
           SizedBox(height: 10.h),
@@ -334,6 +335,9 @@ class _OptionTile extends StatelessWidget {
   final bool revealed;
   final VoidCallback onTap;
 
+  /// Tapped, and waiting on the server's verdict.
+  final bool pending;
+
   const _OptionTile({
     required this.letter,
     required this.option,
@@ -342,6 +346,7 @@ class _OptionTile extends StatelessWidget {
     required this.correctId,
     required this.revealed,
     required this.onTap,
+    this.pending = false,
   });
 
   @override
@@ -354,12 +359,19 @@ class _OptionTile extends StatelessWidget {
         ? _kPrimary
         : isWrongPick
             ? _kRed
-            : Colors.transparent;
+            : pending
+                // Neutral on purpose. The tap is acknowledged; guessing at
+                // green or red before the server rules would be a lie half
+                // the time.
+                ? _kPrimary
+                : Colors.transparent;
     final fill = isCorrect
         ? _kPrimary.withValues(alpha: 0.08)
         : isWrongPick
             ? _kRed.withValues(alpha: 0.07)
-            : Colors.white;
+            : pending
+                ? _kPrimary.withValues(alpha: 0.06)
+                : Colors.white;
 
     return GestureDetector(
       onTap: enabled ? onTap : null,
@@ -379,14 +391,25 @@ class _OptionTile extends StatelessWidget {
                   ? _kPrimary
                   : isWrongPick
                       ? _kRed
-                      : Colors.grey.shade200,
-              child: Text(letter,
-                  style: TextStyle(
-                      fontSize: 12.sp,
-                      fontWeight: FontWeight.w700,
-                      color: isCorrect || isWrongPick
-                          ? Colors.white
-                          : Colors.black87)),
+                      : pending
+                          ? _kPrimary
+                          : Colors.grey.shade200,
+              child: pending
+                  // On the tile itself, not over the page: the student can
+                  // see exactly which answer is being checked.
+                  ? SizedBox(
+                      width: 13.r,
+                      height: 13.r,
+                      child: const CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white),
+                    )
+                  : Text(letter,
+                      style: TextStyle(
+                          fontSize: 12.sp,
+                          fontWeight: FontWeight.w700,
+                          color: isCorrect || isWrongPick
+                              ? Colors.white
+                              : Colors.black87)),
             ),
             SizedBox(width: 12.w),
             Expanded(

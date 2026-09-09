@@ -1,6 +1,9 @@
+import 'dart:convert';
 // lib/repository/saved_provider.dart
+import '../core/utils/load_timer.dart';
 import 'package:flutter/foundation.dart';
 
+import '../core/constant/local_storage.dart';
 import '../models/quiz_model.dart' show QuizException;
 import '../models/saved_model.dart';
 import '../services/saved_service.dart';
@@ -11,6 +14,41 @@ import '../services/saved_service.dart';
 /// of them saved something.
 class SavedProvider extends ChangeNotifier {
   final SavedService _service = SavedService();
+
+  SavedProvider() {
+    _restore();
+  }
+
+  /// Paints the last known bookmarks before the network is asked. /saved
+  /// measured 5010ms cold on device.
+  Future<void> _restore() async {
+    if (_fetched) return;
+    try {
+      final stored = await LocalStorage.getCached(LocalStorage.savedKey);
+      if (stored == null || stored.isEmpty || _fetched) return;
+
+      final bundle = SavedBundle.fromJson(jsonDecode(stored));
+      counts = bundle.counts;
+      questions = bundle.questions;
+      lessons = bundle.lessons;
+      questionCount = bundle.counts['question'] ?? bundle.questions.length;
+      lessonCount = bundle.counts['lesson'] ?? bundle.lessons.length;
+      _savedQuestionIds
+        ..clear()
+        ..addAll(bundle.questions.map((q) => q.questionId));
+      _savedLessonIds
+        ..clear()
+        ..addAll(bundle.lessons.map((l) => l.lessonId));
+
+      // Not _fetched: that means the server answered, and this did not. The
+      // next loadAll still shows nothing stale as authoritative.
+      isLoadingQuestions = false;
+      isLoadingLessons = false;
+      notifyListeners();
+    } catch (_) {
+      // Restoring is an optimisation and must never break the screen.
+    }
+  }
 
   int questionCount = 0;
   int lessonCount = 0;
@@ -74,7 +112,9 @@ class SavedProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final bundle = await _service.fetchAll();
+      final bundle = await timedLoad('bookmarks', _service.fetchAll,
+          detail: (b) =>
+              '${b.questions.length} MCQs, ${b.lessons.length} lessons');
 
       counts = bundle.counts;
       questions = bundle.questions;

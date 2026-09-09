@@ -23,6 +23,7 @@ import '../../core/utils/app_navigator.dart';
 import '../../widget/app_loading_screen.dart';
 import '../../repository/daily_quiz_provider.dart';
 import '../../repository/refresh_api_provider.dart';
+import '../../repository/quiz_prefetch.dart';
 import '../../repository/saved_provider.dart';
 import '../../repository/selection_content_provider.dart';
 import '../Authendication/login/login_screen.dart';
@@ -86,6 +87,41 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
     super.dispose();
   }
 
+  bool _warmedUp = false;
+
+  /// Pulls the app's content once, as soon as there is a session.
+  ///
+  /// Screens restore from disk instantly, so this is about what lands in that
+  /// store for next time and about being fresh before the student navigates —
+  /// rather than each screen discovering it needs data at the moment it is
+  /// opened, which is what put a spinner in front of every tap.
+  ///
+  /// One at a time. The backend is a single instance and measured 3-5s per
+  /// call when cold; firing these together would make the home screen — the
+  /// one thing the student is actually looking at — the slowest of the three.
+  ///
+  /// Deliberately NOT the daily quiz: fetchToday *creates* the attempt, and
+  /// preloading it would end the day with an unfinished quiz and a broken
+  /// streak for a student who only opened the app.
+  void _warmUp() {
+    if (_warmedUp) return;
+    _warmedUp = true;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final navigatorContext = navigatorKey.currentContext;
+      if (navigatorContext == null || !mounted) return;
+      try {
+        await navigatorContext.read<SelectionContentProvider>().loadContent();
+        if (!mounted) return;
+        await navigatorContext.read<HomeSummaryProvider>().load();
+        if (!mounted) return;
+        await navigatorContext.read<SavedProvider>().ensureLoaded();
+      } catch (_) {
+        // Warming is an optimisation. Every screen still loads on its own.
+      }
+    });
+  }
+
   void _onAuthChanged() {
     final auth = _auth;
     if (auth == null || !mounted) return;
@@ -116,8 +152,12 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
     // lands. Done here rather than in the logout button because a session
     // also ends from another device signing in and from an account being
     // blocked — all three arrive as this one transition.
+    _warmedUp = false;
     context.read<SavedProvider>().clear();
     context.read<SelectionContentProvider>().invalidate();
+    // Warmed attempts belong to the account that just left; opening one on
+    // the next account would show the wrong student's answers.
+    context.read<QuizPrefetch>().clear();
 
     // The session can die while a quiz, a test paper or the player is on
     // top. Swapping this root does not remove those, and without the reset
@@ -250,7 +290,10 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
       return const AppLoadingScreen(message: 'Loading your course…');
     }
 
-    if (auth.hasSelectedExam) return const Homescreen();
+    if (auth.hasSelectedExam) {
+      _warmUp();
+      return const Homescreen();
+    }
 
     _tokens ??= _loadTokensForExamSelection();
     return FutureBuilder<Map<String, String?>>(

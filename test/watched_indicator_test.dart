@@ -2,6 +2,7 @@ import 'package:dr_app/models/selection_content_model.dart';
 import 'package:dr_app/repository/selection_content_provider.dart';
 import 'package:dr_app/services/lesson_progress_service.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 StudentLessonModel _lesson(Map<String, dynamic> extra) =>
     StudentLessonModel.fromJson({
@@ -26,6 +27,11 @@ SelectionContentModel _content(StudentLessonModel lesson) =>
     ]);
 
 void main() {
+  // SelectionContentProvider restores its cached tree on construction, so
+  // the binding and a stub store have to exist before one is built.
+  TestWidgetsFlutterBinding.ensureInitialized();
+  setUp(() => SharedPreferences.setMockInitialValues({}));
+
   group('watchedPercent', () {
     test('null is "length unknown", never zero', () {
       // A bar pinned at 0% reads as "never watched" for a lesson someone is

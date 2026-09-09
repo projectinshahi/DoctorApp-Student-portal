@@ -1,5 +1,8 @@
 // lib/view/Home/Qbank/quiz_screen.dart
 import 'package:flutter/material.dart';
+
+import '../../../models/selection_content_model.dart' show LessonAttemptInfo;
+import '../../../repository/quiz_prefetch.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 
@@ -18,10 +21,21 @@ class QuizScreen extends StatelessWidget {
   final int lessonId;
   final String lessonTitle;
 
+  /// What the content tree already knows about this lesson's attempt, when
+  /// the caller came from a screen that holds the tree. Passing it saves the
+  /// history round trip that used to run before every quiz opened.
+  final LessonAttemptInfo? knownAttempt;
+
+  /// True when [knownAttempt] was read from the tree — a null attempt then
+  /// means "never attempted", not "we did not look".
+  final bool attemptStateKnown;
+
   const QuizScreen({
     super.key,
     required this.lessonId,
     required this.lessonTitle,
+    this.knownAttempt,
+    this.attemptStateKnown = false,
   });
 
   @override
@@ -29,7 +43,13 @@ class QuizScreen extends StatelessWidget {
     // Provider is scoped to this route. The attempt lives on the server, so
     // a re-open resumes it rather than replaying anything cached here.
     return ChangeNotifierProvider<QuizProvider>(
-      create: (_) => QuizProvider()..load(lessonId),
+      // take() before the provider is built: if QuizPrefetch already has this
+      // attempt, load() makes no call and the screen opens on questions.
+      create: (context) => QuizProvider()
+        ..load(lessonId,
+            known: knownAttempt,
+            treeKnows: attemptStateKnown,
+            warmed: context.read<QuizPrefetch>().take(lessonId)),
       child: _QuizView(lessonId: lessonId, lessonTitle: lessonTitle),
     );
   }

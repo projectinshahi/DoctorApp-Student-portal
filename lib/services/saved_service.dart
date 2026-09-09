@@ -1,5 +1,8 @@
+import 'dart:async';
 // lib/services/saved_service.dart
 import 'dart:convert';
+
+import '../core/constant/local_storage.dart';
 
 import '../core/constant/api_constant.dart';
 import '../models/quiz_model.dart' show QuizException, QuizErrorKind;
@@ -20,8 +23,15 @@ class SavedService {
   ///
   /// `type` accepts all | question | video | text | quiz. NOT `note` — notes
   /// are stored as `text`, and asking for `note` is a 400, not an empty list.
-  Future<SavedBundle> fetchAll({String type = 'all'}) async =>
-      SavedBundle.fromJson(await _send('GET', '$_allUrl?type=$type'));
+  Future<SavedBundle> fetchAll({String type = 'all'}) async {
+    final json = await _send('GET', '$_allUrl?type=$type');
+    // Only the unfiltered bundle is worth caching — it is what the screen
+    // opens on, and a filtered one would restore as if it were everything.
+    if (type == 'all') {
+      unawaited(LocalStorage.saveCached(LocalStorage.savedKey, jsonEncode(json)));
+    }
+    return SavedBundle.fromJson(json);
+  }
 
   Future<SavedQuestionsResponse> fetchQuestions() async =>
       SavedQuestionsResponse.fromJson(await _send('GET', _questionsUrl));

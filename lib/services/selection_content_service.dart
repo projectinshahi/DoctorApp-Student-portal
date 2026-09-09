@@ -8,17 +8,22 @@ import '../models/selection_content_model.dart';
 class SelectionContentResult {
   final bool isSuccess;
   final SelectionContentModel? content;
+
+  /// The response exactly as it arrived, for writing to disk. The model has
+  /// no toJson, and replaying the server's own bytes cannot drift from it.
+  final String? rawJson;
   final String? errorMessage;
   final bool sessionExpired; // true when refresh also failed — caller should log out
 
-  SelectionContentResult.success(this.content)
+  SelectionContentResult.success(this.content, {this.rawJson})
       : isSuccess = true,
         errorMessage = null,
         sessionExpired = false;
 
   SelectionContentResult.failure(this.errorMessage, {this.sessionExpired = false})
       : isSuccess = false,
-        content = null;
+        content = null,
+        rawJson = null;
 }
 
 class SelectionContentService {
@@ -52,7 +57,10 @@ class SelectionContentService {
 
 
     if (response.statusCode == 200) {
-      return SelectionContentResult.success(SelectionContentModel.fromJson(data));
+      return SelectionContentResult.success(
+        SelectionContentModel.fromJson(data),
+        rawJson: response.body,
+      );
     }
 
     final message = (data is Map && data['error'] is Map)

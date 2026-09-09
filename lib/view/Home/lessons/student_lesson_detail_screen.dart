@@ -1,7 +1,10 @@
 import 'dart:async';
 import 'package:dr_app/view/Home/lessons/videoplay/FullscreenVideoPage.dart';
 import 'package:dr_app/view/Home/lessons/videoplay/PdfViewerModal.dart';
+import 'dart:ui' show FontFeature;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 import 'package:video_player/video_player.dart';
@@ -58,6 +61,15 @@ class _StudentLessonDetailScreenState extends State<StudentLessonDetailScreen> {
 
   // ── YouTube-specific state ──
   YoutubePlayerController? _ytController;
+
+  /// Keeps the player's element — and with it the webview — alive when the
+  /// widget moves between the page layout and the fullscreen one. Without a
+  /// GlobalKey Flutter builds a second player and the video reloads from the
+  /// start every time fullscreen is toggled.
+  final GlobalKey _ytKey = GlobalKey();
+
+  /// Mirrors the controller's own fullscreen flag, so build() can swap layout.
+  bool _ytFullScreen = false;
   bool _isYoutube = false;
 
   late StudentLessonModel _lesson;
@@ -267,7 +279,15 @@ class _StudentLessonDetailScreenState extends State<StudentLessonDetailScreen> {
   /// Same job for the YouTube player, which exposes position on its own value.
   void _onYoutubeTick() {
     final controller = _ytController;
-    if (controller == null || !controller.value.isReady) return;
+    if (controller == null) return;
+
+    // Checked before the readiness guards below: the fullscreen button can be
+    // tapped at any time, and this is the only signal the package gives.
+    if (controller.value.isFullScreen != _ytFullScreen) {
+      setState(() => _ytFullScreen = controller.value.isFullScreen);
+    }
+
+    if (!controller.value.isReady) return;
 
     final position = controller.value.position;
     if (position <= Duration.zero) return;
@@ -424,6 +444,25 @@ class _StudentLessonDetailScreenState extends State<StudentLessonDetailScreen> {
     });
   }
 
+  /// A control in the player bar.
+  ///
+  /// The padding is the point: a bare Icon is a ~20px tap target, which is
+  /// under half the 48px minimum and is why these felt hard to hit.
+  Widget _ctrl({
+    required IconData icon,
+    required VoidCallback onTap,
+    double size = 20,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: 7.w, vertical: 6.h),
+        child: Icon(icon, color: Colors.white, size: size.sp),
+      ),
+    );
+  }
+
   void _openFullscreen() {
     if (_controller == null) return;
     Navigator.push(
@@ -467,6 +506,13 @@ class _StudentLessonDetailScreenState extends State<StudentLessonDetailScreen> {
     _controller?.dispose();
     _ytController?.dispose();
     _hideControlsTimer?.cancel();
+    // Belt and braces on the one screen that can be in landscape. The
+    // YouTube player restores portrait when its own fullscreen button is
+    // tapped, but leaving the lesson while still in fullscreen never reaches
+    // that, and the app would come back rotated with nothing to rotate it
+    // again.
+    SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     super.dispose();
   }
 
@@ -489,10 +535,16 @@ class _StudentLessonDetailScreenState extends State<StudentLessonDetailScreen> {
         child: AppLoading(color: Colors.white),
       );
     }
+    final size = MediaQuery.of(context).size;
     return YoutubePlayer(
+      key: _ytKey,
       controller: _ytController!,
       showVideoProgressIndicator: true,
       progressIndicatorColor: kPrimary,
+      // 16:9 in the page, the screen's own shape in fullscreen — which is
+      // what makes it fill the display instead of sitting letterboxed in the
+      // middle of a rotated page.
+      aspectRatio: _ytFullScreen ? size.width / size.height : 16 / 9,
     );
   }
 
@@ -631,53 +683,69 @@ class _StudentLessonDetailScreenState extends State<StudentLessonDetailScreen> {
                                 },
                               ),
                             ),
+                            // Two rows, not one. Everything used to share a
+                            // single line with a Spacer, so on a narrow phone
+                            // the speed pill and the mute and fullscreen icons
+                            // were squeezed to the edge and clipped.
                             Row(
                               children: [
-                                GestureDetector(
+                                _ctrl(
+                                  icon: value.isPlaying
+                                      ? Icons.pause_rounded
+                                      : Icons.play_arrow_rounded,
                                   onTap: _togglePlay,
-                                  child: Icon(
-                                    value.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                                    color: Colors.white,
-                                    size: 26.sp,
-                                  ),
+                                  size: 26,
+                                ),
+                                _ctrl(
+                                    icon: Icons.fast_forward_rounded,
+                                    onTap: _skipForward),
+                                _ctrl(
+                                  icon: _isMuted
+                                      ? Icons.volume_off_rounded
+                                      : Icons.volume_up_rounded,
+                                  onTap: _toggleMute,
+                                ),
+                                const Spacer(),
+                                // Elapsed *and* total — the total was never
+                                // shown, so there was no way to tell how much
+                                // of the lesson was left.
+                                Text(
+                                  '${_formatDuration(value.position)} / '
+                                  '${_formatDuration(value.duration)}',
+                                  style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 11.sp,
+                                      fontFeatures: const [
+                                        // Digits keep their width, so the row
+                                        // stops twitching as the clock runs.
+                                        FontFeature.tabularFigures(),
+                                      ]),
                                 ),
                                 SizedBox(width: 10.w),
-                                Text(_formatDuration(value.position), style: TextStyle(color: Colors.white, fontSize: 11.sp)),
-                                const Spacer(),
-                                // ── Speed control button, next to skip/mute/fullscreen ──
                                 GestureDetector(
                                   onTap: _openSpeedSelector,
                                   child: Container(
-                                    padding: EdgeInsets.symmetric(horizontal: 7.w, vertical: 3.h),
+                                    padding: EdgeInsets.symmetric(
+                                        horizontal: 7.w, vertical: 3.h),
                                     decoration: BoxDecoration(
                                       border: Border.all(color: Colors.white70),
                                       borderRadius: BorderRadius.circular(6.r),
                                     ),
                                     child: Text(
-                                      _playbackSpeed == 1.0 ? '1x' : '${_playbackSpeed}x',
-                                      style: TextStyle(color: Colors.white, fontSize: 11.sp, fontWeight: FontWeight.w700),
+                                      _playbackSpeed == 1.0
+                                          ? '1x'
+                                          : '${_playbackSpeed}x',
+                                      style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 11.sp,
+                                          fontWeight: FontWeight.w700),
                                     ),
                                   ),
                                 ),
-                                SizedBox(width: 14.w),
-                                GestureDetector(
-                                  onTap: _skipForward,
-                                  child: Icon(Icons.fast_forward_rounded, color: Colors.white, size: 20.sp),
-                                ),
-                                SizedBox(width: 14.w),
-                                GestureDetector(
-                                  onTap: _toggleMute,
-                                  child: Icon(
-                                    _isMuted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
-                                    color: Colors.white,
-                                    size: 20.sp,
-                                  ),
-                                ),
-                                SizedBox(width: 14.w),
-                                GestureDetector(
-                                  onTap: _openFullscreen,
-                                  child: Icon(Icons.fullscreen_rounded, color: Colors.white, size: 22.sp),
-                                ),
+                                _ctrl(
+                                    icon: Icons.fullscreen_rounded,
+                                    onTap: _openFullscreen,
+                                    size: 24),
                               ],
                             ),
                           ],
@@ -846,7 +914,12 @@ class _StudentLessonDetailScreenState extends State<StudentLessonDetailScreen> {
                 onPressed: () => Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => QuizScreen(lessonId: _lesson.id, lessonTitle: _lesson.title),
+                    builder: (_) => QuizScreen(
+                      lessonId: _lesson.id,
+                      lessonTitle: _lesson.title,
+                      knownAttempt: _lesson.attempt,
+                      attemptStateKnown: true,
+                    ),
                   ),
                 ),
                 style: ElevatedButton.styleFrom(
@@ -983,6 +1056,24 @@ class _StudentLessonDetailScreenState extends State<StudentLessonDetailScreen> {
   Widget build(BuildContext context) {
     // Locked lesson → the paywall owns the screen, same model as the quiz.
     if (_lesson.locked) return _buildPaywallScreen();
+
+    // YouTube fullscreen. The package only rotates the app — it does not take
+    // the screen — so without this the page stayed exactly as it was and the
+    // whole lesson, app bar included, just turned on its side.
+    if (_ytFullScreen && _ytController != null) {
+      return PopScope(
+        // Back leaves fullscreen rather than the lesson, which is what the
+        // gesture means on a fullscreen video everywhere else.
+        canPop: false,
+        onPopInvokedWithResult: (didPop, _) {
+          if (!didPop) _ytController?.toggleFullScreenMode();
+        },
+        child: Scaffold(
+          backgroundColor: Colors.black,
+          body: Center(child: _buildYoutubePlayer()),
+        ),
+      );
+    }
 
     final hasValidVideoUrl = _lesson.videoUrl != null && _lesson.videoUrl!.isNotEmpty;
     final isVideoAvailable = _lesson.hasVideo && hasValidVideoUrl;

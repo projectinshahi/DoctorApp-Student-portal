@@ -278,6 +278,7 @@ class _Body extends StatelessWidget {
             selectedId: answer?.selectedOptionId,
             correctId: answer?.correctOptionId,
             revealed: revealed,
+            pending: quiz.pendingOptionId == question.options[i].id,
             onTap: () => onAnswer(question, question.options[i].id),
           ),
           SizedBox(height: 11.h),
@@ -313,6 +314,9 @@ class _Option extends StatelessWidget {
   final bool revealed;
   final VoidCallback onTap;
 
+  /// Tapped, and waiting on the server's verdict.
+  final bool pending;
+
   const _Option({
     required this.letter,
     required this.option,
@@ -321,6 +325,7 @@ class _Option extends StatelessWidget {
     required this.correctId,
     required this.revealed,
     required this.onTap,
+    this.pending = false,
   });
 
   @override
@@ -329,11 +334,16 @@ class _Option extends StatelessWidget {
     final isWrongPick =
         revealed && option.id == selectedId && option.id != correctId;
 
+    // Neutral on purpose while pending: the tap is acknowledged, but
+    // guessing green or red before the server rules would be a lie half the
+    // time.
     final accent = isCorrect
         ? _kPrimary
         : isWrongPick
             ? _kRed
-            : null;
+            : pending
+                ? _kPrimary
+                : null;
 
     return GestureDetector(
       onTap: enabled ? onTap : null,
@@ -371,11 +381,22 @@ class _Option extends StatelessWidget {
                     ? Border.all(color: const Color(0xFFDFDFDF))
                     : null,
               ),
-              child: Text(letter,
-                  style: TextStyle(
-                      fontSize: 11.5.sp,
-                      fontWeight: FontWeight.w600,
-                      color: accent == null ? Colors.grey.shade700 : Colors.white)),
+              child: pending
+                  // On the tile, not over the card: it says which answer is
+                  // being checked, and the rest of the card stays readable.
+                  ? SizedBox(
+                      width: 12.w,
+                      height: 12.w,
+                      child: const CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white),
+                    )
+                  : Text(letter,
+                      style: TextStyle(
+                          fontSize: 11.5.sp,
+                          fontWeight: FontWeight.w600,
+                          color: accent == null
+                              ? Colors.grey.shade700
+                              : Colors.white)),
             ),
             SizedBox(width: 11.w),
             Expanded(

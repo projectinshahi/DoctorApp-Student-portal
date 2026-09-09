@@ -64,6 +64,10 @@ class _ContinueMcqsScreenState extends State<ContinueMcqsScreen> {
         builder: (_) => QuizScreen(
           lessonId: attempt.lessonId,
           lessonTitle: attempt.lessonTitle,
+          // This list is in-progress attempts by definition, so there is no
+          // finished one to look for and startAttempt will resume this very
+          // attempt. One call instead of two.
+          attemptStateKnown: true,
         ),
       ),
     );

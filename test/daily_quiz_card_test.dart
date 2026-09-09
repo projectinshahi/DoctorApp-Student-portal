@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:dr_app/models/daily_quiz_model.dart';
 import 'package:dr_app/services/daily_quiz_service.dart';
 import 'package:dr_app/view/Home/daily_quiz/daily_quiz_card.dart';
@@ -32,6 +33,12 @@ const _question = {
 class _FakeService extends DailyQuizService {
   int answerCalls = 0;
 
+  /// Held open to freeze the request mid-flight — the only way to observe
+  /// what the card shows while it is waiting.
+  final Completer<void>? answerGate;
+
+  _FakeService({this.answerGate});
+
   @override
   Future<DailyQuizSet> fetchToday(int courseId) async => DailyQuizSet.fromJson({
         'date': '2026-09-02',
@@ -48,6 +55,7 @@ class _FakeService extends DailyQuizService {
   Future<DailyQuizAnswerResult> answer(int courseId,
       {required int questionId, required int optionId}) async {
     answerCalls++;
+    if (answerGate != null) await answerGate!.future;
     return DailyQuizAnswerResult.fromJson({
       'questionId': questionId,
       'selectedOptionId': optionId,
@@ -63,13 +71,19 @@ class _FakeService extends DailyQuizService {
   }
 }
 
-Future<_FakeService> _pump(WidgetTester tester, {String state = 'inProgress'}) async {
+Future<_FakeService> _pump(WidgetTester tester,
+    {String state = 'inProgress'}) async {
+  final service = _FakeService();
+  await _pumpWith(tester, service, state: state);
+  return service;
+}
+
+Future<void> _pumpWith(WidgetTester tester, _FakeService service,
+    {String state = 'inProgress'}) async {
   tester.view.physicalSize = const Size(440, 956);
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
-
-  final service = _FakeService();
 
   await tester.pumpWidget(
     ScreenUtilInit(
@@ -93,7 +107,6 @@ Future<_FakeService> _pump(WidgetTester tester, {String state = 'inProgress'}) a
     ),
   );
   await tester.pumpAndSettle();
-  return service;
 }
 
 void main() {
@@ -237,5 +250,29 @@ void main() {
     // is the whole point: there is no clock left to wait out.
     await tester.pump();
     expect(find.textContaining('multifactorial inheritance'), findsOneWidget);
+  });
+
+  testWidgets('the tapped option lights up before the server answers',
+      (tester) async {
+    // The whole complaint: the tap changed nothing on screen until the round
+    // trip came back, which on a cold backend is seconds of the student
+    // wondering whether it registered at all.
+    final gate = Completer<void>();
+    final service = _FakeService(answerGate: gate);
+    await _pumpWith(tester, service);
+
+    await tester.tap(find.text('Achondroplasia'));
+    await tester.pump();
+
+    // Acknowledged on this frame, with the request still in flight — and
+    // still no verdict, because the answer key is deliberately absent from
+    // the question payload and only the server can rule.
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+
+    gate.complete();
+    await tester.pumpAndSettle();
+
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+    expect(service.answerCalls, 1);
   });
 }

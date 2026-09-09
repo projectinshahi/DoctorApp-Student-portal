@@ -1,9 +1,11 @@
+import 'dart:async';
 // lib/view/Home/Qbank/qbank_subjects_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 
 import '../../../models/selection_content_model.dart';
+import '../../../repository/quiz_prefetch.dart';
 import '../../../repository/selection_content_provider.dart';
 import '../../../widget/app_loading.dart';
 import 'quiz_screen.dart';
@@ -36,14 +38,30 @@ class _QbankSubjectsScreenState extends State<QbankSubjectsScreen>
   /// these rows render from. Silent: the spinner shows only on a cold load, so
   /// this swaps the data underneath instead of flashing the list away.
   @override
-  Future<void> onRefresh() =>
-      context.read<SelectionContentProvider>().loadContent();
+  Future<void> onRefresh() async {
+    await context.read<SelectionContentProvider>().loadContent();
+    if (!mounted) return;
+    // Warm this chapter's quizzes while the student reads the list they are
+    // about to tap. Read-only: only quizzes that already have an attempt are
+    // fetched, so nothing is started that the student did not start.
+    unawaited(
+      context.read<QuizPrefetch>().warm(
+        // read, not watch: this runs from an async callback, and watching
+        // outside a build is what threw "Tried to listen to a value exposed
+        // with provider, from outside of the widget tree".
+        _chapterIn(context.read<SelectionContentProvider>()).lessons,
+      ),
+    );
+  }
 
   /// The chapter as the provider currently holds it. `widget.chapter` was
   /// captured when this route was pushed, so after a quiz is finished and the
   /// tree reloads, that copy still carries the old `attempt` objects.
-  StudentChapterModel _liveChapter(BuildContext context) {
-    final chapters = context.watch<SelectionContentProvider>().content?.chapters;
+  ///
+  /// Takes the provider rather than a context, so the caller decides between
+  /// watch (in build) and read (in a callback) — the wrong one throws.
+  StudentChapterModel _chapterIn(SelectionContentProvider provider) {
+    final chapters = provider.content?.chapters;
     if (chapters == null) return widget.chapter;
 
     for (final candidate in chapters) {
@@ -56,7 +74,14 @@ class _QbankSubjectsScreenState extends State<QbankSubjectsScreen>
     await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => QuizScreen(lessonId: lesson.id, lessonTitle: lesson.title),
+        builder: (_) => QuizScreen(
+          lessonId: lesson.id,
+          lessonTitle: lesson.title,
+          // Straight off the tree this screen already renders from, so the
+          // quiz opens on one call rather than two.
+          knownAttempt: lesson.attempt,
+          attemptStateKnown: true,
+        ),
       ),
     );
 
@@ -67,13 +92,15 @@ class _QbankSubjectsScreenState extends State<QbankSubjectsScreen>
   @override
   Widget build(BuildContext context) {
     final content = context.watch<SelectionContentProvider>();
-    final live = _liveChapter(context);
+    final live = _chapterIn(context.watch<SelectionContentProvider>());
     final subjects = live.lessons.where((l) => l.isQuiz).toList();
 
-    // Only while there is genuinely nothing to show. A refresh over rows that
-    // are already on screen stays silent — flashing them away on every entry
-    // would be worse than a moment of stale numbers.
-    final showLoading = content.isLoading;
+    // This screen is pushed with its chapter already in hand, so there is
+    // almost never nothing to show: `subjects` comes from widget.chapter even
+    // before the refresh lands. Binding the loader to the shared tree's
+    // isLoading blanked a screen that was holding its own data — which is the
+    // spinner on an empty page the client reported.
+    final showLoading = content.isLoading && subjects.isEmpty;
 
     return Scaffold(
       backgroundColor: _kBg,

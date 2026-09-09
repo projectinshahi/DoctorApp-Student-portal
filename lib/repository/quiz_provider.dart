@@ -1,5 +1,8 @@
 // lib/repository/quiz_provider.dart
+import '../core/utils/load_timer.dart';
 import 'package:flutter/foundation.dart';
+
+import '../models/selection_content_model.dart' show LessonAttemptInfo;
 
 import '../models/quiz_model.dart';
 import '../services/quiz_service.dart';
@@ -20,7 +23,9 @@ import '../services/quiz_service.dart';
 /// response a student could read before committing, so every number here comes
 /// back from the API.
 class QuizProvider extends ChangeNotifier {
-  final QuizService _service = QuizService();
+  final QuizService _service;
+
+  QuizProvider({QuizService? service}) : _service = service ?? QuizService();
 
   int _lessonId = 0;
 
@@ -148,18 +153,74 @@ class QuizProvider extends ChangeNotifier {
   /// Starts an attempt, or picks up the unfinished one the server is holding.
   /// This single call also runs every lesson gate — locked, wrong course, no
   /// quiz linked — so there is no lesson fetch to make first.
-  Future<void> load(int lessonId) async {
+  /// [known] is the tree's own `attempt` for this lesson, and [treeKnows]
+  /// says whether that tree was consulted at all.
+  ///
+  /// Opening a quiz used to cost two round trips in a row: a history fetch to
+  /// find a finished attempt, then startAttempt. The content tree already
+  /// carries that state — its own doc says "enough to label the row with no
+  /// second call" — so when the caller has it, the history fetch is pure
+  /// latency and this drops to one call.
+  /// [warmed] is an attempt already fetched by QuizPrefetch. When it is
+  /// here there is no call to make at all, so the quiz opens with no spinner.
+  Future<void> load(
+    int lessonId, {
+    LessonAttemptInfo? known,
+    bool treeKnows = false,
+    QuizAttempt? warmed,
+  }) async {
     _lessonId = lessonId;
-    isLoading = true;
     failure = null;
     _reset();
+
+    if (warmed != null) {
+      attempt = warmed;
+      if (warmed.completed) {
+        result = warmed.review;
+        finished = true;
+      } else {
+        _seedFrom(warmed);
+      }
+      // Never true for a heartbeat: the questions are already here, so a
+      // spinner would only flash.
+      isLoading = false;
+      notifyListeners();
+      return;
+    }
+
+    isLoading = true;
     notifyListeners();
 
     try {
-      // One attempt only: a finished one reopens as a review. This has to come
-      // before startAttempt, because startAttempt on a finished quiz does not
-      // fail — it cheerfully opens attempt #2.
-      final done = await _findCompletedAttempt(lessonId);
+      if (treeKnows) {
+        if (known != null && known.completed) {
+          // Straight to the review. Nothing is started, so a stale tree
+          // costs at worst a review of the wrong attempt id, which the GET
+          // would reject rather than corrupt.
+          await _openReview(known.attemptId);
+          isLoading = false;
+          notifyListeners();
+          return;
+        }
+        // Not completed, or never attempted: startAttempt resumes the
+        // unfinished one or opens a fresh one, and runs the lesson gates on
+        // the way. No history call needed to decide that.
+        final resumed = await timedLoad(
+            'quiz open', () => _service.startAttempt(lessonId),
+            detail: (a) => '${a.questions.length} questions');
+        attempt = resumed;
+        _seedFrom(resumed);
+        isLoading = false;
+        notifyListeners();
+        return;
+      }
+
+      // No tree data — the careful path. One attempt only: a finished one
+      // reopens as a review, and this has to come before startAttempt,
+      // because startAttempt on a finished quiz does not fail — it cheerfully
+      // opens attempt #2.
+      final done = await timedLoad('quiz history', () => _findCompletedAttempt(lessonId),
+          detail: (d) => d == null ? 'no finished attempt' : 'attempt ${d.attemptId}');
       if (done != null) {
         await _openReview(done.attemptId);
         isLoading = false;
@@ -170,24 +231,31 @@ class QuizProvider extends ChangeNotifier {
       // One call: it starts a fresh attempt or resumes the unfinished one, and
       // runs every lesson gate on the way, so a locked lesson still fails here
       // with its plans attached.
-      final started = await _service.startAttempt(lessonId);
+      final started = await timedLoad(
+          'quiz start', () => _service.startAttempt(lessonId),
+          detail: (a) => '${a.questions.length} questions');
       attempt = started;
-
-      // Seed a resumed attempt: the picks come back, the key does not.
-      _answered.addAll(started.answeredIds);
-      answers.addAll(started.answered);
-      _resumedCount = started.resumed ? started.answeredIds.length : 0;
-
-      // Open on the first question they haven't answered rather than at Q1 —
-      // resuming should feel like continuing, not like starting over.
-      final next = questions.indexWhere((q) => !_answered.contains(q.id));
-      currentIndex = next < 0 ? 0 : next;
+      _seedFrom(started);
     } on QuizException catch (e) {
       failure = e;
     }
 
     isLoading = false;
     notifyListeners();
+  }
+
+  /// Seeds a started or resumed attempt.
+  ///
+  /// The picks come back from the server; the key does not.
+  void _seedFrom(QuizAttempt started) {
+    _answered.addAll(started.answeredIds);
+    answers.addAll(started.answered);
+    _resumedCount = started.resumed ? started.answeredIds.length : 0;
+
+    // Open on the first question they haven't answered rather than at Q1 —
+    // resuming should feel like continuing, not like starting over.
+    final next = questions.indexWhere((q) => !_answered.contains(q.id));
+    currentIndex = next < 0 ? 0 : next;
   }
 
   void _reset() {
