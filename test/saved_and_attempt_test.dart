@@ -32,7 +32,10 @@ void main() {
       expect(question.explanation, isNull);
       // Null must read as "unknown", never as "wrong" — `== true` is what
       // keeps the UI from highlighting anything here.
-      expect(question.options.every((o) => o.isCorrect == null), isTrue);
+      // What protects the student: nothing in a bookmarked question claims
+      // to be the answer, and correctOptionId — the presence signal the app
+      // marks from — is absent, so it cannot be marked locally.
+      expect(question.correctOptionId, isNull);
       expect(question.options.any((o) => o.isCorrect == true), isFalse);
 
       // The question itself still renders; only the answer is withheld.
@@ -195,31 +198,56 @@ void main() {
     });
   });
 
-  group('one attempt per quiz', () {
-    QuizAttemptSummary row({required int id, required bool completed}) =>
+  group('the latest attempt decides what opens', () {
+    QuizAttemptSummary row({
+      required int id,
+      required bool completed,
+      int? answered,
+    }) =>
         QuizAttemptSummary.fromJson({
           'attemptId': id,
           'completed': completed,
           'totalQuestions': 3,
-          'answeredCount': completed ? 3 : 0,
+          'answeredCount': answered ?? (completed ? 3 : 0),
           'correctCount': completed ? 1 : 0,
           'score': completed ? 0.5 : 0,
         });
 
-    test('finds the completed attempt under an abandoned empty one', () {
-      // Newest first, exactly as the API sends it: #4 was opened and closed
-      // without answering anything, on top of the finished #3.
+    test('a finished latest attempt opens its review', () {
+      // Newest first, as the API sends it: two attempts, both finished.
       final history = [
-        row(id: 4, completed: false),
+        row(id: 7, completed: true),
         row(id: 3, completed: true),
       ];
+      expect(QuizProvider.latestCompleted(history)?.attemptId, 7,
+          reason: 'the retake, not the first go');
+    });
 
-      expect(QuizProvider.firstCompleted(history)?.attemptId, 3);
+    test('a retake under way resumes instead of reopening the old review', () {
+      // #7 is a retake with answers in it. Showing #3's review would strand
+      // those answers behind a screen with no way back into them.
+      final history = [
+        row(id: 7, completed: false, answered: 2),
+        row(id: 3, completed: true),
+      ];
+      expect(QuizProvider.latestCompleted(history), isNull);
+    });
+
+    test('an attempt opened and closed does not hide the finished one', () {
+      // #4 was opened with nothing answered, on top of the finished #3.
+      final history = [
+        row(id: 4, completed: false, answered: 0),
+        row(id: 3, completed: true),
+      ];
+      expect(QuizProvider.latestCompleted(history)?.attemptId, 3);
     });
 
     test('null when nothing has ever been finished', () {
-      expect(QuizProvider.firstCompleted([row(id: 1, completed: false)]), isNull);
-      expect(QuizProvider.firstCompleted(const []), isNull);
+      expect(
+        QuizProvider.latestCompleted([row(id: 1, completed: false, answered: 1)]),
+        isNull,
+      );
+      expect(QuizProvider.latestCompleted(const []), isNull);
     });
   });
 

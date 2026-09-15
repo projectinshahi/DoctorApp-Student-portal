@@ -10,6 +10,7 @@ import '../../../models/quiz_model.dart' show QuizErrorKind;
 import '../../../models/test_model.dart';
 import '../../../repository/test_provider.dart';
 import '../../../widget/app_loading.dart';
+import '../../../widget/quiz_loading.dart';
 import 'test_question_palette.dart';
 import 'test_result_screen.dart';
 
@@ -197,7 +198,11 @@ class _AttemptViewState extends State<_AttemptView> {
   }
 
   Widget _body(BuildContext context, TestProvider provider) {
-    if (provider.isLoading) return const AppLoading();
+    // The same wait as opening a QBank quiz — questions that do not exist
+    // until the server makes the attempt — so it reads the same way.
+    if (provider.isLoading) {
+      return const QuizLoading(message: 'Preparing your paper…');
+    }
 
     final failure = provider.failure;
     if (failure != null) {

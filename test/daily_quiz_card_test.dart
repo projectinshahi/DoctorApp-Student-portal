@@ -1,3 +1,7 @@
+import 'package:dr_app/repository/daily_quiz_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:dr_app/core/constant/local_storage.dart';
+import 'dart:convert';
 import 'dart:async';
 import 'package:dr_app/models/daily_quiz_model.dart';
 import 'package:dr_app/services/daily_quiz_service.dart';
@@ -109,7 +113,36 @@ Future<void> _pumpWith(WidgetTester tester, _FakeService service,
   await tester.pumpAndSettle();
 }
 
+/// The same set, but with the key on every option — what the server sends
+/// if it ships the answer with the question.
+Map<String, dynamic> _keyed(Map<String, dynamic> question, int correctId) => {
+      ...question,
+      'options': [
+        for (final o in question['options'] as List)
+          {...o as Map<String, dynamic>, 'isCorrect': o['id'] == correctId},
+      ],
+    };
+
+class _KeyedService extends _FakeService {
+  _KeyedService({super.answerGate});
+
+  @override
+  Future<DailyQuizSet> fetchToday(int courseId) async => DailyQuizSet.fromJson({
+        'date': '2026-09-02',
+        'totalQuestions': 1,
+        'answeredCount': 0,
+        'remainingCount': 1,
+        'completed': false,
+        'currentStreak': 3,
+        'questions': [_keyed(_question, 3)],
+        'answers': const [],
+      });
+}
+
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  _cacheTests();
+
   testWidgets('shows the question and four options, and lays out clean',
       (tester) async {
     await _pump(tester);
@@ -274,5 +307,151 @@ void main() {
 
     expect(find.byType(CircularProgressIndicator), findsNothing);
     expect(service.answerCalls, 1);
+  });
+
+  testWidgets('when the key ships with the question, the reveal is instant',
+      (tester) async {
+    // The POST still goes out — it records the answer and returns the
+    // explanation — but the student must not wait on it to learn whether
+    // they were right.
+    final gate = Completer<void>();
+    await _pumpWith(tester, _KeyedService(answerGate: gate));
+
+    await tester.tap(find.text('Achondroplasia'));
+    await tester.pump();
+
+    // Wrong pick: 3 (Cleft lip) is the key in this fixture. Revealed with
+    // the request still in flight.
+    expect(find.text('Cleft lip'), findsOneWidget);
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+
+    gate.complete();
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('without the key it still waits, rather than guessing',
+      (tester) async {
+    // The ordinary payload carries no isCorrect, and a guessed verdict would
+    // be wrong half the time.
+    final gate = Completer<void>();
+    await _pumpWith(tester, _FakeService(answerGate: gate));
+
+    await tester.tap(find.text('Achondroplasia'));
+    await tester.pump();
+
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+
+    gate.complete();
+    await tester.pumpAndSettle();
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+  });
+
+  testWidgets('the card shows nothing while loading — the page covers it',
+      (tester) async {
+    // The card used to draw its own skeleton, which left the home screen
+    // complete except for one box. The page now holds its whole skeleton
+    // until onReady fires, so the card itself must stay quiet.
+    final gate = Completer<void>();
+    final service = _GatedLoadService(gate);
+
+    tester.view.physicalSize = const Size(440, 956);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    var readyCalls = 0;
+    await tester.pumpWidget(
+      ScreenUtilInit(
+        designSize: const Size(440, 956),
+        minTextAdapt: true,
+        builder: (context, child) => MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: DailyQuizCard(
+                summary: DailyQuizSummary.fromJson(
+                    {'state': 'inProgress', 'totalQuestions': 1}),
+                courseId: 22,
+                onChanged: () {},
+                onReady: () => readyCalls++,
+                service: service,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+    expect(readyCalls, 0, reason: 'the question has not landed yet');
+
+    gate.complete();
+    await tester.pumpAndSettle();
+
+    expect(readyCalls, 1, reason: 'fired once, when the question arrived');
+    expect(find.textContaining('multifactorial'), findsOneWidget);
+  });
+}
+
+/// Holds the *set* fetch open, which is the state the card shows a skeleton
+/// for — distinct from _FakeService's gate, which holds an answer.
+class _GatedLoadService extends _FakeService {
+  final Completer<void> loadGate;
+
+  _GatedLoadService(this.loadGate);
+
+  @override
+  Future<DailyQuizSet> fetchToday(int courseId) async {
+    await loadGate.future;
+    return super.fetchToday(courseId);
+  }
+}
+
+void _cacheTests() {
+  group("today's set is restored before the network", () {
+    setUp(() => SharedPreferences.setMockInitialValues({}));
+
+    test('a stored set for this course is used', () async {
+      await LocalStorage.saveCached(
+        LocalStorage.dailyQuizKey,
+        jsonEncode({
+          'courseId': 22,
+          'set': {
+            'date': '2026-09-10',
+            'totalQuestions': 1,
+            'answeredCount': 0,
+            'remainingCount': 1,
+            'completed': false,
+            'questions': [_question],
+            'answers': const [],
+          },
+        }),
+      );
+
+      final provider = DailyQuizProvider(courseId: 22, service: _FakeService());
+      expect(await provider.restoreCached(), isTrue);
+      expect(provider.questions, isNotEmpty);
+      expect(provider.isLoading, isFalse);
+    });
+
+    test('a set stored for another course is refused', () async {
+      // Switching course must not restore the previous course's question.
+      await LocalStorage.saveCached(
+        LocalStorage.dailyQuizKey,
+        jsonEncode({'courseId': 99, 'set': const {}}),
+      );
+
+      final provider = DailyQuizProvider(courseId: 22, service: _FakeService());
+      expect(await provider.restoreCached(), isFalse);
+      expect(provider.questions, isEmpty);
+    });
+
+    test('a set written by an older build is discarded, not crashed on',
+        () async {
+      await LocalStorage.saveCached(LocalStorage.dailyQuizKey, '{ not json');
+
+      final provider = DailyQuizProvider(courseId: 22, service: _FakeService());
+      expect(await provider.restoreCached(), isFalse);
+    });
   });
 }

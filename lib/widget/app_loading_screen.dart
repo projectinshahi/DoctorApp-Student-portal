@@ -9,6 +9,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
+import 'app_logo.dart';
+
 const Color _kPrimary = Color(0xFF87986B);
 const Color _kBg = Color(0xFFEFF4E2);
 const Color _kInk = Color(0xFF1F2418);
@@ -56,14 +58,7 @@ class _AppLoadingScreenState extends State<AppLoadingScreen>
               // "frozen" when the network is slow.
               ScaleTransition(
                 scale: _pulse,
-                child: Container(
-                  width: 110.w,
-                  height: 110.w,
-                  decoration: BoxDecoration(
-                    color: _kPrimary,
-                    borderRadius: BorderRadius.circular(26.r),
-                  ),
-                ),
+                child: AppLogo(size: 110.w),
               ),
               SizedBox(height: 26.h),
               Text(

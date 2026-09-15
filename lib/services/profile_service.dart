@@ -1,3 +1,4 @@
+import 'dart:async';
 // lib/services/profile_service.dart
 import 'dart:convert';
 import 'dart:io';
@@ -26,6 +27,10 @@ class ProfileService {
     final data = jsonDecode(response.body);
 
     if (response.statusCode == 200) {
+      // For the next launch, so the greeting is on screen before the network
+      // is asked. Not awaited: the caller already has its data.
+      unawaited(LocalStorage.saveCached(
+          LocalStorage.profileKey, jsonEncode(data['user'])));
       return ProfileModel.fromJson(data['user']);
     } else {
       throw Exception(data['error']?['message'] ?? 'Failed to load profile');

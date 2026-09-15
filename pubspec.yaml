@@ -48,6 +48,7 @@ dependencies:
   no_screenshot: ^2.0.1
   safe_device: ^1.4.1
   device_info_plus: ^10.1.2
+  firebase_core: ^4.14.0
 
 dev_dependencies:
   flutter_test:

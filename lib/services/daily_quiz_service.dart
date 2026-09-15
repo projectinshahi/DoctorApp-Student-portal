@@ -59,8 +59,14 @@ class DailyQuizService {
   ///
   /// Safe to call repeatedly: the set is frozen by (courseId, date), so a
   /// refetch returns the identical ten. Pull-to-refresh cannot reroll it.
-  Future<DailyQuizSet> fetchToday(int courseId) async =>
-      DailyQuizSet.fromJson(await _send('GET', '$_base/courses/$courseId/daily-quiz'));
+  Future<DailyQuizSet> fetchToday(int courseId) async {
+    final json = await _send('GET', '$_base/courses/$courseId/daily-quiz');
+    // Stored with its course, so switching course cannot restore the wrong
+    // set. Not awaited — the caller already has its data.
+    unawaited(LocalStorage.saveCached(LocalStorage.dailyQuizKey,
+        jsonEncode({'courseId': courseId, 'set': json})));
+    return DailyQuizSet.fromJson(json);
+  }
 
   /// Answers one question. The key comes back here and only here.
   Future<DailyQuizAnswerResult> answer(

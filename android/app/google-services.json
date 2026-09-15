@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "272943468173",
+    "project_id": "drapp-31ae1",
+    "storage_bucket": "drapp-31ae1.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:272943468173:android:18745b3e315ff8b0691cc4",
+        "android_client_info": {
+          "package_name": "com.keerthana.dr_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDyFV8dKZuWHszhPhDkY-p9QMwtEvHnSSw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

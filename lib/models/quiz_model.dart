@@ -9,11 +9,26 @@
 //   4. GET  /users/me/quiz-attempts/:id                resume / review
 //   5. GET  /users/me/lessons/:id/quiz-attempts        history
 //
-// The answer key is stripped from anything a student could read before
-// committing: the start response and an unfinished GET carry NO `isCorrect`,
-// `correctOptionId` or `explanation`. They appear only on the answer response
-// and on a finished attempt. That is why [QuizOptionModel.isCorrect] is
-// nullable — making it required crashes parsing the start response.
+// The QBank now ships its answer key with the questions: the start response
+// and an unfinished GET carry `correctOptionId`, `explanation` and
+// `options[].isCorrect`, so the app marks the answer itself and the reveal
+// costs nothing. QBank attempts are not ranked and feed no leaderboard,
+// which is what makes that safe.
+//
+// Two payloads still withhold it and both must keep parsing: a bookmarked
+// question (saved_model strips the key so nobody can read answers out of
+// their own bookmarks) and, separately, Grand Tests — which are ranked and
+// have their own models in test_model.dart with optionA..optionD and no
+// isCorrect anywhere. `correctOptionId` being null is the signal that the
+// key is absent.
+
+/// Null stays null. Distinct from _toInt, which turns an absent field into
+/// 0 — and 0 would read as a real option id.
+int? _toIntOrNull(dynamic v) {
+  if (v == null) return null;
+  if (v is num) return v.toInt();
+  return int.tryParse(v.toString());
+}
 
 double _toDouble(dynamic v) {
   if (v == null) return 0;
@@ -230,6 +245,22 @@ class QuizQuestionModel {
   /// A genuine negative (e.g. -0.5). Render as-is; never take its absolute value.
   final double marksIncorrect;
 
+  /// The answer, when the payload carries it.
+  ///
+  /// **This is the presence signal.** Null means the key was withheld — a
+  /// bookmarked question, or any future payload that strips it — and the app
+  /// must fall back to asking the server. Never infer presence from
+  /// `options[].isCorrect`, which is false-by-default and so reads as "all
+  /// wrong" on a stripped payload.
+  ///
+  /// The server guarantees this agrees with the options: exactly one carries
+  /// `isCorrect: true`, and its id is this.
+  final int? correctOptionId;
+
+  /// Shown with the reveal. Nullable — plenty of questions have none, which
+  /// is not the same as the key being absent.
+  final String? explanation;
+
   final List<QuizOptionModel> options;
 
   QuizQuestionModel({
@@ -239,6 +270,8 @@ class QuizQuestionModel {
     this.difficulty,
     required this.marksCorrect,
     required this.marksIncorrect,
+    this.correctOptionId,
+    this.explanation,
     required this.options,
   });
 
@@ -252,6 +285,8 @@ class QuizQuestionModel {
       difficulty: json['difficulty']?.toString(),
       marksCorrect: _toDouble(json['marksCorrect']),
       marksIncorrect: _toDouble(json['marksIncorrect']),
+      correctOptionId: _toIntOrNull(json['correctOptionId']),
+      explanation: json['explanation']?.toString(),
       // Options arrive pre-sorted by displayOrder — do not re-sort, do not shuffle.
       options: raw
           .whereType<Map>()
@@ -267,17 +302,18 @@ class QuizOptionModel {
   final String? optionImageUrl;
   final int displayOrder;
 
-  /// Absent before the student answers, present afterwards. MUST stay
-  /// nullable: making it required crashes parsing the start response, which
-  /// is the one place it is never sent.
-  final bool? isCorrect;
+  /// Defaults to false rather than being nullable, so a payload that omits
+  /// it parses as "not the answer" instead of crashing. Never read this on
+  /// its own to decide whether the key is present — a stripped payload makes
+  /// every option false. [QuizQuestionModel.correctOptionId] is that signal.
+  final bool isCorrect;
 
   QuizOptionModel({
     required this.id,
     required this.optionText,
     this.optionImageUrl,
     required this.displayOrder,
-    this.isCorrect,
+    this.isCorrect = false,
   });
 
   factory QuizOptionModel.fromJson(Map<String, dynamic> json) {
@@ -286,7 +322,7 @@ class QuizOptionModel {
       optionText: json['optionText']?.toString() ?? '',
       optionImageUrl: json['optionImageUrl']?.toString(),
       displayOrder: _toInt(json['displayOrder']),
-      isCorrect: json['isCorrect'] is bool ? json['isCorrect'] as bool : null,
+      isCorrect: json['isCorrect'] is bool ? json['isCorrect'] as bool : false,
     );
   }
 }

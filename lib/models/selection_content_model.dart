@@ -427,11 +427,12 @@ class LessonAttemptInfo {
   final int remainingCount;
   final int correctCount;
 
-  /// Genuinely negative when negative marking bites. Render as sent.
+  /// The latest attempt's score — not the best. Genuinely negative when
+  /// negative marking bites. Render as sent.
   final double score;
 
-  /// How many attempts this student has made. The app allows one, but the
-  /// API does not enforce that, so this can legitimately be more than 1.
+  /// How many attempts this student has made that have at least one answer.
+  /// Every retake adds one.
   final int attemptCount;
 
   LessonAttemptInfo({

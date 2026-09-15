@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:dr_app/view/Home/profile/profile_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -12,10 +13,13 @@ import 'Qbank/qbank_tab.dart';
 import 'tests/tests_tab.dart';
 import 'dashbord/ai_video_tab.dart';
 import 'continue_learning_row.dart';
+import 'notifications/notifications_screen.dart';
+import 'recall/recall_lists_screen.dart';
 import 'lessons/student_lesson_detail_screen.dart';
 import '../../repository/daily_quiz_provider.dart';
 import 'daily_quiz/daily_quiz_card.dart';
-import '../../widget/app_loading.dart';
+import '../../widget/home_loading.dart';
+import '../../widget/app_bottom_nav.dart';
 import '../../core/utils/refresh_on_visible.dart';
 
 
@@ -59,8 +63,11 @@ class _HomescreenState extends State<Homescreen> with RefreshOnVisible<Homescree
         _pushScreen(const AiVideoTab());
         break;
 
-      case 4:
-        _pushScreen(const ProfileScreen());
+      case 4: // Rapid Recall
+        // Profile used to sit here. It moved to the header's drawer icon,
+        // which already opened it — the nav slot was the second way in, and
+        // Recall had none.
+        _pushScreen(const RecallTopicsScreen());
         break;
 
       default:
@@ -92,6 +99,14 @@ class _HomescreenState extends State<Homescreen> with RefreshOnVisible<Homescree
   }
 
   @override
+  void dispose() {
+    // The timer outlives a frame, so it has to go or it fires setState on a
+    // screen that is gone.
+    _mcqCap?.cancel();
+    super.dispose();
+  }
+
+  @override
   void initState() {
     super.initState();
   }
@@ -112,13 +127,49 @@ class _HomescreenState extends State<Homescreen> with RefreshOnVisible<Homescree
     ]);
   }
 
+  /// The MCQ card has reported in, or the cap ran out.
+  bool _mcqReady = false;
+  Timer? _mcqCap;
+
+  bool get _readyToShow => _mcqReady;
+
+  /// The card is the slowest thing on this page — /daily-quiz measured
+  /// 1.5-5.3s — and it must never be able to hold the page hostage. Whatever
+  /// has arrived by the cap is shown, and the card fills in behind it.
+  static const _mcqWaitCap = Duration(milliseconds: 1200);
+
+  void _startMcqCap() {
+    _mcqCap ??= Timer(_mcqWaitCap, () {
+      if (mounted && !_mcqReady) setState(() => _mcqReady = true);
+    });
+  }
+
+  void _onMcqReady() {
+    _mcqCap?.cancel();
+    if (mounted && !_mcqReady) setState(() => _mcqReady = true);
+  }
+
   @override
   Widget build(BuildContext context) {
+    _startMcqCap();
+
     // The whole page, not a section of it. Half a home screen with a live
     // header over an empty body reads as broken rather than loading.
     // The nav bar stays put so the tabs are still reachable.
-    final loading = context.watch<SelectionContentProvider>().isLoading ||
-        context.watch<ProfileProvider>().isLoading;
+    // Only when there is genuinely nothing to draw. This used to be
+    // `isLoading || isLoading`, so a profile fetch that was still in flight
+    // blanked the whole page — including the course tree, which is restored
+    // from disk and was already there. The greeting simply fills in when the
+    // profile lands.
+    final content = context.watch<SelectionContentProvider>();
+    context.watch<ProfileProvider>();
+
+    // One skeleton for the page, not a loaded page with one card still
+    // spinning — that mixed state is what read as broken. The MCQ card says
+    // when its question has landed, and until then the whole page is the
+    // skeleton.
+    final loading =
+        (content.isLoading && content.content == null) || !_readyToShow;
 
     return Scaffold(
       extendBody: true,
@@ -126,7 +177,7 @@ class _HomescreenState extends State<Homescreen> with RefreshOnVisible<Homescree
       body: Column(
         children: [
           if (loading)
-            const Expanded(child: AppLoading())
+            const Expanded(child: HomeLoading())
           else
           Expanded(
             child: SingleChildScrollView(
@@ -235,7 +286,15 @@ class _HomescreenState extends State<Homescreen> with RefreshOnVisible<Homescree
                               ),
                             ),
                             SizedBox(width: 10.w),
-                            _HeaderIconButton(icon: Icons.notifications_none_rounded),
+                            _HeaderIconButton(
+                              icon: Icons.notifications_none_rounded,
+                              onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (_) =>
+                                        const NotificationsScreen()),
+                              ),
+                            ),
                           ],
                         ),
                         SizedBox(height: 32.h),
@@ -407,6 +466,7 @@ class _HomescreenState extends State<Homescreen> with RefreshOnVisible<Homescree
                                   onChanged: () => context
                                       .read<HomeSummaryProvider>()
                                       .load(),
+                                  onReady: _onMcqReady,
                                 ),
                               ],
                             );
@@ -442,7 +502,7 @@ class _HomescreenState extends State<Homescreen> with RefreshOnVisible<Homescree
                                       MaterialPageRoute(
                                         builder: (_) => StudentLessonDetailScreen(
                                             lesson: lesson),
-                                      ),
+                                      ), 
                                     );
                                     // On return only — the player already
                                     // drops a finished video from the list.
@@ -506,54 +566,9 @@ class _HomescreenState extends State<Homescreen> with RefreshOnVisible<Homescree
       ),
 
       // ── Floating bottom nav bar ──
-      bottomNavigationBar: Padding(
-        padding: EdgeInsets.fromLTRB(16.w, 0, 16.w, 16.h),
-        child: Container(
-          height: 75.h,
-          padding: EdgeInsets.symmetric(horizontal: 8.w),
-          decoration: BoxDecoration(
-            color: kPrimary,
-            borderRadius: BorderRadius.circular(30.r),
-            boxShadow: [
-              BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 16, offset: const Offset(0, 6)),
-            ],
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _NavItem(
-                icon: Icons.home_rounded,
-                label: "Home",
-                isSelected: _currentNavIndex == 0,
-                onTap: () => _handleNavTap(0),
-              ),
-              _NavItem(
-                icon: Icons.help_outline_rounded,
-                label: "QBank",
-                isSelected: _currentNavIndex == 1,
-                onTap: () => _handleNavTap(1),
-              ),
-              _NavItem(
-                icon: Icons.description_outlined,
-                label: "Tests",
-                isSelected: _currentNavIndex == 2,
-                onTap: () => _handleNavTap(2),
-              ),
-              _NavItem(
-                icon: Icons.play_circle_outline_rounded,
-                label: "AI Videos",
-                isSelected: _currentNavIndex == 3,
-                onTap: () => _handleNavTap(3),
-              ),
-              _NavItem(
-                icon: Icons.person_outline_rounded,
-                label: "Profile",
-                isSelected: _currentNavIndex == 4,
-                onTap: () => _handleNavTap(4),
-              ),
-            ],
-          ),
-        ),
+      bottomNavigationBar: AppBottomNav(
+        currentIndex: _currentNavIndex,
+        onTap: _handleNavTap,
       ),
     );
   }
@@ -563,8 +578,7 @@ class _HomescreenState extends State<Homescreen> with RefreshOnVisible<Homescree
 class _HeaderIconButton extends StatelessWidget {
   final IconData icon;
 
-  /// Null leaves the button inert — which is what the notifications one still
-  /// is, since there is no notifications screen to open yet.
+  /// Null leaves the button inert. Nothing passes null today.
   final VoidCallback? onTap;
 
   const _HeaderIconButton({required this.icon, this.onTap});
@@ -653,56 +667,6 @@ class _AiPickCard extends StatelessWidget {
             style: TextStyle(fontSize: 11.sp, color: Colors.white.withOpacity(0.7)),
           ),
         ],
-      ),
-    );
-  }
-}
-
-// ── Bottom nav item ──
-class _NavItem extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  const _NavItem({
-    required this.icon,
-    required this.label,
-    required this.isSelected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    // Expanded so five items divide whatever width there is, instead of
-    // each taking its natural size and running off the end — "AI Videos" at
-    // 18.sp overflowed by 156px even at the 440 design width.
-    return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        behavior: HitTestBehavior.opaque,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 25.sp, color: isSelected ? Colors.white : Colors.white.withOpacity(0.55)),
-            SizedBox(height: 3.h),
-            // scaleDown keeps 18.sp wherever it fits and shrinks only the
-            // labels that would not, so the bar adapts instead of clipping.
-            FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Text(
-                label,
-                maxLines: 1,
-                style: TextStyle(
-                  fontSize: 18.sp,
-                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w400,
-                  color: isSelected ? Colors.white : Colors.white.withOpacity(0.55),
-                ),
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }

@@ -13,9 +13,9 @@ import '../services/saved_service.dart';
 /// all have to agree — three copies of this state would drift the moment one
 /// of them saved something.
 class SavedProvider extends ChangeNotifier {
-  final SavedService _service = SavedService();
+  final SavedService _service;
 
-  SavedProvider() {
+  SavedProvider({SavedService? service}) : _service = service ?? SavedService() {
     _restore();
   }
 
@@ -103,7 +103,23 @@ class SavedProvider extends ChangeNotifier {
   /// One call for both lists and every count, replacing the two-request
   /// version. Cheaper, and the counts come back consistent with each other
   /// instead of from two responses taken a moment apart.
-  Future<void> loadAll() async {
+  /// The request currently in flight, if any.
+  Future<void>? _inFlight;
+
+  /// Fetches both lists, sharing one request between callers.
+  ///
+  /// Five places call this — the home screen, the QBank tab, the bookmarks
+  /// screen twice, and the sign-in warm-up — and one navigation touches
+  /// several within a second. On device that showed as the same 113-byte
+  /// response fetched twice back to back, 2489ms and 2526ms, neither of
+  /// which the student needed to wait for twice.
+  ///
+  /// Sharing, not caching: a call made after the first finishes is its own
+  /// request, so a bookmark added elsewhere still shows up.
+  Future<void> loadAll() =>
+      _inFlight ??= _fetchAll().whenComplete(() => _inFlight = null);
+
+  Future<void> _fetchAll() async {
     // The lists stay up while the refetch runs. This screen is opened and
     // closed constantly, and a spinner between every visit is the flicker.
     isLoadingQuestions = !_fetched || _staleLists;

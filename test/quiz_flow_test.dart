@@ -39,7 +39,11 @@ void main() {
       expect(attempt.resumed, isFalse);
       expect(attempt.completed, isFalse);
       expect(attempt.review, isNull);
-      expect(attempt.questions.single.options.first.isCorrect, isNull);
+      // The QBank now ships the key, but this fixture is a payload without
+      // one — correctOptionId is what says so. isCorrect is false-by-default
+      // and so cannot distinguish "withheld" from "wrong".
+      expect(attempt.questions.single.correctOptionId, isNull);
+      expect(attempt.questions.single.options.any((o) => o.isCorrect), isFalse);
       expect(attempt.answeredCount, 0);
       expect(attempt.remainingCount, 3);
       expect(attempt.hasNegativeMarking, isTrue);

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../../../models/selection_content_model.dart' show LessonAttemptInfo;
 import '../../../repository/quiz_prefetch.dart';
+import '../../../widget/quiz_loading.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 
@@ -11,7 +12,6 @@ import '../../../models/quiz_model.dart';
 import '../../../repository/quiz_provider.dart';
 import '../../../repository/saved_provider.dart';
 import '../../subjectSelection/select_exam_screen.dart';
-import '../../../widget/app_loading.dart';
 import '../../../widget/pro_plan_dialog.dart';
 
 const Color _kPrimary = Color(0xFF87986B);
@@ -30,12 +30,17 @@ class QuizScreen extends StatelessWidget {
   /// means "never attempted", not "we did not look".
   final bool attemptStateKnown;
 
+  /// Begin a new attempt straight away instead of opening the finished one's
+  /// review — the Retest button on the list.
+  final bool retake;
+
   const QuizScreen({
     super.key,
     required this.lessonId,
     required this.lessonTitle,
     this.knownAttempt,
     this.attemptStateKnown = false,
+    this.retake = false,
   });
 
   @override
@@ -45,13 +50,40 @@ class QuizScreen extends StatelessWidget {
     return ChangeNotifierProvider<QuizProvider>(
       // take() before the provider is built: if QuizPrefetch already has this
       // attempt, load() makes no call and the screen opens on questions.
-      create: (context) => QuizProvider()
-        ..load(lessonId,
-            known: knownAttempt,
-            treeKnows: attemptStateKnown,
-            warmed: context.read<QuizPrefetch>().take(lessonId)),
-      child: _QuizView(lessonId: lessonId, lessonTitle: lessonTitle),
+      create: (context) {
+        // Taken either way. On a retest the warmed copy is the attempt being
+        // left behind, and leaving it cached would reopen it next time.
+        final warm = context.read<QuizPrefetch>().take(lessonId);
+        return QuizProvider()
+          ..load(lessonId,
+              known: knownAttempt,
+              treeKnows: attemptStateKnown,
+              startFresh: retake,
+              warmed: retake
+                  ? null
+                  : usableWarm(warm,
+                      stateKnown: attemptStateKnown, known: knownAttempt));
+      },
+      child: _QuizView(
+          lessonId: lessonId, lessonTitle: lessonTitle, retake: retake),
     );
+  }
+
+  /// A prefetched attempt, if it is still the one to open.
+  ///
+  /// Before retakes, a finished attempt was final, so a warmed copy could
+  /// never go stale. Now a retake makes a newer attempt current, and a copy
+  /// warmed a moment earlier would reopen the old review over it. When the
+  /// caller knows the lesson's attempt, the copy must be that attempt; a
+  /// caller that knows nothing takes the copy as before.
+  @visibleForTesting
+  static QuizAttempt? usableWarm(
+    QuizAttempt? warmed, {
+    required bool stateKnown,
+    LessonAttemptInfo? known,
+  }) {
+    if (warmed == null || !stateKnown) return warmed;
+    return warmed.attemptId == known?.attemptId ? warmed : null;
   }
 }
 
@@ -59,7 +91,15 @@ class _QuizView extends StatelessWidget {
   final int lessonId;
   final String lessonTitle;
 
-  const _QuizView({required this.lessonId, required this.lessonTitle});
+  /// Kept so Retry after a failed retest retries the retest, rather than
+  /// landing on the review the student skipped.
+  final bool retake;
+
+  const _QuizView({
+    required this.lessonId,
+    required this.lessonTitle,
+    this.retake = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -110,13 +150,16 @@ class _QuizView extends StatelessWidget {
 
   Widget _body(BuildContext context, QuizProvider provider) {
     if (provider.isLoading) {
-      return const AppLoading();
+      // startAttempt measured 1.5-3s on device and none of it is ours to
+      // remove — the questions do not exist until the server makes the
+      // attempt. A bare spinner spends that saying nothing.
+      return const QuizLoading();
     }
 
     if (provider.failure != null) {
       return _FailureView(
         failure: provider.failure!,
-        onRetry: () => provider.load(lessonId),
+        onRetry: () => provider.load(lessonId, startFresh: retake),
       );
     }
 
@@ -876,8 +919,7 @@ class _ReviewView extends StatelessWidget {
                 (index) => _ReviewQuestionCard(number: index + 1, outcome: rows[index]),
               ),
 
-              // Past attempts. Self-hides under the one-attempt-per-quiz rule;
-              // it only shows for quizzes attempted before that rule existed.
+              // Every attempt at this quiz, once there is more than one.
               if (provider.history.length > 1) ...[
                 SizedBox(height: 8.h),
                 Text(
@@ -885,12 +927,14 @@ class _ReviewView extends StatelessWidget {
                   style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700, color: Colors.black87),
                 ),
                 SizedBox(height: 12.h),
-                ...provider.history.map(
-                  (summary) => _HistoryRow(
-                    summary: summary,
-                    isCurrent: summary.attemptId == provider.attempt?.attemptId,
+                for (var i = 0; i < provider.history.length; i++)
+                  _HistoryRow(
+                    summary: provider.history[i],
+                    // Newest first, so the oldest is attempt 1.
+                    number: provider.history.length - i,
+                    isCurrent: provider.history[i].attemptId ==
+                        provider.attempt?.attemptId,
                   ),
-                ),
               ],
             ],
           ),
@@ -900,7 +944,23 @@ class _ReviewView extends StatelessWidget {
           padding: EdgeInsets.fromLTRB(20.w, 0, 20.w, 20.h),
           child: Row(
             children: [
-              // No Retake: one attempt per quiz, so this review is final.
+              // A fresh attempt. This one stays in the history above it.
+              Expanded(
+                child: SizedBox(
+                  height: 50.h,
+                  child: OutlinedButton.icon(
+                    onPressed: provider.isLoading ? null : provider.retake,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: _kPrimary,
+                      side: const BorderSide(color: _kPrimary, width: 1.4),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30.r)),
+                    ),
+                    icon: Icon(Icons.replay_rounded, size: 19.sp),
+                    label: Text("Retest", style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700)),
+                  ),
+                ),
+              ),
+              SizedBox(width: 12.w),
               Expanded(
                 child: SizedBox(
                   height: 50.h,
@@ -1100,9 +1160,17 @@ class _SaveButton extends StatelessWidget {
 /// no per-question detail, so there is nothing here to tap into.
 class _HistoryRow extends StatelessWidget {
   final QuizAttemptSummary summary;
+
+  /// 1 for the first attempt. The database id used to stand here, and
+  /// "Attempt #412" means nothing to a student on their second go.
+  final int number;
   final bool isCurrent;
 
-  const _HistoryRow({required this.summary, required this.isCurrent});
+  const _HistoryRow({
+    required this.summary,
+    required this.number,
+    required this.isCurrent,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1121,7 +1189,7 @@ class _HistoryRow extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  isCurrent ? "This attempt" : "Attempt #${summary.attemptId}",
+                  isCurrent ? "Attempt $number · this one" : "Attempt $number",
                   style: TextStyle(
                     fontSize: 12.5.sp,
                     fontWeight: FontWeight.w700,

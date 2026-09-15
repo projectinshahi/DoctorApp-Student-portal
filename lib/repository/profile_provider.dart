@@ -1,8 +1,10 @@
+import 'dart:convert';
 // lib/provider/profile_provider.dart
 import '../core/utils/load_timer.dart';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import '../View_model/profile_model.dart';
+import '../core/constant/local_storage.dart';
 import '../services/profile_service.dart';
 
 class ProfileProvider extends ChangeNotifier {
@@ -15,7 +17,39 @@ class ProfileProvider extends ChangeNotifier {
   String? photoUploadError;
   ProfileModel? profile;
 
-  Future<void> loadProfile() async {
+  ProfileProvider() {
+    _restore();
+  }
+
+  /// Paints the last known profile before the network is asked, so the home
+  /// screen's greeting and avatar are there on launch rather than a beat
+  /// later.
+  Future<void> _restore() async {
+    if (profile != null) return;
+    try {
+      final stored = await LocalStorage.getCached(LocalStorage.profileKey);
+      if (stored == null || stored.isEmpty || profile != null) return;
+      profile = ProfileModel.fromJson(jsonDecode(stored));
+      isLoading = false;
+      notifyListeners();
+    } catch (_) {
+      // Written by an older build, or storage unavailable. The fetch under
+      // way covers it — restoring must never break the screen.
+    }
+  }
+
+  /// The request currently in flight, if any.
+  Future<void>? _inFlight;
+
+  /// Fetches the profile, sharing one request between callers.
+  ///
+  /// The home screen and the profile screen both refresh on becoming
+  /// visible, and moving between them lands both within a second. The last
+  /// of the app's loaders without this guard.
+  Future<void> loadProfile() =>
+      _inFlight ??= _fetchProfile().whenComplete(() => _inFlight = null);
+
+  Future<void> _fetchProfile() async {
     // Only when there is nothing to show. A reopened Profile keeps the name
     // and photo on screen while the refetch runs behind them.
     isLoading = profile == null;

@@ -7,7 +7,7 @@ import 'package:provider/provider.dart';
 
 import '../../../models/test_model.dart';
 import '../../../repository/test_provider.dart';
-import '../../../widget/app_loading.dart';
+import '../../../widget/loading_wave.dart';
 import 'test_review_screen.dart';
 
 const Color _kPrimary = Color(0xFF87986B);
@@ -86,7 +86,7 @@ class _ResultView extends StatelessWidget {
           ),
         ),
         body: provider.isLoading
-            ? const AppLoading()
+            ? const _ResultSkeleton()
             : TabBarView(
                 children: [
                   _ResultTab(provider: provider),
@@ -524,6 +524,73 @@ class _LeaderRow extends StatelessWidget {
               Text(_clock(entry.timeTakenSeconds),
                   style: TextStyle(fontSize: 10.5.sp, color: Colors.grey.shade600)),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The result screen while the score is on its way.
+///
+/// Shaped like the page it becomes: the rank banner, the Review Answers
+/// button, then the score card with its rows of figures. Scoring a paper is
+/// the moment a student most wants to see something happening, and a dot on
+/// an empty screen is the worst possible answer to that.
+class _ResultSkeleton extends StatelessWidget {
+  const _ResultSkeleton();
+
+  /// Rank banner, button, score card, and the rows inside it.
+  static const int _blocks = 5;
+
+  @override
+  Widget build(BuildContext context) {
+    return LoadingWave(
+      steps: _blocks,
+      builder: (context, lift) => ListView(
+        padding: EdgeInsets.fromLTRB(16.w, 16.h, 16.w, 24.h),
+        physics: const NeverScrollableScrollPhysics(),
+        children: [
+          // Rank banner.
+          WaveBar(height: 76.h, radius: 18.r, lift: lift(0)),
+          SizedBox(height: 14.h),
+          // Review Answers.
+          WaveBar(height: 48.h, radius: 14.r, lift: lift(1)),
+          SizedBox(height: 14.h),
+          // The score card: a heading, then rows of figures.
+          Container(
+            padding: EdgeInsets.fromLTRB(18.w, 20.h, 18.w, 18.h),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(18.r),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: WaveBar(
+                      width: 132.w, height: 34.h, radius: 10.r, lift: lift(2)),
+                ),
+                SizedBox(height: 18.h),
+                for (var i = 0; i < 3; i++) ...[
+                  Row(
+                    children: [
+                      Expanded(
+                        child: WaveBar(
+                            height: 12.h, radius: 6.r, lift: lift(3 + (i % 2))),
+                      ),
+                      SizedBox(width: 40.w),
+                      WaveBar(
+                          width: 46.w,
+                          height: 12.h,
+                          radius: 6.r,
+                          lift: lift(3 + (i % 2))),
+                    ],
+                  ),
+                  if (i < 2) SizedBox(height: 14.h),
+                ],
+              ],
+            ),
           ),
         ],
       ),

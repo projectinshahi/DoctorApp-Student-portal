@@ -20,10 +20,38 @@ class LocalStorage {
   /// /saved 5010ms — the whole of which the student spent on a spinner.
   static const String homeSummaryKey = 'cache_home_summary';
   static const String savedKey = 'cache_saved';
+  static const String profileKey = 'cache_profile';
+
+  /// Today's MCQ set. Frozen server-side per (course, date), so what was on
+  /// screen last time is what is coming back — /daily-quiz measured 1.5-5.3s
+  /// for a set that cannot have changed.
+  static const String dailyQuizKey = 'cache_daily_quiz';
+
+  /// Every Rapid Recall deck the student can see, as one list. The whole
+  /// feature groups this on the device, so the cache is what makes opening
+  /// Recall instant on the second visit.
+  static const String rapidRecallKey = 'cache_rapid_recall';
+
+  /// Bookmarked decks, as a JSON list of ids. Device-local — the backend has
+  /// no saved-recall endpoint — so it is a convenience, not a sync.
+  static const String recallBookmarksKey = 'cache_recall_bookmarks';
+
+  /// Decks this student has opened, as a JSON list of ids. Drives the accent
+  /// on a deck row that is still new to them. Device-local, like bookmarks.
+  static const String recallOpenedKey = 'cache_recall_opened';
+
 
 
   /// Everything written by [saveCached], so clearAll can take them all.
-  static const List<String> _cacheKeys = [homeSummaryKey, savedKey];
+  static const List<String> _cacheKeys = [
+    homeSummaryKey,
+    savedKey,
+    profileKey,
+    dailyQuizKey,
+    rapidRecallKey,
+    recallBookmarksKey,
+    recallOpenedKey,
+  ];
 
   // ---- Device ID ----
   /// Delegates to [DeviceIdHelper], which is the single source of truth.

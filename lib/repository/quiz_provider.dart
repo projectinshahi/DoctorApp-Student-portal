@@ -1,3 +1,4 @@
+import 'dart:async';
 // lib/repository/quiz_provider.dart
 import '../core/utils/load_timer.dart';
 import 'package:flutter/foundation.dart';
@@ -15,9 +16,10 @@ import '../services/quiz_service.dart';
 /// finishing scores it. Nothing is cached locally: closing the app mid-quiz
 /// loses nothing, and re-opening resumes from the server's copy.
 ///
-/// **One attempt per quiz.** Opening a quiz that has already been finished
-/// reopens it read-only as a review — no new attempt is started. The API
-/// itself allows retakes, so this file is the only thing enforcing the rule.
+/// **Retakes.** Opening a finished quiz shows its review, and the review
+/// offers [retake], which starts a fresh attempt. Every attempt stays on the
+/// server, so the review lists them all. The *latest* attempt decides what
+/// opens: finished → its review, unfinished → resume it.
 ///
 /// No mark is ever computed in this file. The answer key is absent from every
 /// response a student could read before committing, so every number here comes
@@ -60,8 +62,9 @@ class QuizProvider extends ChangeNotifier {
   bool isSubmitting = false;
   String? submitError;
 
-  /// Past attempts on this lesson, newest first. Fetched after finishing —
-  /// that's the only place it is shown.
+  /// Past attempts on this lesson, newest first. Fetched with any review —
+  /// after finishing, or on reopening a finished quiz — which is the only
+  /// place it is shown.
   List<QuizAttemptSummary> history = const [];
 
   // ── Questions ────────────────────────────────────────────────
@@ -100,9 +103,22 @@ class QuizProvider extends ChangeNotifier {
   QuizQuestionResult? resultFor(QuizQuestionModel question) =>
       result?.forQuestion(question.id) ?? _checked[question.id];
 
+  /// The counts as the last save reported them.
+  ///
+  /// Straight off the answer response, never a refetch — asking for the
+  /// attempt again is a second round trip for numbers just handed over, and
+  /// it is the usual way a fast endpoint stops feeling fast. Null until the
+  /// first save lands, and then authoritative: it counts answers from an
+  /// earlier sitting that this session never saw.
+  int? _serverAnswered;
+  int? _serverRemaining;
+
   int get attemptedCount => _answered.length;
   int get totalQuestions => attempt?.totalQuestions ?? questions.length;
-  int get remainingCount => totalQuestions - attemptedCount;
+
+  int get answeredCount => _serverAnswered ?? attemptedCount;
+  int get remainingCount =>
+      _serverRemaining ?? (totalQuestions - attemptedCount);
 
   /// The review rows, in the order the questions were shown when that order
   /// is known, and in the server's own order when it isn't — a review opened
@@ -163,13 +179,19 @@ class QuizProvider extends ChangeNotifier {
   /// latency and this drops to one call.
   /// [warmed] is an attempt already fetched by QuizPrefetch. When it is
   /// here there is no call to make at all, so the quiz opens with no spinner.
+  ///
+  /// [startFresh] is the list's Retest: straight into a new attempt, past the
+  /// review of the finished one the student chose not to open.
   Future<void> load(
     int lessonId, {
     LessonAttemptInfo? known,
     bool treeKnows = false,
     QuizAttempt? warmed,
+    bool startFresh = false,
   }) async {
     _lessonId = lessonId;
+    if (startFresh) return _startFresh();
+
     failure = null;
     _reset();
 
@@ -178,9 +200,16 @@ class QuizProvider extends ChangeNotifier {
       if (warmed.completed) {
         result = warmed.review;
         finished = true;
+        // The attempts list under the review. Detached: the review itself is
+        // already here and must not wait on it.
+        unawaited(_loadHistory());
       } else {
         _seedFrom(warmed);
       }
+      // A prefetched attempt reaches the screen without a network call, so
+      // without this the key report is silent on the very path that is
+      // fastest — and looks like the quiz never loaded.
+      _reportKeyAvailability();
       // Never true for a heartbeat: the questions are already here, so a
       // spinner would only flash.
       isLoading = false;
@@ -210,17 +239,18 @@ class QuizProvider extends ChangeNotifier {
             detail: (a) => '${a.questions.length} questions');
         attempt = resumed;
         _seedFrom(resumed);
+        _reportKeyAvailability();
         isLoading = false;
         notifyListeners();
         return;
       }
 
-      // No tree data — the careful path. One attempt only: a finished one
-      // reopens as a review, and this has to come before startAttempt,
-      // because startAttempt on a finished quiz does not fail — it cheerfully
-      // opens attempt #2.
-      final done = await timedLoad('quiz history', () => _findCompletedAttempt(lessonId),
-          detail: (d) => d == null ? 'no finished attempt' : 'attempt ${d.attemptId}');
+      // No tree data — the careful path. The latest attempt decides: if it
+      // is finished, open its review. This has to come before startAttempt,
+      // which does not fail on a finished quiz — it quietly begins a retake
+      // nobody asked for.
+      final done = await timedLoad('quiz history', () => _latestIfCompleted(lessonId),
+          detail: (d) => d == null ? 'latest attempt unfinished' : 'attempt ${d.attemptId}');
       if (done != null) {
         await _openReview(done.attemptId);
         isLoading = false;
@@ -236,6 +266,7 @@ class QuizProvider extends ChangeNotifier {
           detail: (a) => '${a.questions.length} questions');
       attempt = started;
       _seedFrom(started);
+      _reportKeyAvailability();
     } on QuizException catch (e) {
       failure = e;
     }
@@ -269,17 +300,27 @@ class QuizProvider extends ChangeNotifier {
     result = null;
     submitError = null;
     history = const [];
+    // A new attempt's counts are not the old one's, and a queued save for a
+    // question that no longer exists would post into the wrong attempt.
+    _serverAnswered = null;
+    _serverRemaining = null;
+    _pendingSaves.clear();
     _resumedCount = 0;
   }
 
   // ── Answering ────────────────────────────────────────────────
   /// Tapping an option IS the answer — there is no separate Submit step.
-  /// The response carries this question's correct option and explanation, so
-  /// the reveal happens on the same tap.
   ///
-  /// On failure the pick is kept on screen but NOT marked answered: the
-  /// server never received it, and pretending otherwise would silently drop
-  /// it from the score. Tapping again retries.
+  /// When the attempt shipped its answer key, the marking happens here and
+  /// this returns **without touching the network**. The POST still goes out,
+  /// but detached: nothing on screen and no caller waits on it. That is the
+  /// whole point — it measured 3254ms for 790 bytes, and none of that was
+  /// information the app did not already have.
+  ///
+  /// Without a key it falls back to asking the server, and then the pick is
+  /// kept on screen but NOT marked answered if the call fails: the server
+  /// never received it, and pretending otherwise would silently drop it from
+  /// the score. Tapping again retries.
   Future<void> answer(int questionId, int optionId) async {
     final attemptId = attempt?.attemptId;
     if (attemptId == null) return;
@@ -289,8 +330,23 @@ class QuizProvider extends ChangeNotifier {
     if (isAnswered(questionId) || checkingQuestionId != null) return;
 
     answers[questionId] = optionId;
-    checkingQuestionId = questionId;
     submitError = null;
+
+    final local = _localResult(questionId, optionId);
+    if (local != null) {
+      _checked[questionId] = local;
+      _answered.add(questionId);
+      checkingQuestionId = null;
+      notifyListeners();
+
+      // Detached on purpose. Awaiting it here would put the 3s back — not in
+      // front of the reveal, but in front of whatever the caller does next.
+      unawaited(_recordInBackground(questionId, optionId));
+      return;
+    }
+
+    // No key: the server is the only thing that knows, so this one waits.
+    checkingQuestionId = questionId;
     notifyListeners();
 
     try {
@@ -302,12 +358,136 @@ class QuizProvider extends ChangeNotifier {
 
       _answered.add(questionId);
       _checked[questionId] = response.result;
+      _serverAnswered = response.answeredCount;
+      _serverRemaining = response.remainingCount;
+      await _flushPendingSaves();
     } on QuizException catch (e) {
       submitError = '${e.message} Tap your answer again to retry.';
     }
 
     checkingQuestionId = null;
     notifyListeners();
+  }
+
+  /// Records an already-revealed answer, out of the student's way.
+  ///
+  /// Still essential, just not in front of anything: it is what makes the
+  /// attempt survive the app being killed, what the resume flow reads, and
+  /// what the admin's per-student stats are built from.
+  Future<void> _recordInBackground(int questionId, int optionId) async {
+    final attemptId = attempt?.attemptId;
+    if (attemptId == null) return;
+
+    try {
+      final response = await _service.answerQuestion(
+        attemptId,
+        questionId: questionId,
+        optionId: optionId,
+      );
+
+      // The server's row is authoritative. It agrees with the local verdict
+      // on right and wrong; what it adds is the counts and any explanation
+      // the question payload did not carry.
+      _checked[questionId] = response.result;
+      _serverAnswered = response.answeredCount;
+      _serverRemaining = response.remainingCount;
+
+      await _flushPendingSaves();
+      notifyListeners();
+    } on QuizException {
+      // Queued, not surfaced. The student has their answer and has moved on,
+      // and "tap again" is not available to them — the question already
+      // counts as answered. finish() flushes this before scoring.
+      _pendingSaves[questionId] = optionId;
+    }
+  }
+
+  /// Answers the student has given that the server has not acknowledged.
+  ///
+  /// Only reachable when the key was local: without it the reveal itself
+  /// failed and the student is told to retry. With it they have moved on, so
+  /// the write has to catch up on its own.
+  final Map<int, int> _pendingSaves = {};
+
+  @visibleForTesting
+  int get pendingSaveCount => _pendingSaves.length;
+
+  /// Re-sends queued answers. The endpoint is an upsert, so re-sending one
+  /// that did land is harmless.
+  Future<void> _flushPendingSaves() async {
+    if (_pendingSaves.isEmpty) return;
+    final attemptId = attempt?.attemptId;
+    if (attemptId == null) return;
+
+    for (final entry in Map<int, int>.from(_pendingSaves).entries) {
+      try {
+        final response = await _service.answerQuestion(
+          attemptId,
+          questionId: entry.key,
+          optionId: entry.value,
+        );
+        _pendingSaves.remove(entry.key);
+        _serverAnswered = response.answeredCount;
+        _serverRemaining = response.remainingCount;
+      } on QuizException {
+        // Still down. Leave it queued; finish() tries again.
+        break;
+      }
+    }
+  }
+
+  /// Whether this attempt's questions carry their own answer key.
+  ///
+  /// Printed rather than assumed: the model parses `isCorrect` when it is
+  /// there, and whether the server sends it is the difference between an
+  /// instant reveal and a 3s wait.
+  void _reportKeyAvailability() {
+    if (!kDebugMode) return;
+    final withKey = questions.where((q) => q.correctOptionId != null).length;
+    debugPrint('QBANK QUIZ  ${questions.length} questions, '
+        '$withKey carry the answer key');
+  }
+
+  /// The verdict from the question itself, when the key came with it.
+  ///
+  /// Null when it did not — which is what the POST is for. Guessing would be
+  /// wrong as often as it was right.
+  /// QBANK ONLY. Grand Tests must never mark locally.
+  ///
+  /// This is safe here because QBank attempts are not ranked and feed no
+  /// leaderboard, so there is nothing to cheat at. Grand Tests are ranked,
+  /// timed and compared between students; their key is released only by
+  /// /submit, and their models (test_model.dart, optionA..optionD) carry no
+  /// key at all so this code cannot be reused there.
+  ///
+  /// **If a leaderboard is ever added to the QBank, revert this first.**
+  QuizQuestionResult? _localResult(int questionId, int optionId) {
+    final question = questions.where((q) => q.id == questionId).firstOrNull;
+    if (question == null) return null;
+
+    // correctOptionId, not options[].isCorrect: that field is false by
+    // default, so a payload with the key stripped — a bookmarked question —
+    // would read as "every option is wrong" and mark a correct answer wrong.
+    final correctId = question.correctOptionId;
+    if (correctId == null) return null;
+
+    final right = correctId == optionId;
+    return QuizQuestionResult(
+      questionId: questionId,
+      questionText: question.questionText,
+      questionImageUrl: question.questionImageUrl,
+      selectedOptionId: optionId,
+      correctOptionId: correctId,
+      isCorrect: right,
+      answered: true,
+      // Not negated: marksIncorrect is already a genuine negative, and
+      // flipping it would award marks for a wrong answer.
+      marksAwarded: right ? question.marksCorrect : question.marksIncorrect,
+      // Now shipped with the question, so the explanation appears with the
+      // verdict rather than a round trip later.
+      explanation: question.explanation,
+      options: question.options,
+    );
   }
 
   void next() {
@@ -333,6 +513,11 @@ class QuizProvider extends ChangeNotifier {
     submitError = null;
     notifyListeners();
 
+    // Last chance for anything the network swallowed. A queued save that
+    // never lands is a question the server thinks is unanswered — and the
+    // review below comes from the server, so it would show as skipped.
+    await _flushPendingSaves();
+
     try {
       result = await _service.finishAttempt(attemptId);
       finished = true;
@@ -340,7 +525,10 @@ class QuizProvider extends ChangeNotifier {
       notifyListeners();
 
       printScore();
-      await _loadHistory();
+      // Detached. The review is already in this response; history is a
+      // section at the foot of it, shown from the second attempt on. Waiting
+      // on it put a measured 1541ms between Submit and the score.
+      unawaited(_loadHistory());
       return true;
     } on QuizException catch (e) {
       isSubmitting = false;
@@ -369,7 +557,7 @@ class QuizProvider extends ChangeNotifier {
         result = fetched.review;
         finished = true;
         printScore();
-        await _loadHistory();
+        unawaited(_loadHistory());
       } else {
         submitError = 'This attempt is already finished.';
       }
@@ -384,40 +572,41 @@ class QuizProvider extends ChangeNotifier {
   Future<void> _loadHistory() async {
     try {
       history = await _service.fetchHistory(_lessonId);
+      // Arrives after the review is already on screen, so it has to announce
+      // itself — nothing else will rebuild for it.
+      notifyListeners();
     } on QuizException {
       history = const [];
     }
     notifyListeners();
   }
 
-  /// This lesson's finished attempt, if it has one.
+  /// The latest attempt on this lesson when it is finished, else null.
   ///
-  /// Deliberately not `history.first`: a student can abandon an empty attempt
-  /// on top of a completed one, and keying off the newest row would let that
-  /// unlock the quiz again.
-  ///
-  /// Fails open. If the history call itself fails we start an attempt rather
-  /// than locking someone out of a quiz they may never have taken — a lost
-  /// retake-block is a smaller harm than a quiz that will not open.
-  Future<QuizAttemptSummary?> _findCompletedAttempt(int lessonId) async {
+  /// Fails open. If the history call itself fails we start (or resume) an
+  /// attempt rather than lock someone out of a quiz — at worst a retake they
+  /// did not ask for, which is a smaller harm than a quiz that will not open.
+  Future<QuizAttemptSummary?> _latestIfCompleted(int lessonId) async {
     try {
       history = await _service.fetchHistory(lessonId);
     } on QuizException {
       history = const [];
       return null;
     }
-    return firstCompleted(history);
+    return latestCompleted(history);
   }
 
-  /// The finished attempt in a history list, or null.
+  /// The newest attempt that counts, if it is finished.
   ///
-  /// Deliberately not `history.first`. History is newest-first, and an empty
-  /// abandoned attempt sits on top of the completed one it followed — reading
-  /// the newest row would report "not finished" and unlock the quiz again.
+  /// History is newest first. An attempt with no answers is skipped: a quiz
+  /// opened and closed is not a retake under way, and letting it sit on top
+  /// would hide the finished attempt beneath it. An unfinished attempt *with*
+  /// answers is a retake under way, and gives null so that it resumes.
   @visibleForTesting
-  static QuizAttemptSummary? firstCompleted(List<QuizAttemptSummary> history) {
+  static QuizAttemptSummary? latestCompleted(List<QuizAttemptSummary> history) {
     for (final past in history) {
       if (past.completed) return past;
+      if (past.answeredCount > 0) return null;
     }
     return null;
   }
@@ -429,6 +618,45 @@ class QuizProvider extends ChangeNotifier {
     attempt = reopened;
     result = reopened.review;
     finished = true;
+    // The list of attempts under the review, detached like after finishing.
+    // Skipped when the careful path already fetched it to get here.
+    if (history.isEmpty) unawaited(_loadHistory());
+  }
+
+  /// Starts a fresh attempt on a quiz whose review is open.
+  ///
+  /// startAttempt does the deciding: with the latest attempt finished it
+  /// opens a new one, and if a retake was left half-done it resumes that
+  /// instead of starting a third — which is the right answer either way. The
+  /// finished attempt is untouched and stays in history.
+  Future<void> retake() async {
+    if (isLoading || isSubmitting) return;
+    await _startFresh();
+  }
+
+  /// Starts an attempt without looking for a finished one first. Shared by
+  /// Retest on the review and Retest on the list — the list's version runs
+  /// while the provider is still in its initial loading state, which is why
+  /// the guard lives in [retake] and not here.
+  Future<void> _startFresh() async {
+    failure = null;
+    _reset();
+    isLoading = true;
+    notifyListeners();
+
+    try {
+      final started = await timedLoad(
+          'quiz retake', () => _service.startAttempt(_lessonId),
+          detail: (a) => '${a.questions.length} questions');
+      attempt = started;
+      _seedFrom(started);
+      _reportKeyAvailability();
+    } on QuizException catch (e) {
+      failure = e;
+    }
+
+    isLoading = false;
+    notifyListeners();
   }
 
   void printScore() {

@@ -109,6 +109,17 @@ class TestSummary {
 
   bool get isInProgress => lastAttempt?.inProgress == true;
   bool get isSubmitted => lastAttempt?.submittedAt != null;
+
+  /// Started, never submitted, and the clock has run out.
+  ///
+  /// The server auto-submits an expired paper, but the list can be read
+  /// before that lands — and a paper whose time is gone has no work left in
+  /// it either way. Without this it sat on the "to sit" tab forever reading
+  /// "Time is up", which is the one thing a student cannot act on.
+  bool get isTimedOut => isInProgress && secondsLeftOnAttempt == 0;
+
+  /// Nothing left to do: submitted, or out of time.
+  bool get isFinished => isSubmitted || isTimedOut;
   bool get hasNegativeMarking => marksIncorrect < 0;
 
   /// What a perfect paper scores. The list endpoint sends the two factors but

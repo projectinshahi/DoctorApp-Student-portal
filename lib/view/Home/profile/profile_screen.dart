@@ -8,6 +8,8 @@ import '../../subjectSelection/select_exam_screen.dart';
 import '../../../repository/selection_content_provider.dart';
 import '../../../widget/app_snackbar.dart';
 import 'info_screens.dart';
+import 'privacy_policy_screen.dart';
+import 'terms_screen.dart';
 import 'settings_screen.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:image_picker/image_picker.dart';

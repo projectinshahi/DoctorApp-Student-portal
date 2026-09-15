@@ -107,12 +107,19 @@ void main() {
       await LocalStorage.saveCourseTree(jsonEncode(_tree));
       await LocalStorage.saveCached(LocalStorage.homeSummaryKey, '{"a":1}');
       await LocalStorage.saveCached(LocalStorage.savedKey, '{"b":2}');
+      await LocalStorage.saveCached(LocalStorage.profileKey, '{"c":3}');
+      await LocalStorage.saveCached(LocalStorage.dailyQuizKey, '{"d":4}');
 
       await LocalStorage.clearAll();
 
       expect(await LocalStorage.getCourseTree(), isNull);
       expect(await LocalStorage.getCached(LocalStorage.homeSummaryKey), isNull);
       expect(await LocalStorage.getCached(LocalStorage.savedKey), isNull);
+      // The profile is a name and a photo — the most obviously wrong thing
+      // for the next student on this phone to see.
+      expect(await LocalStorage.getCached(LocalStorage.profileKey), isNull);
+      // Today's set carries the student's own answers.
+      expect(await LocalStorage.getCached(LocalStorage.dailyQuizKey), isNull);
     });
   });
 }

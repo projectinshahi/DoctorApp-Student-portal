@@ -29,7 +29,6 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../../../models/daily_quiz_model.dart';
 import '../../../repository/daily_quiz_provider.dart';
 import '../../../services/daily_quiz_service.dart';
-import '../../../widget/app_loading.dart';
 import 'daily_quiz_screen.dart';
 
 const Color _kPrimary = Color(0xFF87986B);
@@ -45,6 +44,12 @@ class DailyQuizCard extends StatefulWidget {
   /// refresh its summary.
   final VoidCallback onChanged;
 
+  /// Fired once, when the first question has landed (or failed to).
+  ///
+  /// The home screen holds its own skeleton until this, so the page arrives
+  /// whole instead of complete-except-for-one-card.
+  final VoidCallback? onReady;
+
   /// Injected in tests. The card owns its provider — creating one is what
   /// starts the day — so this is the only seam a test can reach through.
   final DailyQuizService? service;
@@ -54,6 +59,7 @@ class DailyQuizCard extends StatefulWidget {
     required this.summary,
     required this.courseId,
     required this.onChanged,
+    this.onReady,
     this.service,
   });
 
@@ -94,9 +100,21 @@ class _DailyQuizCardState extends State<DailyQuizCard> {
         DailyQuizProvider(courseId: widget.courseId, service: widget.service);
     setState(() => _quiz = provider);
 
+    // Restore first. When today's set is already on the device the question
+    // is on screen with the rest of the page, and the page never waits.
+    provider.restoreCached().then((restored) {
+      if (restored && mounted) widget.onReady?.call();
+    });
+
     // The spinner ends when the response lands — no timer.
     provider.load().then((_) {
-      if (mounted) widget.onChanged();
+      if (!mounted) return;
+      widget.onChanged();
+      widget.onReady?.call();
+    }).catchError((_) {
+      // Ready means "stop waiting for me", not "succeeded". A card that
+      // failed must not hold the whole page behind a skeleton.
+      if (mounted) widget.onReady?.call();
     });
   }
 
@@ -129,7 +147,7 @@ class _DailyQuizCardState extends State<DailyQuizCard> {
           _Header(summary: widget.summary, quiz: quiz),
           SizedBox(height: 14.h),
           if (quiz == null)
-            AppLoading(height: 180.h)
+            const SizedBox.shrink()
           else
             // _Body shows the spinner while quiz.isLoading, so it stays up
             // until the response lands and not a millisecond longer.
@@ -210,7 +228,7 @@ class _Body extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (quiz.isLoading) {
-      return AppLoading(height: 180.h);
+      return const SizedBox.shrink();
     }
 
     if (quiz.failure != null) {

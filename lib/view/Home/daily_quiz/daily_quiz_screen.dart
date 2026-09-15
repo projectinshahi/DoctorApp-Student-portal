@@ -9,6 +9,7 @@ import 'package:provider/provider.dart';
 import '../../../models/daily_quiz_model.dart';
 import '../../../repository/daily_quiz_provider.dart';
 import '../../../widget/app_loading.dart';
+import '../../../widget/quiz_loading.dart';
 import 'daily_quiz_result_screen.dart';
 
 const Color _kPrimary = Color(0xFF87986B);
@@ -137,7 +138,7 @@ class _QuizView extends StatelessWidget {
   }
 
   Widget _body(BuildContext context, DailyQuizProvider provider) {
-    if (provider.isLoading) return const AppLoading();
+    if (provider.isLoading) return const QuizLoading();
 
     final failure = provider.failure;
     if (failure != null) return _Message(text: failure.message);

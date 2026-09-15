@@ -149,6 +149,43 @@ class DailyQuizProvider extends ChangeNotifier {
   bool isAnswered(int questionId) => answers.containsKey(questionId);
 
   /// Opens today's set. Safe to call again — the set is frozen server-side.
+  /// Paints today's stored set before the network is asked.
+  ///
+  /// The set is frozen server-side per (course, date), so what was on screen
+  /// last time is what is coming back. Restoring it is what lets the question
+  /// arrive with the rest of the home screen instead of a second or two
+  /// after it.
+  ///
+  /// The fetch still runs underneath: it is what confirms the date has not
+  /// rolled over, and picks up an answer committed elsewhere.
+  Future<bool> restoreCached() async {
+    if (set != null) return true;
+    try {
+      final stored = await LocalStorage.getCached(LocalStorage.dailyQuizKey);
+      if (stored == null || stored.isEmpty || set != null) return false;
+
+      final wrapper = jsonDecode(stored) as Map<String, dynamic>;
+      // Another course's set is not this course's question.
+      if (wrapper['courseId'] != courseId) return false;
+
+      final today = DailyQuizSet.fromJson(
+          Map<String, dynamic>.from(wrapper['set'] as Map));
+      set = today;
+      answers
+        ..clear()
+        ..addAll(today.answers);
+      final next = today.questions.indexWhere((q) => !answers.containsKey(q.id));
+      currentIndex = next < 0 ? 0 : next;
+      isLoading = false;
+      notifyListeners();
+      return true;
+    } catch (_) {
+      // Written by an older build, or storage unavailable. The fetch under
+      // way covers it.
+      return false;
+    }
+  }
+
   Future<void> load() async {
     isLoading = set == null;
     failure = null;
@@ -162,6 +199,17 @@ class DailyQuizProvider extends ChangeNotifier {
       answers
         ..clear()
         ..addAll(today.answers);
+
+      if (kDebugMode) {
+        // Whether the key ships with the questions decides whether the reveal
+        // can be instant. Printed rather than assumed.
+        final withKey = today.questions
+            .where((q) => q.options.any((o) => o.isCorrect != null))
+            .length;
+        debugPrint('DAILY QUIZ  ${today.questions.length} questions, '
+            '$withKey carry the answer key, '
+            '${today.answers.length} already answered');
+      }
 
       // Resume where they stopped rather than at question one.
       final next = today.questions.indexWhere((q) => !answers.containsKey(q.id));
@@ -187,16 +235,27 @@ class DailyQuizProvider extends ChangeNotifier {
 
     isSubmitting = true;
     // Recorded before the request, so the tile the student tapped lights up
-    // on the same frame as the tap. Only the correct/wrong reveal waits for
-    // the server, because only the server knows the answer.
+    // on the same frame as the tap.
     pendingOptionId = optionId;
     actionError = null;
+
+    // If the set shipped with the key, the verdict is already here and there
+    // is nothing to wait for. The POST still goes out — it is what records
+    // the answer and returns the explanation — but the student sees right or
+    // wrong now rather than in three seconds.
+    final local = _localVerdict(questionId, optionId);
+    if (local != null) {
+      answers[questionId] = local;
+      pendingOptionId = null;
+    }
     notifyListeners();
 
     var ok = false;
     try {
       final response = await _service.answer(courseId,
           questionId: questionId, optionId: optionId);
+      // Overwrites any local verdict: the server's is authoritative and it
+      // carries the explanation, which the question payload does not.
       answers[questionId] = response.asAnswer;
       ok = true;
 
@@ -216,6 +275,36 @@ class DailyQuizProvider extends ChangeNotifier {
     isSubmitting = false;
     notifyListeners();
     return ok;
+  }
+
+  /// The verdict from the question itself, when the server sent the key with
+  /// it. Null when it did not, which is the case the POST exists for.
+  DailyQuizAnswer? _localVerdict(int questionId, int optionId) {
+    final question =
+        questions.where((q) => q.id == questionId).firstOrNull;
+    if (question == null) return null;
+
+    // Every option has to carry it. A partial key would let a wrong answer
+    // read as right simply because its own flag was missing.
+    if (question.options.any((o) => o.isCorrect == null)) return null;
+
+    final correct =
+        question.options.where((o) => o.isCorrect == true).firstOrNull;
+    if (correct == null) return null;
+
+    final right = correct.id == optionId;
+    return DailyQuizAnswer(
+      questionId: questionId,
+      selectedOptionId: optionId,
+      correctOptionId: correct.id,
+      isCorrect: right,
+      // Not negated: marksIncorrect is already a genuine negative, and
+      // flipping it would award marks for a wrong answer.
+      marksAwarded: right ? question.marksCorrect : question.marksIncorrect,
+      // Deliberately absent. The explanation comes back with the POST, and
+      // inventing one would be worse than showing it a moment later.
+      explanation: null,
+    );
   }
 
   void next() => goTo(currentIndex + 1);

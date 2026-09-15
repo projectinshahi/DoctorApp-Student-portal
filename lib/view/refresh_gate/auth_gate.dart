@@ -1,3 +1,4 @@
+import 'dart:async';
 // lib/view/refresh_gate/auth_gate.dart
 //
 // Decides which of the three roots the app shows: splash, login, or home.
@@ -21,9 +22,11 @@ import 'package:provider/provider.dart';
 import '../../core/constant/local_storage.dart';
 import '../../core/utils/app_navigator.dart';
 import '../../widget/app_loading_screen.dart';
+import '../splash/animated_splash.dart';
 import '../../repository/daily_quiz_provider.dart';
 import '../../repository/refresh_api_provider.dart';
 import '../../repository/quiz_prefetch.dart';
+import '../../repository/rapid_recall_provider.dart';
 import '../../repository/saved_provider.dart';
 import '../../repository/selection_content_provider.dart';
 import '../Authendication/login/login_screen.dart';
@@ -48,6 +51,10 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+
+    _splashTimer = Timer(AnimatedSplash.hold, () {
+      if (mounted) setState(() => _splashOver = true);
+    });
   }
 
   /// Re-checks the session every time the app comes back to the foreground.
@@ -82,10 +89,21 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
 
   @override
   void dispose() {
+    // Outlives a frame, so it has to go or it fires setState on a gate that
+    // is gone.
+    _splashTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     _auth?.removeListener(_onAuthChanged);
     super.dispose();
   }
+
+  /// The splash has had its two seconds.
+  ///
+  /// A floor on the very first screen, not a wait on anything: the session
+  /// and the cached course restore in milliseconds, so without this the
+  /// splash was gone before it could be seen.
+  bool _splashOver = false;
+  Timer? _splashTimer;
 
   bool _warmedUp = false;
 
@@ -158,6 +176,8 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
     // Warmed attempts belong to the account that just left; opening one on
     // the next account would show the wrong student's answers.
     context.read<QuizPrefetch>().clear();
+    // Decks and their bookmarks belong to that account's course too.
+    context.read<RapidRecallProvider>().clear();
 
     // The session can die while a quiz, a test paper or the player is on
     // top. Swapping this root does not remove those, and without the reset
@@ -260,14 +280,17 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
+    // Before the switch, so it covers every branch. Signing in and being
+    // signed out both resolve fast enough to flash past otherwise.
+    if (!_splashOver) return const AnimatedSplash();
+
     final auth = context.watch<AuthProvider>();
 
     return switch (auth.status) {
       AuthStatus.unauthenticated => const LoginScreen(),
       // Reading the stored token. Brief, but it is the very first frame and
       // an empty screen there reads as a crash.
-      AuthStatus.unknown =>
-        const AppLoadingScreen(message: 'Starting up…'),
+      AuthStatus.unknown => const AnimatedSplash(),
       AuthStatus.authenticated => _authenticated(auth),
     };
   }

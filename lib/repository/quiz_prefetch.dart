@@ -6,9 +6,11 @@
 // quiz nobody has attempted is `POST /attempts`, which *creates* the attempt.
 // Prefetching with that would mark quizzes as started that the student never
 // opened — filling Continue MCQs, flipping rows from Start to Continue, and
-// inflating the attemptCount the one-attempt rule is built on. So this warms
-// only quizzes that already have an attempt, where `GET /attempts/{id}` is
-// read-only and changes nothing.
+// inflating attemptCount. So this warms only quizzes that already have an
+// attempt, where `GET /attempts/{id}` is read-only and changes nothing.
+//
+// A retake makes a newer attempt current, so a copy warmed before it is
+// stale. QuizScreen.usableWarm checks the id before trusting one.
 //
 // A never-attempted quiz therefore still costs one call on open. Removing
 // that needs a read-only questions endpoint from the backend.

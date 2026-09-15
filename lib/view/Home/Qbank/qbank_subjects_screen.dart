@@ -70,7 +70,12 @@ class _QbankSubjectsScreenState extends State<QbankSubjectsScreen>
     return widget.chapter;
   }
 
-  Future<void> _openQuiz(BuildContext context, StudentLessonModel lesson) async {
+  /// [retake] opens straight into a new attempt — the row's Retest.
+  Future<void> _openQuiz(
+    BuildContext context,
+    StudentLessonModel lesson, {
+    bool retake = false,
+  }) async {
     await Navigator.push(
       context,
       MaterialPageRoute(
@@ -81,6 +86,7 @@ class _QbankSubjectsScreenState extends State<QbankSubjectsScreen>
           // quiz opens on one call rather than two.
           knownAttempt: lesson.attempt,
           attemptStateKnown: true,
+          retake: retake,
         ),
       ),
     );
@@ -148,6 +154,7 @@ class _QbankSubjectsScreenState extends State<QbankSubjectsScreen>
                   locked: lesson.locked,
                   attempt: lesson.attempt,
                   onTap: () => _openQuiz(context, lesson),
+                  onRetake: () => _openQuiz(context, lesson, retake: true),
                 );
               },
             ),
@@ -155,7 +162,7 @@ class _QbankSubjectsScreenState extends State<QbankSubjectsScreen>
   }
 }
 
-/// Shared row used by both the topics list and the subjects list.
+/// Shared row used by the topic and subject lists, and by Rapid Recall.
 class QbankRowTile extends StatelessWidget {
   final IconData icon;
   final String title;
@@ -166,7 +173,13 @@ class QbankRowTile extends StatelessWidget {
   /// quiz never started and on every non-quiz row, so it stays nullable.
   final LessonAttemptInfo? attempt;
 
+  /// Opens the row: the quiz, or a finished quiz's review.
   final VoidCallback onTap;
+
+  /// Starts a new attempt on a finished quiz. Given, a finished row offers
+  /// Review and Retest side by side; not given, it keeps a single Review
+  /// pill — the topic and Recall lists have nothing to retest.
+  final VoidCallback? onRetake;
 
   const QbankRowTile({
     super.key,
@@ -176,6 +189,7 @@ class QbankRowTile extends StatelessWidget {
     required this.onTap,
     this.locked = false,
     this.attempt,
+    this.onRetake,
   });
 
   @override
@@ -184,66 +198,154 @@ class QbankRowTile extends StatelessWidget {
     final resuming = latest != null && latest.isInProgress;
     final completed = latest != null && latest.completed;
 
+    // Two choices get a line of their own. Squeezed in beside the title they
+    // left a long quiz name a few characters wide.
+    final twoActions = completed && onRetake != null;
+
+    final header = Row(
+      children: [
+        Container(
+          width: 44.w,
+          height: 44.w,
+          alignment: Alignment.center,
+          decoration: const BoxDecoration(color: _kBg, shape: BoxShape.circle),
+          child: Icon(icon, size: 20.sp, color: _kPrimary),
+        ),
+        SizedBox(width: 14.w),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                maxLines: twoActions ? 2 : 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700, color: Colors.black87),
+              ),
+              SizedBox(height: 3.h),
+              Text(
+                resuming
+                    ? "${latest.remainingCount} left of ${latest.answeredCount + latest.remainingCount}"
+                    : completed
+                        // The tree reports the latest attempt, not the best —
+                        // with retests the two differ.
+                        ? "Last score ${_trimMarks(latest.score)} · "
+                            "${latest.attemptCount} attempt${latest.attemptCount == 1 ? '' : 's'}"
+                        : subtitle,
+                style: TextStyle(
+                  fontSize: 12.sp,
+                  fontWeight: latest == null ? FontWeight.w400 : FontWeight.w600,
+                  color: latest == null ? Colors.grey.shade600 : _kPrimary,
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (locked) ...[
+          SizedBox(width: 6.w),
+          Icon(Icons.lock_outline_rounded, size: 16.sp, color: Colors.grey.shade500),
+        ],
+        if (!twoActions) ...[
+          SizedBox(width: 6.w),
+          // Three states, one row: never started, half-done, already scored.
+          if (resuming)
+            _Pill(label: "Continue", filled: true)
+          else if (completed)
+            _Pill(label: "Review", filled: false)
+          else
+            Icon(Icons.chevron_right_rounded, size: 24.sp, color: Colors.grey.shade500),
+        ],
+      ],
+    );
+
     return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
       child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 14.h),
+        padding: EdgeInsets.fromLTRB(16.w, 14.h, 16.w, twoActions ? 16.h : 14.h),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(20.r),
           border: resuming ? Border.all(color: _kPrimary, width: 1.2) : null,
         ),
-        child: Row(
-          children: [
-            Container(
-              width: 44.w,
-              height: 44.w,
-              alignment: Alignment.center,
-              decoration: const BoxDecoration(color: _kBg, shape: BoxShape.circle),
-              child: Icon(icon, size: 20.sp, color: _kPrimary),
-            ),
-            SizedBox(width: 14.w),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+        child: twoActions
+            ? Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
-                    title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700, color: Colors.black87),
-                  ),
-                  SizedBox(height: 3.h),
-                  Text(
-                    resuming
-                        ? "${latest.remainingCount} left of ${latest.answeredCount + latest.remainingCount}"
-                        : completed
-                            ? "Best ${_trimMarks(latest.score)} · "
-                                "${latest.attemptCount} attempt${latest.attemptCount == 1 ? '' : 's'}"
-                            : subtitle,
-                    style: TextStyle(
-                      fontSize: 12.sp,
-                      fontWeight: latest == null ? FontWeight.w400 : FontWeight.w600,
-                      color: latest == null ? Colors.grey.shade600 : _kPrimary,
-                    ),
+                  header,
+                  SizedBox(height: 14.h),
+                  Row(
+                    children: [
+                      // Review first, Retest second: the forward action sits
+                      // where the thumb ends up, as Continue does on an
+                      // unfinished row.
+                      Expanded(
+                        child: _RowAction(
+                          label: "Review",
+                          icon: Icons.fact_check_outlined,
+                          filled: false,
+                          onTap: onTap,
+                        ),
+                      ),
+                      SizedBox(width: 10.w),
+                      Expanded(
+                        child: _RowAction(
+                          label: "Retest",
+                          icon: Icons.replay_rounded,
+                          filled: true,
+                          onTap: onRetake!,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
-              ),
+              )
+            : header,
+      ),
+    );
+  }
+}
+
+/// One of the two buttons under a finished quiz.
+class _RowAction extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final bool filled;
+  final VoidCallback onTap;
+
+  const _RowAction({
+    required this.label,
+    required this.icon,
+    required this.filled,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final tint = filled ? Colors.white : _kPrimary;
+
+    return GestureDetector(
+      onTap: onTap,
+      // Opaque, so a tap on the button's padding is the button's — not the
+      // card's, which would open the review behind a Retest.
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        height: 40.h,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: filled ? _kPrimary : Colors.transparent,
+          borderRadius: BorderRadius.circular(22.r),
+          border: filled ? null : Border.all(color: _kPrimary, width: 1.2),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 16.sp, color: tint),
+            SizedBox(width: 6.w),
+            Text(
+              label,
+              style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: tint),
             ),
-            if (locked) ...[
-              Icon(Icons.lock_outline_rounded, size: 16.sp, color: Colors.grey.shade500),
-              SizedBox(width: 6.w),
-            ],
-            // Three states, one row: never started, half-done, already scored.
-            // A finished quiz reopens read-only, so this says Review: there
-            // is no second attempt to offer.
-            if (resuming)
-              _Pill(label: "Continue", filled: true)
-            else if (completed)
-              _Pill(label: "Review", filled: false)
-            else
-              Icon(Icons.chevron_right_rounded, size: 24.sp, color: Colors.grey.shade500),
           ],
         ),
       ),

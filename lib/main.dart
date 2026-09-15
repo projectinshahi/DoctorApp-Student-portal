@@ -11,10 +11,14 @@ import 'package:dr_app/repository/selection_content_provider.dart';
 import 'package:dr_app/repository/selection_provider.dart';
 import 'package:dr_app/view/refresh_gate/auth_gate.dart';
 import 'package:dr_app/widget/screenshot_guard.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
+
+import 'repository/rapid_recall_provider.dart';
 import 'core/theam /app_theme.dart';
 import 'core/utils/app_navigator.dart';
 import 'core/utils/refresh_on_visible.dart';
@@ -22,6 +26,16 @@ import 'widget/integrity_gate.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Started before runApp, because anything Firebase-backed needs it ready.
+  // Guarded: a missing or mismatched google-services.json must not stop the
+  // app opening — everything that matters today (the course, the quizzes,
+  // sign-in) runs against the app's own backend, not Firebase.
+  try {
+    await Firebase.initializeApp();
+  } catch (error) {
+    if (kDebugMode) debugPrint('FIREBASE  not initialised: $error');
+  }
 
   // Portrait everywhere. The one exception is fullscreen video, which asks
   // for landscape on the way in and puts this back on the way out — both
@@ -52,6 +66,9 @@ class MyApp extends StatelessWidget {
         // Primed from HomeScreen, which is the first place a token exists.
         ChangeNotifierProvider(create: (_) => SavedProvider()),
         ChangeNotifierProvider(create: (_) => QuizPrefetch()),
+        // Rapid Recall. One list for all four of its screens — four copies
+        // would each fetch their own.
+        ChangeNotifierProvider(create: (_) => RapidRecallProvider()),
         // The home card's read-only summary. Separate from the quiz provider
         // on purpose: this one never starts the day's attempt.
         ChangeNotifierProvider(create: (_) => HomeSummaryProvider())

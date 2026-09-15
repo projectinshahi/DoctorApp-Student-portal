@@ -17,7 +17,7 @@ import '../../../models/quiz_model.dart' show QuizException;
 import '../../../models/test_model.dart';
 import '../../../repository/selection_content_provider.dart';
 import '../../../services/test_service.dart';
-import '../../../widget/app_loading.dart';
+import '../../../widget/loading_wave.dart';
 import 'test_attempt_screen.dart';
 import 'test_instructions_screen.dart';
 import 'test_result_screen.dart';
@@ -61,10 +61,22 @@ class _TestsTabState extends State<TestsTab> with RefreshOnVisible<TestsTab> {
   /// The course this list was fetched for, so build() can spot it arriving.
   int? _loadedCourseId;
 
+  /// The fetch currently in flight, if any.
+  Future<void>? _inFlight;
+
   /// Refetched on entry and on return, so a paper just submitted moves from
   /// one tab to the other without a manual pull.
+  ///
+  /// Three things call this — the route observer when the tab becomes
+  /// visible, again on resume, and build() the moment the course id arrives.
+  /// Two of those land together on a first open, which showed on device as
+  /// the same 1231-byte response fetched twice, 1263ms and 1265ms. A second
+  /// caller now joins the first rather than starting another.
   @override
-  Future<void> onRefresh() async {
+  Future<void> onRefresh() =>
+      _inFlight ??= _refresh().whenComplete(() => _inFlight = null);
+
+  Future<void> _refresh() async {
     final content = context.read<SelectionContentProvider>();
     final courseId = content.content?.course?.id;
 
@@ -139,13 +151,16 @@ class _TestsTabState extends State<TestsTab> with RefreshOnVisible<TestsTab> {
     );
   }
 
-  /// Still to sit — never opened, or opened and left running. Both have work
+  /// Still to sit — never opened, or opened and still running. Both have work
   /// left in them, which is what puts them on the same tab.
+  ///
+  /// A paper whose clock has run out does not, so it moves across even though
+  /// the server may not have recorded the auto-submit yet.
   List<TestSummary> get _pending =>
-      _tests.where((t) => !t.isSubmitted).toList();
+      _tests.where((t) => !t.isFinished).toList();
 
   List<TestSummary> get _attempted =>
-      _tests.where((t) => t.isSubmitted).toList();
+      _tests.where((t) => t.isFinished).toList();
 
   @override
   Widget build(BuildContext context) {
@@ -185,7 +200,8 @@ class _TestsTabState extends State<TestsTab> with RefreshOnVisible<TestsTab> {
   }
 
   Widget _list(List<TestSummary> tests, {required String emptyText}) {
-    if (_loading) return const AppLoading();
+    // The list's own shape, not a dot in an empty tab.
+    if (_loading) return const _TestsSkeleton();
     if (_error != null) return _message(_error!, onRetry: onRefresh);
     if (tests.isEmpty) return _message(emptyText);
 
@@ -197,7 +213,15 @@ class _TestsTabState extends State<TestsTab> with RefreshOnVisible<TestsTab> {
         final test = tests[index];
         return test.isSubmitted
             ? _CompletedCard(test: test, onTap: () => _open(test))
-            : _PendingCard(test: test, onTap: () => _open(test));
+            : _PendingCard(
+                test: test,
+                onTap: () => _open(test),
+                // Re-splits the two tabs. The paper is finished; it just did
+                // not get there by being submitted.
+                onExpired: () {
+                  if (mounted) setState(() {});
+                },
+              );
       },
     );
   }
@@ -326,7 +350,12 @@ class _PendingCard extends StatelessWidget {
   final TestSummary test;
   final VoidCallback onTap;
 
-  const _PendingCard({required this.test, required this.onTap});
+  /// Passed down to the countdown, so the tab can re-split when the clock
+  /// runs out under the student's eyes.
+  final VoidCallback? onExpired;
+
+  const _PendingCard(
+      {required this.test, required this.onTap, this.onExpired});
 
   @override
   Widget build(BuildContext context) {
@@ -411,7 +440,7 @@ class _PendingCard extends StatelessWidget {
                 children: [
                   Expanded(
                     child: running
-                        ? _ResumeCountdown(test: test)
+                        ? _ResumeCountdown(test: test, onExpired: onExpired)
                         : Text('One attempt only',
                             style: TextStyle(
                                 fontSize: 11.5.sp,
@@ -589,7 +618,15 @@ class _Chip extends StatelessWidget {
 class _ResumeCountdown extends StatefulWidget {
   final TestSummary test;
 
-  const _ResumeCountdown({required this.test});
+  /// Fired the moment the clock reaches zero.
+  ///
+  /// The tab splits pending from finished in its own build, and this ticker
+  /// lives in a card — so without telling the parent, a paper that expired
+  /// while the student was looking at the list stayed on the wrong tab until
+  /// something else happened to refresh it.
+  final VoidCallback? onExpired;
+
+  const _ResumeCountdown({required this.test, this.onExpired});
 
   @override
   State<_ResumeCountdown> createState() => _ResumeCountdownState();
@@ -598,11 +635,23 @@ class _ResumeCountdown extends StatefulWidget {
 class _ResumeCountdownState extends State<_ResumeCountdown> {
   Timer? _ticker;
 
+  /// Once only — the parent rebuild would otherwise fire this every second.
+  bool _announced = false;
+
   @override
   void initState() {
     super.initState();
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted) setState(() {});
+      if (!mounted) return;
+      setState(() {});
+
+      if ((widget.test.secondsLeftOnAttempt ?? 0) <= 0 && !_announced) {
+        _announced = true;
+        // Stop ticking: there is nothing left to count, and the card is
+        // about to move to the other tab.
+        _ticker?.cancel();
+        widget.onExpired?.call();
+      }
     });
   }
 
@@ -639,6 +688,56 @@ class _ResumeCountdownState extends State<_ResumeCountdown> {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// The Tests tab while its list is on the way.
+///
+/// Four rows shaped like a test card — the title, a shorter meta line, and
+/// the action pill on the right — so the page fills in where it is going to
+/// be rather than appearing from behind a spinner.
+class _TestsSkeleton extends StatelessWidget {
+  const _TestsSkeleton();
+
+  static const int _rows = 4;
+
+  @override
+  Widget build(BuildContext context) {
+    return LoadingWave(
+      steps: _rows,
+      builder: (context, lift) => ListView.separated(
+        padding: EdgeInsets.fromLTRB(20.w, 16.h, 20.w, 24.h),
+        physics: const NeverScrollableScrollPhysics(),
+        itemCount: _rows,
+        separatorBuilder: (_, __) => SizedBox(height: 14.h),
+        itemBuilder: (context, i) => Container(
+          padding: EdgeInsets.all(16.w),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(18.r),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    WaveBar(height: 13.h, radius: 7.r, lift: lift(i)),
+                    SizedBox(height: 9.h),
+                    FractionallySizedBox(
+                      widthFactor: 0.55,
+                      child: WaveBar(height: 11.h, radius: 6.r, lift: lift(i)),
+                    ),
+                  ],
+                ),
+              ),
+              SizedBox(width: 14.w),
+              WaveBar(width: 74.w, height: 32.h, radius: 18.r, lift: lift(i)),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
