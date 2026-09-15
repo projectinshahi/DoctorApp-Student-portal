@@ -167,7 +167,6 @@ void main() {
 
       // Two chapters done. The course block says "4 completed" — of lessons.
       expect(content.completedModules, 2);
-      expect(content.totalModules, 3);
       expect(content.progress!.completedLessons, 4);
     });
 
@@ -178,7 +177,6 @@ void main() {
     test('a chapter with no progress block counts in neither', () {
       final content = tree([null]);
       expect(content.completedModules, 0);
-      expect(content.totalModules, 0);
     });
   });
 }

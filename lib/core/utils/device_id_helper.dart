@@ -84,8 +84,4 @@ class DeviceIdHelper {
     await prefs.setString(_key, generated);
     return generated;
   }
-
-  /// Tests only. The cache is process-wide and would leak between cases.
-  @visibleForTesting
-  static void resetCache() => _cached = null;
 }

@@ -80,8 +80,6 @@ class TestProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  int get markedCount => markedForReview.length;
-
   /// What the palette paints each numbered box.
   QuestionState stateAt(int index) {
     if (index < 0 || index >= questions.length) return QuestionState.unanswered;

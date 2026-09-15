@@ -45,7 +45,6 @@ void main() {
     // Printing the lesson figure as modules would claim four chapters were
     // done when there are only three.
     expect(content.completedModules, 1);
-    expect(content.totalModules, 3);
     expect(content.progress?.completedLessons, 4);
     expect(content.progress?.totalLessons, 6);
   });
@@ -61,7 +60,6 @@ void main() {
     // Counting it as unfinished would show "1 of 2" for a course whose
     // second chapter the server said nothing about.
     expect(content.completedModules, 1);
-    expect(content.totalModules, 1);
   });
 
   test('a course with no progress at all renders as zero, not a crash', () {
@@ -72,7 +70,6 @@ void main() {
     expect(content.course?.title, 'NEET-PG Complete');
     expect(content.progress, isNull);
     expect(content.completedModules, 0);
-    expect(content.totalModules, 0);
   });
 
   group('lesson sections', () {
@@ -95,12 +92,12 @@ void main() {
 
       expect(locked.hasVideo, isFalse, reason: 'no url while locked');
       expect(locked.isVideo, isTrue, reason: 'type survives the lock');
-      expect(locked.isNote, isFalse);
+      expect(locked.isQuiz, isFalse);
     });
 
     test('a note is a note', () {
       final note = lesson({'type': 'text', 'noteUrl': 'https://x/n.pdf'});
-      expect(note.isNote, isTrue);
+      expect(note.isQuiz, isFalse);
       expect(note.isVideo, isFalse);
     });
 
@@ -113,9 +110,11 @@ void main() {
       ];
 
       for (final l in all) {
-        // Exactly one of the three, so nothing shows twice or vanishes.
+        // Exactly one of the three, so nothing shows twice or vanishes. A
+        // note is whatever is neither a quiz nor a video.
+        final isNote = !l.isQuiz && !l.isVideo;
         final sections =
-            [l.isQuiz, l.isVideo, l.isNote].where((inIt) => inIt).length;
+            [l.isQuiz, l.isVideo, isNote].where((inIt) => inIt).length;
         expect(sections, 1, reason: 'type ${l.type} landed in $sections');
       }
     });

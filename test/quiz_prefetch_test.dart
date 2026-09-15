@@ -63,7 +63,7 @@ void main() {
     final service = _Service();
     final cache = QuizPrefetch(service: service);
     await cache.warm([_quiz(id: 1)]);
-    expect(cache.isWarm(1), isTrue);
+    expect(cache.warmCount, 1);
 
     final provider = QuizProvider(service: service);
     await provider.load(1, warmed: cache.take(1), treeKnows: true);
@@ -88,7 +88,7 @@ void main() {
 
     expect(service.fetchCalls, 0);
     expect(service.startCalls, 0);
-    expect(cache.isWarm(2), isFalse);
+    expect(cache.warmCount, 0);
   });
 
   test('a locked quiz is not warmed', () async {

@@ -38,28 +38,4 @@ class SelectionService {
       throw Exception(data['error']?['message'] ?? 'Failed to select course');
     }
   }
-
-  Future<SelectionResult> getSelectedCourse() async {
-    final token = await LocalStorage.getAccessToken();
-
-    if (token == null || token.isEmpty) {
-      throw Exception('Not logged in. Please log in again.');
-    }
-
-    final response = await http.get(
-      Uri.parse(_baseUrl),
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
-    );
-
-    final data = jsonDecode(response.body);
-
-    if (response.statusCode == 200) {
-      return SelectionResult.fromJson(data);
-    } else {
-      throw Exception(data['error']?['message'] ?? 'Failed to fetch selection');
-    }
-  }
 }

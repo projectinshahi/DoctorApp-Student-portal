@@ -175,25 +175,6 @@ class SavedProvider extends ChangeNotifier {
   bool isLessonSaved(int lessonId) => _savedLessonIds.contains(lessonId);
 
   // ── Questions ────────────────────────────────────────────────
-  Future<void> loadQuestions() async {
-    isLoadingQuestions = true;
-    errorMessage = null;
-    notifyListeners();
-
-    try {
-      final response = await _service.fetchQuestions();
-      questions = response.questions;
-      questionCount = response.count;
-      _savedQuestionIds
-        ..clear()
-        ..addAll(response.questions.map((q) => q.questionId));
-    } on QuizException catch (e) {
-      errorMessage = e.message;
-    }
-
-    isLoadingQuestions = false;
-    notifyListeners();
-  }
 
   /// Optimistic: the icon flips immediately and rolls back if the write
   /// fails. POST is an upsert and DELETE on something already gone answers
@@ -233,25 +214,6 @@ class SavedProvider extends ChangeNotifier {
   }
 
   // ── Lessons ──────────────────────────────────────────────────
-  Future<void> loadLessons() async {
-    isLoadingLessons = true;
-    errorMessage = null;
-    notifyListeners();
-
-    try {
-      final response = await _service.fetchLessons();
-      lessons = response.lessons;
-      lessonCount = response.count;
-      _savedLessonIds
-        ..clear()
-        ..addAll(response.lessons.map((l) => l.lessonId));
-    } on QuizException catch (e) {
-      errorMessage = e.message;
-    }
-
-    isLoadingLessons = false;
-    notifyListeners();
-  }
 
   Future<void> toggleLesson(int lessonId) async {
     if (_busyLessons.contains(lessonId)) return;

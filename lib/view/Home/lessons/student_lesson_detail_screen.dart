@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:dr_app/view/Home/lessons/videoplay/FullscreenVideoPage.dart';
 import 'package:dr_app/view/Home/lessons/videoplay/PdfViewerModal.dart';
-import 'dart:ui' show FontFeature;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';

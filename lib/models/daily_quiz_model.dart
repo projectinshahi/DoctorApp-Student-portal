@@ -76,16 +76,6 @@ class DailyQuizSummary {
             ? null
             : DateTime.tryParse(json['nextSetAt'].toString())?.toLocal(),
       );
-
-  bool get isCompleted => state == DailyQuizState.completed;
-
-  /// Time until the next set, or null when there is nothing to wait for.
-  Duration? get timeUntilNextSet {
-    final at = nextSetAt;
-    if (at == null) return null;
-    final left = at.difference(DateTime.now());
-    return left.isNegative ? Duration.zero : left;
-  }
 }
 
 class DailyQuizOption {

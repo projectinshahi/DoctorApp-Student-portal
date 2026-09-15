@@ -174,10 +174,6 @@ class RecallCard {
   bool get hasImage => (imageUrl ?? '').isNotEmpty;
   bool get hasNote => (note ?? '').trim().isNotEmpty;
 
-  /// Rendered with flutter's SVG path rather than [Image.network], which
-  /// cannot decode one.
-  bool get isSvg => (imageUrl ?? '').toLowerCase().endsWith('.svg');
-
   factory RecallCard.fromJson(Map<String, dynamic> json) => RecallCard(
         id: _asInt(json['id']) ?? 0,
         imageUrl: _asText(json['imageUrl']),

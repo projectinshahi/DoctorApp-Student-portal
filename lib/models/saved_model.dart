@@ -207,9 +207,4 @@ class SavedBundle {
   }
 
   int countOf(String type) => counts[type] ?? 0;
-
-  /// Lessons of one type. `note` is not a server filter — notes are `text` —
-  /// so the split happens here rather than in a second request.
-  List<SavedLesson> lessonsOfType(String type) =>
-      lessons.where((saved) => saved.type == type).toList();
 }

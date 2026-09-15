@@ -32,8 +32,6 @@ class QuizPrefetch extends ChangeNotifier {
   @visibleForTesting
   int get warmCount => _byLesson.length;
 
-  bool isWarm(int lessonId) => _byLesson.containsKey(lessonId);
-
   /// Hands over a warmed attempt and drops it.
   ///
   /// One shot on purpose. The moment a quiz opens the student starts changing

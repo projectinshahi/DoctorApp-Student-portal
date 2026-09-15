@@ -157,12 +157,11 @@ void main() {
 
       expect(correct.isCorrect, isTrue);
 
-      expect(wrong.isWrong, isTrue);
+      expect(wrong.isCorrect, isFalse);
       expect(wrong.isSkipped, isFalse);
       expect(wrong.marksAwarded, -0.5); // signed, never absolute
 
       expect(skipped.isSkipped, isTrue);
-      expect(skipped.isWrong, isFalse); // skipped is NOT wrong
       expect(skipped.selectedOptionId, isNull);
       expect(skipped.marksAwarded, 0); // no penalty
 

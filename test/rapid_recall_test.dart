@@ -360,7 +360,6 @@ void main() {
       final provider = await _loaded();
       provider.toggleBookmark(4);
       expect(provider.isBookmarked(4), isTrue);
-      expect(provider.bookmarkCount, 1);
 
       // Written in the background, so the write has to land before a new
       // provider reads it.
@@ -370,7 +369,8 @@ void main() {
       await Future<void>.delayed(const Duration(milliseconds: 20));
 
       expect(restarted.isBookmarked(4), isTrue);
-      expect(restarted.bookmarkedDecks.single.title, 'Labour stages');
+      expect(restarted.isBookmarked(1), isFalse,
+          reason: 'only the deck that was toggled');
     });
 
     test('an opened deck stays opened after a restart', () async {

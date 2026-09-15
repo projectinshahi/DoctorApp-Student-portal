@@ -39,9 +39,4 @@ class CourseListGetProvider extends ChangeNotifier {
       notifyListeners();
     }
   }
-
-  void clearCourses() {
-    courses.clear();
-    notifyListeners();
-  }
 }

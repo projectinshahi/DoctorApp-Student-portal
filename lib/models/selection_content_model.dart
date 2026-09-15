@@ -85,11 +85,6 @@ class SelectionContentModel {
   /// finished, so `isComplete` needs no other check.
   int get completedModules =>
       chapters.where((chapter) => chapter.progress?.isComplete == true).length;
-
-  /// Chapters the server reported progress for. A chapter with no progress
-  /// block is unknown rather than unfinished, so it counts in neither.
-  int get totalModules =>
-      chapters.where((chapter) => chapter.progress != null).length;
 }
 
 class SelectedCourseInfo {
@@ -180,10 +175,6 @@ class StudentChapterModel {
       progress: ProgressInfo.maybeFrom(json['progress']),
     );
   }
-
-  /// Quiz lessons only — what the QBank listing shows.
-  List<StudentLessonModel> get quizLessons =>
-      lessons.where((l) => l.isQuiz).toList();
 }
 
 class StudentLessonModel {
@@ -387,10 +378,6 @@ class StudentLessonModel {
 
   bool get isQuiz => type == 'quiz';
 
-  /// A quiz lesson with no quiz attached. The questions endpoint answers 409
-  /// for these, so the app must show the empty state instead of calling it.
-  bool get hasQuiz => isQuiz && quizId != null;
-
   bool get hasVideo => videoUrl != null && videoUrl!.isNotEmpty;
   bool get hasNote => noteUrl != null && noteUrl!.isNotEmpty;
   bool get hasMedia => hasVideo || hasNote;
@@ -409,11 +396,6 @@ class StudentLessonModel {
   /// whole paid catalogue under notes. `type` survives the lock; the URL
   /// does not.
   bool get isVideo => type == 'video' || hasVideo;
-
-  /// Everything watchable that is not a video. Together with [isVideo] and
-  /// [isQuiz] this covers every lesson exactly once, so nothing can appear in
-  /// two sections or vanish from both.
-  bool get isNote => !isQuiz && !isVideo;
 
   bool get isPremium => accessType == 'premium';
 }

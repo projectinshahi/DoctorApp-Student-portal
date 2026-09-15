@@ -266,11 +266,6 @@ class RapidRecallProvider extends ChangeNotifier {
 
   bool isBookmarked(int deckId) => _bookmarks.contains(deckId);
 
-  int get bookmarkCount => _bookmarks.length;
-
-  List<RapidRecallDeck> get bookmarkedDecks =>
-      decks.where((deck) => _bookmarks.contains(deck.id)).toList();
-
   /// Flips immediately and writes in the background — there is no request to
   /// fail, so there is nothing to roll back.
   void toggleBookmark(int deckId) {

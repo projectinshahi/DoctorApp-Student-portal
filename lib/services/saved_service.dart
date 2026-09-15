@@ -33,9 +33,6 @@ class SavedService {
     return SavedBundle.fromJson(json);
   }
 
-  Future<SavedQuestionsResponse> fetchQuestions() async =>
-      SavedQuestionsResponse.fromJson(await _send('GET', _questionsUrl));
-
   /// Returns the new total, so the bookmark badge updates with no extra call.
   Future<int> saveQuestion(int questionId) async {
     final json = await _send('POST', _questionsUrl, body: {'questionId': questionId});
@@ -44,9 +41,6 @@ class SavedService {
 
   Future<int> unsaveQuestion(int questionId) async =>
       _count(await _send('DELETE', '$_questionsUrl/$questionId'));
-
-  Future<SavedLessonsResponse> fetchLessons() async =>
-      SavedLessonsResponse.fromJson(await _send('GET', _lessonsUrl));
 
   Future<int> saveLesson(int lessonId) async {
     final json = await _send('POST', _lessonsUrl, body: {'lessonId': lessonId});

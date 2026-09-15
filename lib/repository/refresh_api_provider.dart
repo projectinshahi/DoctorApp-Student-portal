@@ -49,7 +49,6 @@ class AuthProvider extends ChangeNotifier {
 
   AuthStatus get status => _status;
   String? get sessionMessage => _sessionMessage;
-  bool get isAuthenticated => _status == AuthStatus.authenticated;
   bool get isLoggingOut => _isLoggingOut;
 
   String? get signInNotice => _signInNotice;
@@ -206,11 +205,6 @@ class AuthProvider extends ChangeNotifier {
     _sessionMessage = null;
     _hasSelectedExam = false; // NEW — reset so next login re-checks properly
     _isLoggingOut = false;
-    notifyListeners();
-  }
-
-  void clearSessionMessage() {
-    _sessionMessage = null;
     notifyListeners();
   }
 }

@@ -460,7 +460,6 @@ class QuizQuestionResult {
   });
 
   bool get isSkipped => !answered;
-  bool get isWrong => answered && !isCorrect;
 
   QuizOptionModel? get correctOption {
     for (final option in options) {

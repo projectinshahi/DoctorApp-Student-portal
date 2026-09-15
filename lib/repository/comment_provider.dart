@@ -33,9 +33,6 @@ class CommentProvider extends ChangeNotifier {
   /// top-level comment.
   int? replyingTo;
 
-  /// The comment being edited in place.
-  int? editingId;
-
   bool _disposed = false;
 
   bool get hasMore => _page < _totalPages;
@@ -149,7 +146,6 @@ class CommentProvider extends ChangeNotifier {
       final updated = await _service.editComment(commentId, body: text);
       comments = _map(comments, commentId,
           (c) => c.copyWith(body: updated.body, edited: true));
-      editingId = null;
       ok = true;
     } on CommentException catch (e) {
       actionError = e.message;
@@ -240,19 +236,11 @@ class CommentProvider extends ChangeNotifier {
   // ── Composer state ───────────────────────────────────────────
   void startReply(int commentId) {
     replyingTo = commentId;
-    editingId = null;
-    notifyListeners();
-  }
-
-  void startEdit(int commentId) {
-    editingId = commentId;
-    replyingTo = null;
     notifyListeners();
   }
 
   void cancelComposing() {
     replyingTo = null;
-    editingId = null;
     actionError = null;
     notifyListeners();
   }

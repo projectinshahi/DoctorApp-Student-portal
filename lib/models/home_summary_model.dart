@@ -75,9 +75,6 @@ class InProgressVideo {
     );
   }
 
-  /// True only when there is something real to draw a bar from.
-  bool get hasBar => watchedPercent != null && watchedPercent! > 0;
-
   /// "Resume at 2:30".
   String get resumeLabel {
     final minutes = lastPositionSeconds ~/ 60;

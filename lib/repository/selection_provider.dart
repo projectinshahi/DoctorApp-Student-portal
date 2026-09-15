@@ -30,14 +30,4 @@ class SelectionProvider extends ChangeNotifier {
       return false;
     }
   }
-
-  Future<void> loadCurrentSelection() async {
-    try {
-      currentSelection = await _service.getSelectedCourse();
-      notifyListeners();
-    } catch (e) {
-      errorMessage = e.toString().replaceFirst('Exception: ', '');
-      notifyListeners();
-    }
-  }
 }
