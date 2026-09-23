@@ -1,7 +1,12 @@
 // lib/view/Home/profile/plans_screen.dart
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
-import '../../../widget/app_snackbar.dart';
+import '../../../core/utils/website.dart';
+
+import '../../../widget/app_refresh.dart';
+
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 
@@ -40,31 +45,17 @@ class _PlansScreenState extends State<PlansScreen> {
     super.dispose();
   }
 
-  Future<void> _handleSubscribe(PlanProvider planProvider, int planId) async {
-    final success = await planProvider.subscribe(planId);
+  /// Plans are bought on the website, so this opens it.
+  ///
+  /// The cached course tree says "locked" on every premium lesson, and a
+  /// purchase made in the browser is the one thing that changes it — so the
+  /// cache is dropped here and the next look fetches the truth.
+  Future<void> _handleSubscribe() async {
+    await openWebsite(context);
     if (!mounted) return;
 
-    if (!success) {
-      showAppSnackBar(
-        context,
-        planProvider.subscribeErrorMessage ?? 'Failed to subscribe',
-        kind: AppMessage.failure,
-      );
-      return;
-    }
-
-    // Refresh both so the profile badge and the lesson lock icons update.
-    // The tree is invalidated first: every lesson in the cached copy still
-    // says locked, and that is the one thing this purchase just changed.
     context.read<SelectionContentProvider>().invalidate();
-    await Future.wait([
-      context.read<ProfileProvider>().loadProfile(),
-      context.read<SelectionContentProvider>().loadContent(),
-    ]);
-    if (!mounted) return;
-
-    showAppSnackBar(context, 'Subscribed successfully!');
-    Navigator.pop(context, true);
+    unawaited(context.read<ProfileProvider>().loadProfile());
   }
 
   @override
@@ -90,14 +81,21 @@ class _PlansScreenState extends State<PlansScreen> {
             return const AppLoading();
           }
           if (planProvider.plansErrorMessage != null && planProvider.plans.isEmpty) {
-            return Center(child: Text(planProvider.plansErrorMessage!));
+            return AppRefresh.fill(
+              onRefresh: () => context.read<PlanProvider>().loadPlans(widget.courseId),
+              child: Center(child: Text(planProvider.plansErrorMessage!)),
+            );
           }
           if (planProvider.plans.isEmpty) {
-            return const Center(child: Text('No plans available for this course yet.'));
+            return AppRefresh.fill(
+              onRefresh: () =>
+                  context.read<PlanProvider>().loadPlans(widget.courseId),
+              child: const Center(
+                  child: Text('No plans available for this course yet.')),
+            );
           }
 
           final plans = planProvider.plans;
-          final selected = plans[_currentPage.clamp(0, plans.length - 1)];
 
           return Column(
             children: [
@@ -108,9 +106,13 @@ class _PlansScreenState extends State<PlansScreen> {
                   onPageChanged: (i) => setState(() => _currentPage = i),
                   // Scrollable so the card hugs its content and still copes
                   // with a long feature list.
-                  itemBuilder: (context, index) => SingleChildScrollView(
-                    padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 8.h),
-                    child: _PlanCard(plan: plans[index]),
+                  itemBuilder: (context, index) => AppRefresh(
+                    onRefresh: () => context.read<PlanProvider>().loadPlans(widget.courseId),
+                    child: SingleChildScrollView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                      padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 8.h),
+                      child: _PlanCard(plan: plans[index]),
+                    ),
                   ),
                 ),
               ),
@@ -140,27 +142,19 @@ class _PlansScreenState extends State<PlansScreen> {
                     SizedBox(
                       width: double.infinity,
                       height: 54.h,
-                      child: ElevatedButton(
-                        onPressed: planProvider.isSubscribing
-                            ? null
-                            : () => _handleSubscribe(planProvider, selected.id),
+                      child: ElevatedButton.icon(
+                        onPressed: _handleSubscribe,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColor.buttoncolor,
                           foregroundColor: AppColor.Buttontextcolor,
-                          disabledBackgroundColor: AppColor.buttoncolor.withOpacity(0.6),
                           elevation: 0,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.r)),
                         ),
-                        child: planProvider.isSubscribing
-                            ? SizedBox(
-                                width: 20.w,
-                                height: 20.w,
-                                child: const CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                              )
-                            : Text(
-                                'Subscribe',
-                                style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700),
-                              ),
+                        icon: Icon(Icons.open_in_new_rounded, size: 18.sp),
+                        label: Text(
+                          'Subscribe on our website',
+                          style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w700),
+                        ),
                       ),
                     ),
                     SizedBox(height: 12.h),

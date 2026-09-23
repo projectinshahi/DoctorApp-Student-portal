@@ -3,6 +3,9 @@ import 'package:dr_app/repository/google_sign_in_provider.dart';
 import 'package:dr_app/repository/profile_provider.dart';
 import 'package:dr_app/repository/refresh_api_provider.dart';
 import 'package:dr_app/repository/saved_provider.dart';
+import 'package:dr_app/repository/settings_provider.dart';
+import 'package:dr_app/repository/notification_feed_provider.dart';
+import 'package:dr_app/repository/plan_access_provider.dart';
 import 'package:dr_app/repository/selection_content_provider.dart';
 import 'package:dr_app/view/Authendication/login/Sign_in_screen.dart';
 import 'package:dr_app/view/Authendication/login/sign-up_screen.dart';
@@ -11,6 +14,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
+
+import 'settings_screen_test.dart' show FakeNotifications;
 
 /// Sizes the app actually ships to, in logical pixels.
 ///
@@ -38,6 +43,11 @@ Future<void> _pump(WidgetTester tester, Size size, Widget screen) async {
         ChangeNotifierProvider(create: (_) => HomeSummaryProvider()),
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => GoogleSignInIntergration()),
+        ChangeNotifierProvider(
+            create: (_) =>
+                SettingsProvider(notifications: FakeNotifications())),
+        ChangeNotifierProvider(create: (_) => NotificationFeedProvider()),
+        ChangeNotifierProvider(create: (_) => PlanAccessProvider()),
       ],
       child: ScreenUtilInit(
         designSize: const Size(440, 956),

@@ -3,6 +3,8 @@
 // Everything the student has saved — questions and lessons — behind one set
 // of filter chips, from `GET /users/me/saved?type=all`.
 import 'package:flutter/material.dart';
+
+import '../../../widget/app_refresh.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 
@@ -131,25 +133,39 @@ class _BookmarksScreenState extends State<BookmarksScreen>
 
     if (filter.type == 'question') {
       final questions = provider.questions;
-      if (questions.isEmpty) return _empty('No saved MCQs yet.');
-      return ListView.separated(
-        padding: EdgeInsets.fromLTRB(16.w, 4.h, 16.w, 24.h),
-        itemCount: questions.length,
-        separatorBuilder: (_, __) => SizedBox(height: 12.h),
-        itemBuilder: (context, index) => _QuestionCard(question: questions[index]),
+      if (questions.isEmpty) {
+        return AppRefresh.fill(
+            onRefresh: onRefresh, child: _empty('No saved MCQs yet.'));
+      }
+      return AppRefresh(
+        onRefresh: onRefresh,
+        child: ListView.separated(
+            physics: const AlwaysScrollableScrollPhysics(),
+          padding: EdgeInsets.fromLTRB(16.w, 4.h, 16.w, 24.h),
+          itemCount: questions.length,
+          separatorBuilder: (_, __) => SizedBox(height: 12.h),
+          itemBuilder: (context, index) => _QuestionCard(question: questions[index]),
+        ),
       );
     }
 
     final lessons = provider.lessons
         .where((saved) => saved.type == filter.type)
         .toList();
-    if (lessons.isEmpty) return _empty('Nothing saved here yet.');
+    if (lessons.isEmpty) {
+      return AppRefresh.fill(
+          onRefresh: onRefresh, child: _empty('Nothing saved here yet.'));
+    }
 
-    return ListView.separated(
-      padding: EdgeInsets.fromLTRB(16.w, 4.h, 16.w, 24.h),
-      itemCount: lessons.length,
-      separatorBuilder: (_, __) => SizedBox(height: 12.h),
-      itemBuilder: (context, index) => _LessonCard(saved: lessons[index]),
+    return AppRefresh(
+      onRefresh: onRefresh,
+      child: ListView.separated(
+          physics: const AlwaysScrollableScrollPhysics(),
+        padding: EdgeInsets.fromLTRB(16.w, 4.h, 16.w, 24.h),
+        itemCount: lessons.length,
+        separatorBuilder: (_, __) => SizedBox(height: 12.h),
+        itemBuilder: (context, index) => _LessonCard(saved: lessons[index]),
+      ),
     );
   }
 

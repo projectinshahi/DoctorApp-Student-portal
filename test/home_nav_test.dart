@@ -2,9 +2,12 @@ import 'dart:convert';
 
 import 'package:dr_app/core/constant/local_storage.dart';
 import 'package:dr_app/repository/daily_quiz_provider.dart';
+import 'package:dr_app/repository/notification_feed_provider.dart';
+import 'package:dr_app/repository/plan_access_provider.dart';
 import 'package:dr_app/repository/profile_provider.dart';
 import 'package:dr_app/repository/rapid_recall_provider.dart';
 import 'package:dr_app/repository/saved_provider.dart';
+import 'package:dr_app/repository/settings_provider.dart';
 import 'package:dr_app/repository/selection_content_provider.dart';
 import 'package:dr_app/view/Home/home_screen.dart';
 import 'package:dr_app/view/Home/profile/profile_screen.dart';
@@ -14,6 +17,8 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import 'settings_screen_test.dart' show FakeNotifications;
 
 /// Enough of a course tree to get the home screen past its skeleton — the
 /// header only draws when there is content to draw under it.
@@ -51,6 +56,15 @@ Future<void> _pumpHome(WidgetTester tester) async {
         // The nav's fifth slot opens Rapid Recall, which reads this one.
         ChangeNotifierProvider<RapidRecallProvider>(
             create: (_) => RapidRecallProvider()),
+        // The bell's unread badge reads this.
+        ChangeNotifierProvider<NotificationFeedProvider>(
+            create: (_) => NotificationFeedProvider()),
+        // Home shows the "activating notifications" strip from this.
+        ChangeNotifierProvider<PlanAccessProvider>(
+            create: (_) => PlanAccessProvider()),
+        ChangeNotifierProvider<SettingsProvider>(
+            create: (_) =>
+                SettingsProvider(notifications: FakeNotifications())),
       ],
       child: ScreenUtilInit(
         designSize: const Size(440, 956),

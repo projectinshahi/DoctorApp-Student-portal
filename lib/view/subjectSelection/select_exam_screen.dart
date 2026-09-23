@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../widget/app_refresh.dart';
+
 import '../../core/theam /app_color.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
@@ -245,23 +247,26 @@ class _ExamSelectionScreenState extends State<ExamSelectionScreen> {
             }
 
             if (provider.coursesErrorMessage != null) {
-              return Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(20.0),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        provider.coursesErrorMessage!,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: _kDanger, fontSize: 16.sp),
-                      ),
-                      SizedBox(height: 16.h),
-                      ElevatedButton(
-                        onPressed: () => provider.fetchCourses(),
-                        child: const Text("Retry"),
-                      ),
-                    ],
+              return AppRefresh.fill(
+                onRefresh: () => provider.fetchCourses(),
+                child: Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(20.0),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          provider.coursesErrorMessage!,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: _kDanger, fontSize: 16.sp),
+                        ),
+                        SizedBox(height: 16.h),
+                        ElevatedButton(
+                          onPressed: () => provider.fetchCourses(),
+                          child: const Text("Retry"),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               );
@@ -276,21 +281,28 @@ class _ExamSelectionScreenState extends State<ExamSelectionScreen> {
             }).toList();
 
             if (visibleCourses.isEmpty) {
-              return Center(
-                child: Text(
-                  "No courses available.",
-                  style: TextStyle(fontSize: 16.sp, color: Colors.grey),
+              return AppRefresh.fill(
+                onRefresh: () => provider.fetchCourses(),
+                child: Center(
+                  child: Text(
+                    "No courses available.",
+                    style: TextStyle(fontSize: 16.sp, color: Colors.grey),
+                  ),
                 ),
               );
             }
 
-            return ListView.builder(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-              itemCount: visibleCourses.length,
-              itemBuilder: (context, index) {
-                final course = visibleCourses[index];
-                return _buildCourseCard(course);
-              },
+            return AppRefresh(
+              onRefresh: () => provider.fetchCourses(),
+              child: ListView.builder(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                itemCount: visibleCourses.length,
+                itemBuilder: (context, index) {
+                  final course = visibleCourses[index];
+                  return _buildCourseCard(course);
+                },
+              ),
             );
           },
         ),

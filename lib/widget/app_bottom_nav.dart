@@ -14,10 +14,15 @@ class AppBottomNav extends StatelessWidget {
   final int currentIndex;
   final ValueChanged<int> onTap;
 
+  /// Tabs the student's plan does not cover. Marked, not removed: a tab
+  /// that vanishes looks like a broken app, and the tap explains itself.
+  final Set<int> locked;
+
   const AppBottomNav({
     super.key,
     required this.currentIndex,
     required this.onTap,
+    this.locked = const {},
   });
 
   static const List<(IconData, String)> _items = [
@@ -54,6 +59,7 @@ class AppBottomNav extends StatelessWidget {
                 icon: _items[i].$1,
                 label: _items[i].$2,
                 isSelected: currentIndex == i,
+                locked: locked.contains(i),
                 onTap: () => onTap(i),
               ),
           ],
@@ -67,6 +73,7 @@ class _NavItem extends StatelessWidget {
   final IconData icon;
   final String label;
   final bool isSelected;
+  final bool locked;
   final VoidCallback onTap;
 
   const _NavItem({
@@ -74,6 +81,7 @@ class _NavItem extends StatelessWidget {
     required this.label,
     required this.isSelected,
     required this.onTap,
+    this.locked = false,
   });
 
   @override
@@ -92,7 +100,19 @@ class _NavItem extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 25.sp, color: tint),
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Icon(icon, size: 25.sp, color: tint),
+                if (locked)
+                  Positioned(
+                    right: -5.w,
+                    top: -2.h,
+                    child: Icon(Icons.lock_rounded,
+                        size: 12.sp, color: Colors.white),
+                  ),
+              ],
+            ),
             SizedBox(height: 3.h),
             // scaleDown keeps 18.sp wherever it fits and shrinks only the
             // labels that would not, so the bar adapts instead of clipping.

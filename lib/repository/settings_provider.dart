@@ -57,6 +57,11 @@ class SettingsProvider extends ChangeNotifier {
   /// Null while signed out.
   int? _studentId;
 
+  /// True while the permission is being asked for and this device is being
+  /// registered. Home shows it: the prompt is a system dialog, and what
+  /// follows it — subscribing, sending the token — is invisible otherwise.
+  bool isActivating = false;
+
   bool get pushAvailable => _notifications.pushAvailable;
   bool get analyticsAvailable => AppAnalytics.available;
 
@@ -154,15 +159,23 @@ class SettingsProvider extends ChangeNotifier {
     await _ready;
     _studentId = studentId;
 
-    if (push && pushAvailable) {
-      if (await _notifications.requestPermission()) {
-        await _notifications.subscribePush();
-        if (studentId != null) await _notifications.registerToken(studentId);
-      } else {
-        push = false;
-        await _prefs?.setBool(SettingsKeys.pushNotifications, false);
-        notifyListeners();
+    if (!push || !pushAvailable) {
+      // Nothing to ask for and nothing to register: no point saying so.
+      if (dailyReminder) {
+        await _notifications.scheduleDailyReminder(reminderMinutes);
       }
+      return;
+    }
+
+    isActivating = true;
+    notifyListeners();
+
+    if (await _notifications.requestPermission()) {
+      await _notifications.subscribePush();
+      if (studentId != null) await _notifications.registerToken(studentId);
+    } else {
+      push = false;
+      await _prefs?.setBool(SettingsKeys.pushNotifications, false);
     }
 
     // Scheduled again each session: harmless when it is already set, and it
@@ -170,6 +183,9 @@ class SettingsProvider extends ChangeNotifier {
     if (dailyReminder) {
       await _notifications.scheduleDailyReminder(reminderMinutes);
     }
+
+    isActivating = false;
+    notifyListeners();
   }
 
   /// A signed-out phone stops receiving course news and study reminders. The

@@ -1,6 +1,8 @@
 import 'dart:async';
 // lib/view/Home/Qbank/qbank_subjects_screen.dart
 import 'package:flutter/material.dart';
+
+import '../../../widget/app_refresh.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 
@@ -129,35 +131,42 @@ class _QbankSubjectsScreenState extends State<QbankSubjectsScreen>
       body: showLoading
           ? const AppLoading()
           : subjects.isEmpty
-          ? Center(
-              child: Padding(
-                padding: EdgeInsets.symmetric(horizontal: 32.w),
-                child: Text(
-                  "No MCQ subjects in this topic yet.",
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 13.sp, color: Colors.grey.shade600),
+          ? AppRefresh.fill(
+            onRefresh: onRefresh,
+            child: Center(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 32.w),
+                  child: Text(
+                    "No MCQ subjects in this topic yet.",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 13.sp, color: Colors.grey.shade600),
+                  ),
                 ),
               ),
-            )
-          : ListView.separated(
-              padding: EdgeInsets.fromLTRB(20.w, 8.h, 20.w, 24.h),
-              itemCount: subjects.length,
-              separatorBuilder: (_, __) => SizedBox(height: 12.h),
-              itemBuilder: (context, index) {
-                final lesson = subjects[index];
-                return QbankRowTile(
-                  icon: Icons.help_outline_rounded,
-                  title: lesson.title,
-                  subtitle: lesson.quizQuestionCount == null
-                      ? "MCQs"
-                      : "${lesson.quizQuestionCount} MCQs",
-                  locked: lesson.locked,
-                  attempt: lesson.attempt,
-                  onTap: () => _openQuiz(context, lesson),
-                  onRetake: () => _openQuiz(context, lesson, retake: true),
-                );
-              },
-            ),
+          )
+          : AppRefresh(
+            onRefresh: onRefresh,
+            child: ListView.separated(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: EdgeInsets.fromLTRB(20.w, 8.h, 20.w, 24.h),
+                itemCount: subjects.length,
+                separatorBuilder: (_, __) => SizedBox(height: 12.h),
+                itemBuilder: (context, index) {
+                  final lesson = subjects[index];
+                  return QbankRowTile(
+                    icon: Icons.help_outline_rounded,
+                    title: lesson.title,
+                    subtitle: lesson.quizQuestionCount == null
+                        ? "MCQs"
+                        : "${lesson.quizQuestionCount} MCQs",
+                    locked: lesson.locked,
+                    attempt: lesson.attempt,
+                    onTap: () => _openQuiz(context, lesson),
+                    onRetake: () => _openQuiz(context, lesson, retake: true),
+                  );
+                },
+              ),
+          ),
     );
   }
 }

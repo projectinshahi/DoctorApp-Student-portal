@@ -86,6 +86,10 @@ class NotificationService {
   /// before it is set waits in [pendingOpen].
   void Function(Map<String, dynamic> data)? onOpen;
 
+  /// A push that arrived while the app was open. The backend has already
+  /// stored it, so this only has to move the badge.
+  void Function(Map<String, dynamic> data)? onReceived;
+
   /// A tap that arrived before [onOpen] existed — usually the notification
   /// that launched the app.
   Map<String, dynamic>? pendingOpen;
@@ -170,17 +174,19 @@ class NotificationService {
 
       // App in the background, notification tapped.
       FirebaseMessaging.onMessageOpenedApp
-          .listen((message) => _dispatch(message.data));
+          .listen((message) => _dispatch(dataOf(message)));
 
       // App closed, notification tapped: it launched the app.
       final initial = await FirebaseMessaging.instance.getInitialMessage();
-      if (initial != null) pendingOpen = initial.data;
+      if (initial != null) pendingOpen = dataOf(initial);
     } catch (error) {
       if (kDebugMode) debugPrint('PUSH  not initialised: $error');
     }
   }
 
   void _showInForeground(RemoteMessage message) {
+    onReceived?.call(dataOf(message));
+
     final shown = message.notification;
     if (shown == null) return;
 
@@ -203,8 +209,20 @@ class NotificationService {
       ),
       // The whole data map, so a tap on this copy routes exactly like a tap
       // on the system's — course id included.
-      payload: jsonEncode(message.data),
+      payload: jsonEncode(dataOf(message)),
     );
+  }
+
+  /// A message's data plus the words it was shown with, so the app can put
+  /// a tapped notification on screen without fetching anything.
+  @visibleForTesting
+  static Map<String, dynamic> dataOf(RemoteMessage message) {
+    final shown = message.notification;
+    return {
+      ...message.data,
+      if (shown?.title != null) 'title': shown!.title,
+      if (shown?.body != null) 'body': shown!.body,
+    };
   }
 
   void _dispatch(Map<String, dynamic>? data) {

@@ -12,12 +12,16 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+
+import '../../../widget/app_refresh.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/utils/refresh_on_visible.dart';
 import '../../../models/rapid_recall_model.dart';
+import '../../../repository/plan_access_provider.dart';
 import '../../../repository/rapid_recall_provider.dart';
+import '../../../widget/feature_locked_dialog.dart';
 import '../../../widget/app_bottom_nav.dart';
 import '../../../widget/app_loading.dart';
 import '../Qbank/qbank_subjects_screen.dart' show QbankRowTile;
@@ -98,13 +102,18 @@ class _RecallTopicsScreenState extends State<RecallTopicsScreen>
     if (recall.isLoading && recall.decks.isEmpty) {
       body = const AppLoading();
     } else if (recall.errorMessage != null && recall.decks.isEmpty) {
-      body = RecallMessage(text: recall.errorMessage!);
+      body = AppRefresh.fill(
+          onRefresh: onRefresh,
+          child: RecallMessage(text: recall.errorMessage!));
     } else if (recall.reason != null && recall.decks.isEmpty) {
       // The server's own sentence — "No course selected yet." — which is a
       // different answer from an empty shelf.
-      body = RecallMessage(text: recall.reason!);
+      body = AppRefresh.fill(
+          onRefresh: onRefresh, child: RecallMessage(text: recall.reason!));
     } else if (topics.isEmpty) {
-      body = const RecallMessage(text: 'No recall cards here yet.');
+      body = AppRefresh.fill(
+          onRefresh: onRefresh,
+          child: const RecallMessage(text: 'No recall cards here yet.'));
     } else {
       final topic = _current(topics);
       final lessons = recall.lessonsIn(topic.id);
@@ -157,34 +166,38 @@ class _RecallTopicsScreenState extends State<RecallTopicsScreen>
           ),
           SizedBox(height: 18.h),
           Expanded(
-            child: ListView.separated(
-              // Keyed by topic, so switching chips starts the new list at the
-              // top instead of wherever the last one was scrolled to.
-              key: PageStorageKey('recall-lessons-${topic.id}'),
-              padding:
-                  EdgeInsets.fromLTRB(20.w, 0, 20.w, kRecallNavClearance),
-              itemCount: lessons.length,
-              separatorBuilder: (_, _) => SizedBox(height: 12.h),
-              itemBuilder: (context, index) {
-                final lesson = lessons[index];
-                // The same row the QBank lists use — the same kind of list,
-                // and two separately styled copies would drift.
-                return QbankRowTile(
-                  icon: recallIconFor(lesson.title),
-                  title: lesson.title,
-                  subtitle: lesson.summary,
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => RecallDecksScreen(
-                        chapterId: topic.id,
-                        lessonId: lesson.id,
-                        title: lesson.title,
+            child: AppRefresh(
+              onRefresh: onRefresh,
+              child: ListView.separated(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                // Keyed by topic, so switching chips starts the new list at the
+                // top instead of wherever the last one was scrolled to.
+                key: PageStorageKey('recall-lessons-${topic.id}'),
+                padding:
+                    EdgeInsets.fromLTRB(20.w, 0, 20.w, kRecallNavClearance),
+                itemCount: lessons.length,
+                separatorBuilder: (_, _) => SizedBox(height: 12.h),
+                itemBuilder: (context, index) {
+                  final lesson = lessons[index];
+                  // The same row the QBank lists use — the same kind of list,
+                  // and two separately styled copies would drift.
+                  return QbankRowTile(
+                    icon: recallIconFor(lesson.title),
+                    title: lesson.title,
+                    subtitle: lesson.summary,
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => RecallDecksScreen(
+                          chapterId: topic.id,
+                          lessonId: lesson.id,
+                          title: lesson.title,
+                        ),
                       ),
                     ),
-                  ),
-                );
-              },
+                  );
+                },
+              ),
             ),
           ),
         ],
@@ -200,6 +213,7 @@ class _RecallTopicsScreenState extends State<RecallTopicsScreen>
       // Already on Recall: tapping it again has nowhere to go.
       bottomNavigationBar: AppBottomNav(
         currentIndex: 4,
+        locked: context.watch<PlanAccessProvider>().lockedTabs,
         onTap: (index) {
           if (index != 4) openTabFromRecall(context, index);
         },
@@ -297,6 +311,17 @@ PreferredSizeWidget recallAppBar(
 /// same stack home builds when the tab is tapped there, so back from it
 /// lands on home rather than on a Recall screen left underneath.
 void openTabFromRecall(BuildContext context, int index) {
+  // The same tabs are locked here as on home — otherwise the bar in Recall
+  // is a way around the one on home.
+  const names = {1: 'QBank', 2: 'Grand Tests', 3: 'AI Videos'};
+  final access = context.read<PlanAccessProvider>();
+  if (access.lockedTabs.contains(index)) {
+    showFeatureLockedDialog(context,
+        feature: names[index] ?? 'This section',
+        planTitle: access.subscription?.planTitle);
+    return;
+  }
+
   final navigator = Navigator.of(context);
   navigator.popUntil((route) => route.isFirst);
 

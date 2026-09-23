@@ -1,4 +1,5 @@
 import 'package:dr_app/repository/refresh_api_provider.dart';
+import 'package:dr_app/view/refresh_gate/auth_gate.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// What the gate must do when auth changes.
@@ -33,6 +34,37 @@ GateEffect onAuthChanged({
 }
 
 void main() {
+  group('arriving', () {
+    test('a fresh sign-in gets the welcome animation', () {
+      expect(
+        isFreshSignIn(AuthStatus.unauthenticated, AuthStatus.authenticated),
+        isTrue,
+      );
+    });
+
+    test('a restored session skips it — the splash has just played', () {
+      // Cold start: unknown while the stored token is read, then signed in.
+      // A second brand moment there is delay, not welcome.
+      expect(isFreshSignIn(AuthStatus.unknown, AuthStatus.authenticated),
+          isFalse);
+    });
+
+    test('a rebuild while already signed in is not a sign-in', () {
+      expect(isFreshSignIn(AuthStatus.authenticated, AuthStatus.authenticated),
+          isFalse);
+    });
+
+    test('signing out is not a sign-in', () {
+      expect(isFreshSignIn(AuthStatus.authenticated, AuthStatus.unauthenticated),
+          isFalse);
+    });
+
+    test('the welcome is held long enough to be seen', () {
+      // The animation itself runs 1400ms; a shorter hold would cut it off.
+      expect(AuthGate.welcomeHold.inMilliseconds, greaterThanOrEqualTo(1400));
+    });
+  });
+
   group('sign-out is an event, not a state', () {
     test('losing a live session resets the stack', () {
       expect(

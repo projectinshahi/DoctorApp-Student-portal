@@ -19,6 +19,8 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 
 import 'repository/rapid_recall_provider.dart';
+import 'repository/notification_feed_provider.dart';
+import 'repository/plan_access_provider.dart';
 import 'repository/settings_provider.dart';
 import 'services/notification_service.dart';
 import 'core/theam /app_theme.dart';
@@ -79,6 +81,11 @@ class MyApp extends StatelessWidget {
         // The student's settings, applied app-wide: course alerts, the
         // study reminder, quiz sounds and analytics consent.
         ChangeNotifierProvider(create: (_) => SettingsProvider()),
+        // The notification list and the number on the bell. Read by the
+        // home header and by the notifications screen.
+        ChangeNotifierProvider(create: (_) => NotificationFeedProvider()),
+        // Which tabs the student's plan covers.
+        ChangeNotifierProvider(create: (_) => PlanAccessProvider()),
         // The home card's read-only summary. Separate from the quiz provider
         // on purpose: this one never starts the day's attempt.
         ChangeNotifierProvider(create: (_) => HomeSummaryProvider())

@@ -1,6 +1,7 @@
 import 'package:dr_app/models/quiz_model.dart'
     show QuizErrorKind, QuizException;
 import 'package:dr_app/models/rapid_recall_model.dart';
+import 'package:dr_app/repository/plan_access_provider.dart';
 import 'package:dr_app/repository/rapid_recall_provider.dart';
 import 'package:dr_app/services/rapid_recall_service.dart';
 import 'package:dr_app/view/Home/recall/recall_cards_screen.dart';
@@ -15,7 +16,8 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// One deck per row of the real hierarchy: two lessons under Medicine, one
-/// under OBG, and one deck filed against nothing at all.
+/// under OBG, and one deck filed against nothing at all. A deck can also be
+/// filed under a chapter with no lesson — see the chapter-level group below.
 Map<String, dynamic> _deck(
   int id,
   String title, {
@@ -33,7 +35,9 @@ Map<String, dynamic> _deck(
       'description': 'Read these the night before.',
       'noteUrl': noteUrl,
       'noteFileType': noteUrl == null ? null : 'pdf',
-      'subjectId': subject == null ? null : 8,
+      'chapterId': chapterId,
+      'chapter':
+          chapterId == null ? null : {'id': chapterId, 'title': chapterTitle},
       'lessonId': lessonId,
       'displayOrder': 0,
       'subject': subject == null ? null : {'id': 8, 'name': subject},
@@ -179,8 +183,12 @@ Future<void> _pump(WidgetTester tester, RapidRecallProvider provider,
   addTearDown(tester.view.resetDevicePixelRatio);
 
   await tester.pumpWidget(
-    ChangeNotifierProvider<RapidRecallProvider>.value(
-      value: provider,
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider<RapidRecallProvider>.value(value: provider),
+        // The Recall nav bar marks the tabs the plan does not cover.
+        ChangeNotifierProvider(create: (_) => PlanAccessProvider()),
+      ],
       child: ScreenUtilInit(
         designSize: const Size(440, 956),
         minTextAdapt: true,
@@ -275,6 +283,64 @@ void main() {
       // No subject: just the count, not a stray separator.
       expect(provider.decksIn(chapterId: 200, lessonId: 20).single.summary,
           '6 cards');
+    });
+  });
+
+  group('a deck filed under a subject, with no lesson', () {
+    // The case that was broken: read through the lesson, these fell into
+    // "General", where a student looking under Internal Medicine never sees
+    // them.
+    final service = _FakeRecallService(list: {
+      'rapidRecalls': [
+        _deck(1, 'ECG rapid recall',
+            lessonId: 10,
+            lessonTitle: 'Cardiology',
+            chapterId: 100,
+            chapterTitle: 'Internal Medicine',
+            cards: 2),
+        _deck(2, 'All of Internal Medicine',
+            chapterId: 100, chapterTitle: 'Internal Medicine', cards: 9),
+        _deck(3, 'Exam day checklist', cards: 1),
+      ],
+    });
+
+    test('lands under its own subject, not General', () async {
+      final provider = await _loaded(service);
+
+      expect(provider.topics.map((t) => t.title),
+          ['Internal Medicine', 'General']);
+      expect(provider.topics.first.decks.map((d) => d.title),
+          ['ECG rapid recall', 'All of Internal Medicine']);
+      // Only the deck with no chapter at all is General.
+      expect(provider.topics.last.decks.single.title, 'Exam day checklist');
+    });
+
+    test('sits in a group named after the subject, after the lessons',
+        () async {
+      final provider = await _loaded(service);
+      final groups = provider.lessonsIn(100);
+
+      expect(groups.map((g) => g.title), ['Cardiology', 'All Internal Medicine']);
+      expect(groups.last.decks.single.title, 'All of Internal Medicine');
+    });
+
+    test('opens from that group, and knows its siblings', () async {
+      final provider = await _loaded(service);
+
+      expect(
+        provider.decksIn(chapterId: 100, lessonId: null).single.title,
+        'All of Internal Medicine',
+      );
+      // A deck in the chapter's own group is not a sibling of a lesson's deck.
+      expect(provider.siblingsOf(2), isEmpty);
+      expect(provider.siblingsOf(1), isEmpty);
+    });
+
+    test('a deck pinned to a lesson is where it always was', () async {
+      final provider = await _loaded(service);
+
+      expect(provider.decksIn(chapterId: 100, lessonId: 10).single.title,
+          'ECG rapid recall');
     });
   });
 
@@ -803,6 +869,24 @@ void main() {
       expect(find.byTooltip('Open handout'), findsNothing);
       expect(find.byTooltip('Bookmark'), findsOneWidget);
       expect(find.byType(RecallDeckTile), findsNothing);
+    });
+
+    testWidgets('pulling the list down refetches it', (tester) async {
+      // Counted from after the screen has settled: it refreshes itself on
+      // first appearance too, and that one is not what this is testing. The
+      // pull must add exactly one fetch on top of it.
+      final service = _FakeRecallService();
+      final provider = RapidRecallProvider(service: service);
+      await _pump(tester, provider, const RecallTopicsScreen());
+      await tester.pumpAndSettle();
+      final beforePull = service.listCalls;
+
+      // A drag, not a fling: a fling's momentum can trip the indicator more
+      // than once, and the count is the point.
+      await tester.drag(find.text('Cardiology'), const Offset(0, 300));
+      await tester.pumpAndSettle();
+
+      expect(service.listCalls, beforePull + 1);
     });
 
     testWidgets("an empty shelf says the server's reason, not 'nothing here'",

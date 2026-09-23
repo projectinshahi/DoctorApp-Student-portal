@@ -27,15 +27,34 @@ import '../../repository/daily_quiz_provider.dart';
 import '../../repository/refresh_api_provider.dart';
 import '../../repository/quiz_prefetch.dart';
 import '../../repository/rapid_recall_provider.dart';
+import '../../repository/notification_feed_provider.dart';
+import '../../repository/plan_access_provider.dart';
 import '../../repository/saved_provider.dart';
 import '../../repository/settings_provider.dart';
 import '../../services/notification_service.dart';
 import '../../repository/selection_content_provider.dart';
 import '../Authendication/login/login_screen.dart';
+import '../Home/notifications/notifications_screen.dart';
 import '../subjectSelection/select_exam_screen.dart';
+
+/// A sign-in that just happened, as opposed to a session restored at launch.
+///
+/// Only this one gets the welcome animation: a cold start has already shown
+/// the splash for two seconds, and a second brand moment there is delay.
+@visibleForTesting
+bool isFreshSignIn(AuthStatus? previous, AuthStatus next) =>
+    next == AuthStatus.authenticated &&
+    previous == AuthStatus.unauthenticated;
 
 class AuthGate extends StatefulWidget {
   const AuthGate({super.key});
+
+  /// How long the logo animation is held after a sign-in.
+  ///
+  /// A floor, not a wait: the session usually resolves in a few hundred
+  /// milliseconds, and without it the animation would be gone before it could
+  /// be seen.
+  static const Duration welcomeHold = Duration(milliseconds: 1600);
 
   @override
   State<AuthGate> createState() => _AuthGateState();
@@ -57,6 +76,11 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
     // A tapped notification comes here: this is where it is known whether
     // anyone is signed in to open anything for.
     NotificationService.instance.onOpen = _openFromNotification;
+    // A push that lands while the app is open: the backend has stored it,
+    // so only the badge has to move.
+    NotificationService.instance.onReceived = (_) {
+      if (mounted) context.read<NotificationFeedProvider>().bumpUnread();
+    };
 
     _splashTimer = Timer(AnimatedSplash.hold, () {
       if (mounted) setState(() => _splashOver = true);
@@ -79,6 +103,16 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
     // /users/me/home is small, already cached by the home screen, and starts
     // nothing — unlike the daily-quiz endpoint beside it.
     context.read<HomeSummaryProvider>().load();
+
+    // And the course tree, because it carries whether the plan is still
+    // active: a subscription that lapsed while the app was in the background
+    // has to close the content on the next look, not on the next sign-in.
+    context.read<SelectionContentProvider>().loadContent();
+
+    // And the plan, which carries the days left and which tabs are locked. A
+    // renewal bought in the browser lands here on the way back, so the
+    // countdown is not still reading "ends tomorrow" the morning after.
+    context.read<PlanAccessProvider>().load();
   }
 
   @override
@@ -98,7 +132,9 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
     // Outlives a frame, so it has to go or it fires setState on a gate that
     // is gone.
     _splashTimer?.cancel();
+    _welcomeTimer?.cancel();
     NotificationService.instance.onOpen = null;
+    NotificationService.instance.onReceived = null;
     WidgetsBinding.instance.removeObserver(this);
     _auth?.removeListener(_onAuthChanged);
     super.dispose();
@@ -111,6 +147,12 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
   /// splash was gone before it could be seen.
   bool _splashOver = false;
   Timer? _splashTimer;
+
+  bool _welcoming = false;
+  Timer? _welcomeTimer;
+
+  /// The notification permission and the device token, once per session.
+  bool _settingsApplied = false;
 
   bool _warmedUp = false;
 
@@ -139,13 +181,13 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
       // The notification permission and the study reminder, now that there
       // is a signed-in student to ask on behalf of. Asked at launch, before
       // sign-in, the prompt has no context and gets refused.
-      //
-      // The FCM token is sent here too: this runs right after a successful
-      // sign-in and on every launch with the session restored, so the
-      // backend's copy never goes stale.
-      final settings = navigatorContext.read<SettingsProvider>();
-      unawaited(AuthProvider.currentStudentId().then(
-          (studentId) => settings.applyForSession(studentId: studentId)));
+      // The notification permission, now that home is on screen.
+      _applySettingsForSession();
+
+      // The bell's number, for a student who was sent something while they
+      // were away.
+      unawaited(navigatorContext.read<NotificationFeedProvider>().load());
+
       final pending = NotificationService.instance.takePendingOpen();
       if (pending != null) unawaited(_openFromNotification(pending));
 
@@ -161,57 +203,45 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
     });
   }
 
-  /// Where a tapped notification goes.
+  /// Where a tapped notification goes: the Notifications screen, with the
+  /// one that was tapped at the top of it.
   ///
-  /// The app uses Navigator 1.0 — one global navigatorKey and pushed
-  /// MaterialPageRoutes, no named routes — so "/course/:courseId" is a push
-  /// here, not a URL. And it shows one course at a time, the selected one,
-  /// which *is* home: so a course_join for that course goes home, and one for
-  /// any other course opens the picker with it listed. Switching the student's
-  /// course silently would change everything the app shows without asking.
+  /// The screen is where a student looks for what arrived, and the alert's
+  /// own row still opens what it names — home when it is about the course
+  /// they already have, the picker when it is about another.
   Future<void> _openFromNotification(Map<String, dynamic> data) async {
-    final type = data['type'];
-    if (type != NotificationService.newCourseType &&
-        type != NotificationService.courseJoinType) {
-      return; // A reminder, or anything unknown: opening the app was enough.
-    }
-
     if (_auth?.status != AuthStatus.authenticated) {
       // Tapped before the session was restored. _warmUp picks it up.
       NotificationService.instance.pendingOpen = data;
       return;
     }
 
-    if (type == NotificationService.courseJoinType) {
-      final courseId = NotificationService.courseIdFrom(data);
-      final navigator = navigatorKey.currentState;
-      final selected = navigator?.context
-          .read<SelectionContentProvider>()
-          .content
-          ?.course
-          ?.id;
-      if (courseId != null && courseId == selected) {
-        navigator?.popUntil((route) => route.isFirst);
-        return;
-      }
+    final navigatorContext = navigatorKey.currentContext;
+    if (navigatorContext != null) {
+      await NotificationsScreen.open(navigatorContext);
     }
-
-    await _openCoursePicker();
   }
 
-  Future<void> _openCoursePicker() async {
-    final tokens = await Future.wait([
-      LocalStorage.getAccessToken(),
-      LocalStorage.getRefreshToken(),
-      LocalStorage.getDeviceId(),
-    ]);
-    navigatorKey.currentState?.push(MaterialPageRoute(
-      builder: (_) => ExamSelectionScreen(
-        accessToken: tokens[0] ?? '',
-        refreshToken: tokens[1] ?? '',
-        deviceId: tokens[2] ?? '',
-      ),
-    ));
+  /// Holds the logo animation for [welcomeHold] after a sign-in.
+  void _startWelcome() {
+    _welcomeTimer?.cancel();
+    setState(() => _welcoming = true);
+    _welcomeTimer = Timer(AuthGate.welcomeHold, () {
+      if (mounted) setState(() => _welcoming = false);
+    });
+  }
+
+  /// Asks for the notification permission and registers this device.
+  ///
+  /// From _warmUp, which runs after home's first frame — so the student sees
+  /// where they have landed before a system dialog appears over it.
+  void _applySettingsForSession() {
+    if (_settingsApplied) return;
+    _settingsApplied = true;
+
+    final settings = context.read<SettingsProvider>();
+    unawaited(AuthProvider.currentStudentId()
+        .then((studentId) => settings.applyForSession(studentId: studentId)));
   }
 
   void _onAuthChanged() {
@@ -219,8 +249,11 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
     if (auth == null || !mounted) return;
 
     final status = auth.status;
-    final wasSignedIn = _lastStatus == AuthStatus.authenticated;
+    final previous = _lastStatus;
+    final wasSignedIn = previous == AuthStatus.authenticated;
     _lastStatus = status;
+
+    if (isFreshSignIn(previous, status)) _startWelcome();
 
     // A sign-in that displaced another device. Shown from here rather than
     // from the login screen, because that screen is being replaced by this
@@ -245,6 +278,9 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
     // also ends from another device signing in and from an account being
     // blocked — all three arrive as this one transition.
     _warmedUp = false;
+    _settingsApplied = false;
+    _welcomeTimer?.cancel();
+    _welcoming = false;
     context.read<SavedProvider>().clear();
     context.read<SelectionContentProvider>().invalidate();
     // Warmed attempts belong to the account that just left; opening one on
@@ -254,6 +290,10 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
     context.read<RapidRecallProvider>().clear();
     // Course alerts and the study reminder are for a signed-in student.
     unawaited(context.read<SettingsProvider>().clearForSignOut());
+    // The list belongs to the account that just left.
+    context.read<NotificationFeedProvider>().clear();
+    // The plan belongs to that account too.
+    context.read<PlanAccessProvider>().clear();
 
     // The session can die while a quiz, a test paper or the player is on
     // top. Swapping this root does not remove those, and without the reset
@@ -375,8 +415,11 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
     // Held for a moment after a sign-in is accepted, so the student sees one
     // steady screen instead of three flashing past. The work happens during
     // it, not after.
-    if (auth.isSigningIn) {
-      return const AppLoadingScreen(message: 'Signing you in…');
+    // The logo's animation as a moment after signing in, held long enough to
+    // be seen. The notification prompt comes up over it, so home is the first
+    // thing the student reaches after both.
+    if (_welcoming || auth.isSigningIn) {
+      return const AnimatedSplash(message: 'Signing you in…');
     }
 
     // Still asking the server whether this account has a course. Showing the

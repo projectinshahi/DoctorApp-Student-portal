@@ -4,7 +4,8 @@
 //
 // A card is an image, a note, or both — never neither. A deck may also carry
 // one handout (a PDF or DOC). Every classification on a deck is optional: it
-// can belong to a subject, to a lesson, to both, or to the whole course.
+// can belong to a chapter — the subject a student picks from — to a lesson
+// inside one, or to neither.
 import 'package:flutter/foundation.dart';
 
 @immutable
@@ -19,14 +20,19 @@ class RapidRecallDeck {
   /// "pdf" | "doc" | "docx" | null. Only meaningful with [noteUrl].
   final String? noteFileType;
 
-  final int? subjectId;
+  /// The chapter this deck belongs to: the subject a student browses by.
+  ///
+  /// Sent on every deck, filled in from the lesson when the admin gave only a
+  /// lesson — so it is the one field that groups both a lesson's deck and a
+  /// deck filed under the subject alone.
+  final int? chapterId;
+  final RecallChapter? chapter;
   final int? lessonId;
 
   /// Null means the deck is not filed under a subject.
   final RecallSubject? subject;
 
-  /// Null means the deck is not tied to a lesson — and so has no chapter
-  /// either, which is why course-wide decks land under "General".
+  /// Null on a deck filed under the chapter itself rather than one lesson.
   final RecallLesson? lesson;
 
   final int displayOrder;
@@ -44,7 +50,8 @@ class RapidRecallDeck {
     this.description,
     this.noteUrl,
     this.noteFileType,
-    this.subjectId,
+    this.chapterId,
+    this.chapter,
     this.lessonId,
     this.subject,
     this.lesson,
@@ -84,7 +91,10 @@ class RapidRecallDeck {
       description: _asText(json['description']),
       noteUrl: _asText(json['noteUrl']),
       noteFileType: _asText(json['noteFileType']),
-      subjectId: _asInt(json['subjectId']),
+      chapterId: _asInt(json['chapterId']),
+      chapter: json['chapter'] is Map
+          ? RecallChapter.fromJson(Map<String, dynamic>.from(json['chapter']))
+          : null,
       lessonId: _asInt(json['lessonId']),
       subject: json['subject'] is Map
           ? RecallSubject.fromJson(Map<String, dynamic>.from(json['subject']))

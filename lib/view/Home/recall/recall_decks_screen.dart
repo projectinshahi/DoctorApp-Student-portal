@@ -7,6 +7,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+
+import '../../../widget/app_refresh.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 
@@ -62,6 +64,13 @@ class _RecallDecksScreenState extends State<RecallDecksScreen> {
     unawaited(recall.warmDecks(shown.map((deck) => deck.id)));
   }
 
+  /// Pull to refresh: the list every Recall screen reads, then the
+  /// thumbnails for the rows on screen.
+  Future<void> _refresh() async {
+    await context.read<RapidRecallProvider>().load();
+    if (mounted) _warmShown();
+  }
+
   @override
   Widget build(BuildContext context) {
     final recall = context.watch<RapidRecallProvider>();
@@ -82,48 +91,54 @@ class _RecallDecksScreenState extends State<RecallDecksScreen> {
         subtitle: 'Rapid Recall',
       ),
       body: decks.isEmpty
-          ? const RecallMessage(text: 'No recall cards here yet.')
-          : ListView(
-              padding:
-                  EdgeInsets.fromLTRB(20.w, 8.h, 20.w, kRecallNavClearance),
-              children: [
-                for (final deck in visible) ...[
-                  RecallDeckTile.wired(
-                    recall,
-                    deck,
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => RecallCardsScreen(deckId: deck.id),
-                      ),
-                    ),
-                  ),
-                  SizedBox(height: 12.h),
-                ],
-                if (collapsed)
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: TextButton(
-                      onPressed: () {
-                        setState(() => _showAll = true);
-                        _warmShown();
-                      },
-                      style: TextButton.styleFrom(
-                        foregroundColor: Colors.black87,
-                        padding: EdgeInsets.symmetric(horizontal: 4.w),
-                      ),
-                      child: Text(
-                        'View all',
-                        style: TextStyle(
-                          fontSize: 14.sp,
-                          fontWeight: FontWeight.w500,
-                          decoration: TextDecoration.underline,
+          ? AppRefresh.fill(
+              onRefresh: _refresh,
+              child: const RecallMessage(text: 'No recall cards here yet.'))
+          : AppRefresh(
+            onRefresh: _refresh,
+            child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding:
+                    EdgeInsets.fromLTRB(20.w, 8.h, 20.w, kRecallNavClearance),
+                children: [
+                  for (final deck in visible) ...[
+                    RecallDeckTile.wired(
+                      recall,
+                      deck,
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => RecallCardsScreen(deckId: deck.id),
                         ),
                       ),
                     ),
-                  ),
-              ],
-            ),
+                    SizedBox(height: 12.h),
+                  ],
+                  if (collapsed)
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton(
+                        onPressed: () {
+                          setState(() => _showAll = true);
+                          _warmShown();
+                        },
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.black87,
+                          padding: EdgeInsets.symmetric(horizontal: 4.w),
+                        ),
+                        child: Text(
+                          'View all',
+                          style: TextStyle(
+                            fontSize: 14.sp,
+                            fontWeight: FontWeight.w500,
+                            decoration: TextDecoration.underline,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+          ),
       bottomNavigationBar: AppBottomNav(
         currentIndex: 4,
         onTap: (index) => openTabFromRecall(context, index),

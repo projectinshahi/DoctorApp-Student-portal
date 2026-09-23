@@ -9,6 +9,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+
+import '../../../widget/app_refresh.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 
@@ -202,27 +204,36 @@ class _TestsTabState extends State<TestsTab> with RefreshOnVisible<TestsTab> {
   Widget _list(List<TestSummary> tests, {required String emptyText}) {
     // The list's own shape, not a dot in an empty tab.
     if (_loading) return const _TestsSkeleton();
-    if (_error != null) return _message(_error!, onRetry: onRefresh);
-    if (tests.isEmpty) return _message(emptyText);
+    if (_error != null) {
+      return AppRefresh.fill(
+          onRefresh: onRefresh, child: _message(_error!, onRetry: onRefresh));
+    }
+    if (tests.isEmpty) {
+      return AppRefresh.fill(onRefresh: onRefresh, child: _message(emptyText));
+    }
 
-    return ListView.separated(
-      padding: EdgeInsets.fromLTRB(16.w, 16.h, 16.w, 28.h),
-      itemCount: tests.length,
-      separatorBuilder: (_, __) => SizedBox(height: 12.h),
-      itemBuilder: (context, index) {
-        final test = tests[index];
-        return test.isSubmitted
-            ? _CompletedCard(test: test, onTap: () => _open(test))
-            : _PendingCard(
-                test: test,
-                onTap: () => _open(test),
-                // Re-splits the two tabs. The paper is finished; it just did
-                // not get there by being submitted.
-                onExpired: () {
-                  if (mounted) setState(() {});
-                },
-              );
-      },
+    return AppRefresh(
+      onRefresh: onRefresh,
+      child: ListView.separated(
+          physics: const AlwaysScrollableScrollPhysics(),
+        padding: EdgeInsets.fromLTRB(16.w, 16.h, 16.w, 28.h),
+        itemCount: tests.length,
+        separatorBuilder: (_, __) => SizedBox(height: 12.h),
+        itemBuilder: (context, index) {
+          final test = tests[index];
+          return test.isSubmitted
+              ? _CompletedCard(test: test, onTap: () => _open(test))
+              : _PendingCard(
+                  test: test,
+                  onTap: () => _open(test),
+                  // Re-splits the two tabs. The paper is finished; it just did
+                  // not get there by being submitted.
+                  onExpired: () {
+                    if (mounted) setState(() {});
+                  },
+                );
+        },
+      ),
     );
   }
 

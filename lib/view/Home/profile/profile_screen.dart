@@ -3,6 +3,8 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 
+import '../../../widget/app_refresh.dart';
+
 import '../../../core/constant/local_storage.dart';
 import '../../subjectSelection/select_exam_screen.dart';
 import '../../../repository/selection_content_provider.dart';
@@ -366,343 +368,347 @@ class _ProfileScreenState extends State<ProfileScreen> with RefreshOnVisible<Pro
             _syncControllersFromProfile();
             final profile = provider.profile!;
 
-            return SingleChildScrollView(
-              padding: EdgeInsets.fromLTRB(20.w, 16.h, 20.w, 24.h),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // ── Header ──
-                  Row(
-                    children: [
-                      IconButton(
-                        onPressed: () => Navigator.pop(context),
-                        icon: Image.asset(
-                          'asset/icons/Backarrow.png',
-                          width: AppSize.iconBackArrowWidth,
-                          height: AppSize.iconBackArrowHeight,
-                        ),
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
-                      ),
-                      SizedBox(width: 8.w),
-                      Text(
-                        "profile",
-                        style: TextStyle(
-                          fontSize: 25.sp,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.black,
-                        ),
-                      ),
-                    ],
-                  ),
-                  SizedBox(height: 20.h),
-
-                  // ── Avatar + name + email card ──
-                  Container(
-                    width: double.infinity,
-                    padding: EdgeInsets.symmetric(vertical: 28.h, horizontal: 16.w),
-                    decoration: BoxDecoration(
-                      color: AppColor.buttoncolor,
-                      borderRadius: BorderRadius.circular(20.r),
-                    ),
-                    child: Column(
+            return AppRefresh(
+              onRefresh: onRefresh,
+              child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                padding: EdgeInsets.fromLTRB(20.w, 16.h, 20.w, 24.h),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // ── Header ──
+                    Row(
                       children: [
-                        Stack(
-                          children: [
-                            GestureDetector(
-                              onTap: provider.isUploadingPhoto
-                                  ? null
-                                  : () => _pickAndUploadPhoto(provider),
-                              child: CircleAvatar(
-                                radius: 48.r,
-                                backgroundColor: Colors.white,
-                                backgroundImage: profile.avatarUrl != null
-                                    ? NetworkImage(profile.avatarUrl!)
-                                    : null,
-                                child: profile.avatarUrl == null
-                                    ? Text(
-                                  (profile.name?.isNotEmpty == true
-                                      ? profile.name![0]
-                                      : "S")
-                                      .toUpperCase(),
-                                  style: TextStyle(
-                                    fontSize: 30.sp,
-                                    fontWeight: FontWeight.w700,
-                                    color: AppColor.Buttontextcolor,
-                                  ),
-                                )
-                                    : null,
-                              ),
-                            ),
-                            Positioned(
-                              bottom: 0,
-                              right: 0,
-                              child: GestureDetector(
+                        IconButton(
+                          onPressed: () => Navigator.pop(context),
+                          icon: Image.asset(
+                            'asset/icons/Backarrow.png',
+                            width: AppSize.iconBackArrowWidth,
+                            height: AppSize.iconBackArrowHeight,
+                          ),
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                        ),
+                        SizedBox(width: 8.w),
+                        Text(
+                          "profile",
+                          style: TextStyle(
+                            fontSize: 25.sp,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.black,
+                          ),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 20.h),
+
+                    // ── Avatar + name + email card ──
+                    Container(
+                      width: double.infinity,
+                      padding: EdgeInsets.symmetric(vertical: 28.h, horizontal: 16.w),
+                      decoration: BoxDecoration(
+                        color: AppColor.buttoncolor,
+                        borderRadius: BorderRadius.circular(20.r),
+                      ),
+                      child: Column(
+                        children: [
+                          Stack(
+                            children: [
+                              GestureDetector(
                                 onTap: provider.isUploadingPhoto
                                     ? null
                                     : () => _pickAndUploadPhoto(provider),
-                                child: Container(
-                                  width: 26.w,
-                                  height: 26.w,
-                                  decoration: const BoxDecoration(
-                                    color: Color(0xFFBFBFBA),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: provider.isUploadingPhoto
-                                      ? Padding(
-                                    padding: EdgeInsets.all(5.w),
-                                    child: const CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: Colors.white,
+                                child: CircleAvatar(
+                                  radius: 48.r,
+                                  backgroundColor: Colors.white,
+                                  backgroundImage: profile.avatarUrl != null
+                                      ? NetworkImage(profile.avatarUrl!)
+                                      : null,
+                                  child: profile.avatarUrl == null
+                                      ? Text(
+                                    (profile.name?.isNotEmpty == true
+                                        ? profile.name![0]
+                                        : "S")
+                                        .toUpperCase(),
+                                    style: TextStyle(
+                                      fontSize: 30.sp,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppColor.Buttontextcolor,
                                     ),
                                   )
-                                      : Icon(Icons.edit, size: 13.sp, color: Colors.white),
+                                      : null,
                                 ),
                               ),
+                              Positioned(
+                                bottom: 0,
+                                right: 0,
+                                child: GestureDetector(
+                                  onTap: provider.isUploadingPhoto
+                                      ? null
+                                      : () => _pickAndUploadPhoto(provider),
+                                  child: Container(
+                                    width: 26.w,
+                                    height: 26.w,
+                                    decoration: const BoxDecoration(
+                                      color: Color(0xFFBFBFBA),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: provider.isUploadingPhoto
+                                        ? Padding(
+                                      padding: EdgeInsets.all(5.w),
+                                      child: const CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Colors.white,
+                                      ),
+                                    )
+                                        : Icon(Icons.edit, size: 13.sp, color: Colors.white),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+
+                          if (provider.photoUploadError != null) ...[
+                            SizedBox(height: 8.h),
+                            Text(
+                              provider.photoUploadError!,
+                              style: TextStyle(color: Colors.red, fontSize: 11.sp),
+                              textAlign: TextAlign.center,
+                            ),
+                            TextButton(
+                              onPressed: () => _pickAndUploadPhoto(provider),
+                              child: const Text("Retry upload"),
                             ),
                           ],
-                        ),
 
-                        if (provider.photoUploadError != null) ...[
-                          SizedBox(height: 8.h),
-                          Text(
-                            provider.photoUploadError!,
-                            style: TextStyle(color: Colors.red, fontSize: 11.sp),
-                            textAlign: TextAlign.center,
-                          ),
-                          TextButton(
-                            onPressed: () => _pickAndUploadPhoto(provider),
-                            child: const Text("Retry upload"),
-                          ),
-                        ],
+                          SizedBox(height: 14.h),
 
-                        SizedBox(height: 14.h),
-
-                        // ── Name + edit pencil ──
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Flexible(
-                              child: Text(
-                                profile.name?.isNotEmpty == true
-                                    ? profile.name!
-                                    : "Add your name",
-                                style: TextStyle(
-                                  fontSize: 25.sp,
-                                  fontWeight: FontWeight.w600,
+                          // ── Name + edit pencil ──
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  profile.name?.isNotEmpty == true
+                                      ? profile.name!
+                                      : "Add your name",
+                                  style: TextStyle(
+                                    fontSize: 25.sp,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColor.Buttontextcolor,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              SizedBox(width: 6.w),
+                              GestureDetector(
+                                onTap: () => _openEditProfileDialog(provider),
+                                child: Icon(
+                                  Icons.edit_outlined,
+                                  size: 18.sp,
                                   color: AppColor.Buttontextcolor,
                                 ),
-                                overflow: TextOverflow.ellipsis,
                               ),
-                            ),
-                            SizedBox(width: 6.w),
-                            GestureDetector(
-                              onTap: () => _openEditProfileDialog(provider),
-                              child: Icon(
-                                Icons.edit_outlined,
-                                size: 18.sp,
-                                color: AppColor.Buttontextcolor,
-                              ),
-                            ),
-                          ],
-                        ),
-
-                        SizedBox(height: 4.h),
-
-                        Text(
-                          profile.email,
-                          style: TextStyle(
-                            fontSize: 14.sp,
-                            fontWeight: FontWeight.w400,
-                            color: AppColor.Buttontextcolor,
+                            ],
                           ),
-                        ),
 
-                        if (profile.phone != null && profile.phone!.isNotEmpty) ...[
-                          SizedBox(height: 2.h),
+                          SizedBox(height: 4.h),
+
                           Text(
-                            profile.phone!,
+                            profile.email,
                             style: TextStyle(
                               fontSize: 14.sp,
                               fontWeight: FontWeight.w400,
                               color: AppColor.Buttontextcolor,
                             ),
                           ),
+
+                          if (profile.phone != null && profile.phone!.isNotEmpty) ...[
+                            SizedBox(height: 2.h),
+                            Text(
+                              profile.phone!,
+                              style: TextStyle(
+                                fontSize: 14.sp,
+                                fontWeight: FontWeight.w400,
+                                color: AppColor.Buttontextcolor,
+                              ),
+                            ),
+                          ],
                         ],
-                      ],
+                      ),
                     ),
-                  ),
 
-                  SizedBox(height: 16.h),
+                    SizedBox(height: 16.h),
 
-                  // ── Selected course/exam card ──
-                  Container(
-                    width: double.infinity,
-                    padding: EdgeInsets.all(16.w),
-                    decoration: BoxDecoration(
-                      color: AppColor.buttoncolor,
-                      borderRadius: BorderRadius.circular(18.r),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          "Your course",
-                          style: TextStyle(
-                            fontSize: 20.sp,
-                            fontWeight: FontWeight.w400,
-                            color: AppColor.Buttontextcolor,
-                          ),
-                        ),
-                        SizedBox(height: 4.h),
-                        Text(
-                          profile.selectedCourse != null
-                              ? (profile.selectedCourseType != null
-                              ? "Currently: ${profile.selectedCourse!.title}"
-                              " — ${profile.selectedCourseType!.title}"
-                              : "Currently: ${profile.selectedCourse!.title}")
-                              : "No exam selected yet",
-                          style: TextStyle(
-                            fontSize: 13.sp,
-                            fontWeight: FontWeight.w400,
-                            color: AppColor.Buttontextcolor,
-                          ),
-                        ),
-                        SizedBox(height: 14.h),
-                        Divider(
-                            height: 1,
-                            color: AppColor.Buttontextcolor.withValues(alpha: 0.25)),
-                        SizedBox(height: 6.h),
-                        InkWell(
-                          onTap: () => _changeCourse(context),
-                          borderRadius: BorderRadius.circular(10.r),
-                          child: Padding(
-                            padding: EdgeInsets.symmetric(vertical: 8.h),
-                            child: Row(
-                              children: [
-                                Icon(Icons.swap_horiz_rounded,
-                                    size: 18.sp,
-                                    color: AppColor.Buttontextcolor),
-                                SizedBox(width: 8.w),
-                                Text(
-                                  profile.selectedCourse == null
-                                      ? "Choose a course"
-                                      : "Change course",
-                                  style: TextStyle(
-                                    fontSize: 13.5.sp,
-                                    fontWeight: FontWeight.w700,
-                                    color: AppColor.Buttontextcolor,
-                                  ),
-                                ),
-                                const Spacer(),
-                                Icon(Icons.chevron_right_rounded,
-                                    size: 20.sp,
-                                    color: AppColor.Buttontextcolor),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  SizedBox(height: 16.h),
-
-                  // ── Menu items ──
-                  Container(
-                    decoration: BoxDecoration(
-                      color: AppColor.buttoncolor,
-                      borderRadius: BorderRadius.circular(18.r),
-                    ),
-                    child: Column(
-                      children: [
-                        _ProfileMenuItem(
-                          label: "Bookmarks",
-                          onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => const BookmarksScreen()),
-                          ),
-                        ),
-                        _menuDivider(),
-                        _ProfileMenuItem(
-                          label: "Learn more",
-                          onTap: () => Navigator.push(context,
-                              MaterialPageRoute(builder: (_) => const LearnMoreScreen())),
-                        ),
-                        _menuDivider(),
-                        _ProfileMenuItem(
-                          label: "FAQ",
-                          onTap: () => Navigator.push(context,
-                              MaterialPageRoute(builder: (_) => const FaqScreen())),
-                        ),
-                        _menuDivider(),
-                        _ProfileMenuItem(
-                          label: "Contact us",
-                          onTap: () => Navigator.push(context,
-                              MaterialPageRoute(builder: (_) => const ContactUsScreen())),
-                        ),
-                        _menuDivider(),
-                        _ProfileMenuItem(
-                          label: "Settings",
-                          onTap: () => Navigator.push(context,
-                              MaterialPageRoute(builder: (_) => const SettingsScreen())),
-                        ),
-                        _menuDivider(),
-                        _ProfileMenuItem(
-                          label: "Terms & Conditions",
-                          onTap: () => Navigator.push(context,
-                              MaterialPageRoute(builder: (_) => const TermsScreen())),
-                        ),
-                        _menuDivider(),
-                        _ProfileMenuItem(
-                          label: "Privacy Policy",
-                          onTap: () => Navigator.push(context,
-                              MaterialPageRoute(builder: (_) => const PrivacyPolicyScreen())),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  SizedBox(height: 16.h),
-
-                  // ── Logout button ──
-                  Consumer<AuthProvider>(
-                    builder: (context, auth, _) {
-                      return SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: auth.isLoggingOut ? null : () => _handleLogout(context),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColor.buttoncolor,
-                            foregroundColor: Colors.grey.shade600,
-                            elevation: 0,
-                            padding: EdgeInsets.symmetric(vertical: 16.h),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(28.r),
-                            ),
-                          ),
-                          child: auth.isLoggingOut
-                              ? SizedBox(
-                            width: 20.w,
-                            height: 20.w,
-                            child: const CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.grey),
-                            ),
-                          )
-                              : Text(
-                            "Log out",
+                    // ── Selected course/exam card ──
+                    Container(
+                      width: double.infinity,
+                      padding: EdgeInsets.all(16.w),
+                      decoration: BoxDecoration(
+                        color: AppColor.buttoncolor,
+                        borderRadius: BorderRadius.circular(18.r),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            "Your course",
                             style: TextStyle(
-                              fontSize: 16.sp,
+                              fontSize: 20.sp,
                               fontWeight: FontWeight.w400,
                               color: AppColor.Buttontextcolor,
                             ),
                           ),
-                        ),
-                      );
-                    },
-                  ),
-                ],
+                          SizedBox(height: 4.h),
+                          Text(
+                            profile.selectedCourse != null
+                                ? (profile.selectedCourseType != null
+                                ? "Currently: ${profile.selectedCourse!.title}"
+                                " — ${profile.selectedCourseType!.title}"
+                                : "Currently: ${profile.selectedCourse!.title}")
+                                : "No exam selected yet",
+                            style: TextStyle(
+                              fontSize: 13.sp,
+                              fontWeight: FontWeight.w400,
+                              color: AppColor.Buttontextcolor,
+                            ),
+                          ),
+                          SizedBox(height: 14.h),
+                          Divider(
+                              height: 1,
+                              color: AppColor.Buttontextcolor.withValues(alpha: 0.25)),
+                          SizedBox(height: 6.h),
+                          InkWell(
+                            onTap: () => _changeCourse(context),
+                            borderRadius: BorderRadius.circular(10.r),
+                            child: Padding(
+                              padding: EdgeInsets.symmetric(vertical: 8.h),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.swap_horiz_rounded,
+                                      size: 18.sp,
+                                      color: AppColor.Buttontextcolor),
+                                  SizedBox(width: 8.w),
+                                  Text(
+                                    profile.selectedCourse == null
+                                        ? "Choose a course"
+                                        : "Change course",
+                                    style: TextStyle(
+                                      fontSize: 13.5.sp,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppColor.Buttontextcolor,
+                                    ),
+                                  ),
+                                  const Spacer(),
+                                  Icon(Icons.chevron_right_rounded,
+                                      size: 20.sp,
+                                      color: AppColor.Buttontextcolor),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    SizedBox(height: 16.h),
+
+                    // ── Menu items ──
+                    Container(
+                      decoration: BoxDecoration(
+                        color: AppColor.buttoncolor,
+                        borderRadius: BorderRadius.circular(18.r),
+                      ),
+                      child: Column(
+                        children: [
+                          _ProfileMenuItem(
+                            label: "Bookmarks",
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => const BookmarksScreen()),
+                            ),
+                          ),
+                          _menuDivider(),
+                          _ProfileMenuItem(
+                            label: "Learn more",
+                            onTap: () => Navigator.push(context,
+                                MaterialPageRoute(builder: (_) => const LearnMoreScreen())),
+                          ),
+                          _menuDivider(),
+                          _ProfileMenuItem(
+                            label: "FAQ",
+                            onTap: () => Navigator.push(context,
+                                MaterialPageRoute(builder: (_) => const FaqScreen())),
+                          ),
+                          _menuDivider(),
+                          _ProfileMenuItem(
+                            label: "Contact us",
+                            onTap: () => Navigator.push(context,
+                                MaterialPageRoute(builder: (_) => const ContactUsScreen())),
+                          ),
+                          _menuDivider(),
+                          _ProfileMenuItem(
+                            label: "Settings",
+                            onTap: () => Navigator.push(context,
+                                MaterialPageRoute(builder: (_) => const SettingsScreen())),
+                          ),
+                          _menuDivider(),
+                          _ProfileMenuItem(
+                            label: "Terms & Conditions",
+                            onTap: () => Navigator.push(context,
+                                MaterialPageRoute(builder: (_) => const TermsScreen())),
+                          ),
+                          _menuDivider(),
+                          _ProfileMenuItem(
+                            label: "Privacy Policy",
+                            onTap: () => Navigator.push(context,
+                                MaterialPageRoute(builder: (_) => const PrivacyPolicyScreen())),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    SizedBox(height: 16.h),
+
+                    // ── Logout button ──
+                    Consumer<AuthProvider>(
+                      builder: (context, auth, _) {
+                        return SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: auth.isLoggingOut ? null : () => _handleLogout(context),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColor.buttoncolor,
+                              foregroundColor: Colors.grey.shade600,
+                              elevation: 0,
+                              padding: EdgeInsets.symmetric(vertical: 16.h),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(28.r),
+                              ),
+                            ),
+                            child: auth.isLoggingOut
+                                ? SizedBox(
+                              width: 20.w,
+                              height: 20.w,
+                              child: const CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(Colors.grey),
+                              ),
+                            )
+                                : Text(
+                              "Log out",
+                              style: TextStyle(
+                                fontSize: 16.sp,
+                                fontWeight: FontWeight.w400,
+                                color: AppColor.Buttontextcolor,
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
               ),
             );
           },

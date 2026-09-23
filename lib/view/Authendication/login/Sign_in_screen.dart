@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../../../widget/website_email_note.dart';
+
+import '../../../widget/app_loading_screen.dart';
+
 import '../../../repository/refresh_api_provider.dart';
 
 import '../../../widget/login_refused_dialog.dart';
@@ -30,282 +34,299 @@ class _SignInScreenState extends State<SignInScreen> {
 
   Widget build(BuildContext context) {
 
-    return Scaffold(
-      backgroundColor: AppColor.Screenbackground,
-      appBar: AppBar(
-        backgroundColor: AppColor.Screenbackground,
-        leading: IconButton(
-          onPressed: () {
-            Navigator.pop(context);
-          },
-          icon: Image.asset(
-            'asset/icons/Backarrow.png',
-            width: AppSize.iconBackArrowWidth,
-            height: AppSize.iconBackArrowHeight,
-          ),
-        ),
-      ),
-      body: SafeArea(
-        // Scrolls only when it has to. The Spacer below fills a tall screen
-        // as before, but on a short one — an iPhone SE was 1.7px over — a
-        // Spacer cannot go negative and the column clips instead. minHeight
-        // keeps the fill behaviour; the scroll view absorbs the shortfall.
-        child: LayoutBuilder(
-          builder: (context, constraints) => SingleChildScrollView(
-            padding: EdgeInsets.symmetric(
-              horizontal: AppSize.screenHorizontal.w,
-              vertical: AppSize.screenVertical.h,
+    final signingIn = _finishing ||
+        context.watch<GoogleSignInIntergration>().isLoading;
+
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Scaffold(
+          backgroundColor: AppColor.Screenbackground,
+          appBar: AppBar(
+            backgroundColor: AppColor.Screenbackground,
+            leading: IconButton(
+              onPressed: () {
+                Navigator.pop(context);
+              },
+              icon: Image.asset(
+                'asset/icons/Backarrow.png',
+                width: AppSize.iconBackArrowWidth,
+                height: AppSize.iconBackArrowHeight,
+              ),
             ),
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                minHeight:
-                    constraints.maxHeight - (AppSize.screenVertical.h * 2),
-              ),
-              child: IntrinsicHeight(
-                child: Column(
-            children: [
-              SizedBox(height: 380.h),
-
-              SizedBox(
-                width: double.infinity,
-                child: Column(
-                  children: [
-                    Container(
-                      width: double.infinity,
-                      height: 60.h,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(12.r),
-                        color: AppColor.Screenbackground,
-                        border: Border.all(
-                          color: Colors.grey,
-                          width: 1,
-                        ),
-                      ),
-                      child: Padding(
-                        padding: EdgeInsets.symmetric(vertical: 15.h, horizontal: 20.w),
-                        child:  TextField(
-                          obscureText: _obscurePassword,
-                          textAlign: TextAlign.left,
-                          style: TextStyle(
-                            fontWeight: FontWeight.w300,
-                            fontSize: 16.sp,
-                            letterSpacing: 0,
-                          ),
-                          decoration: InputDecoration(
-                            hintText: "Enter your Password",
-                            hintStyle: TextStyle(
-                              fontWeight: FontWeight.w300,
-                              fontSize: 16.sp,
-                              letterSpacing: 0,
-                            ),
-                            border: InputBorder.none,
-                            isCollapsed: true,
-                            suffixIcon: IconButton(
-                              icon: Icon(
-                                _obscurePassword
-                                    ? Icons.visibility_off
-                                    : Icons.visibility,
-                              ),
-                              onPressed: () {
-                                setState(() {
-                                  _obscurePassword = !_obscurePassword;
-                                });
-                              },
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    SizedBox(height: AppSize.gap.h),
-                    Container(
-                      width: double.infinity,
-                      height: 60.h,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(12.r),
-                        color: AppColor.buttoncolor,
-                      ),
-                      child: Center(
-                        child: SizedBox(
-                          //height: 20.h,
-                          child: Text(
-                            "Login",
-                            style: TextStyle(
-                              color: AppColor.Buttontextcolor,
-                              fontWeight: FontWeight.w500,
-                              fontSize: 20.sp,
-                              letterSpacing: 0,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
+          ),
+          body: SafeArea(
+            // Scrolls only when it has to. The Spacer below fills a tall screen
+            // as before, but on a short one — an iPhone SE was 1.7px over — a
+            // Spacer cannot go negative and the column clips instead. minHeight
+            // keeps the fill behaviour; the scroll view absorbs the shortfall.
+            child: LayoutBuilder(
+              builder: (context, constraints) => SingleChildScrollView(
+                padding: EdgeInsets.symmetric(
+                  horizontal: AppSize.screenHorizontal.w,
+                  vertical: AppSize.screenVertical.h,
                 ),
-              ),
-              SizedBox(height: AppSize.gap.h),
-              
-              Center(child: Text("Forgot Password", style: TextStyle(
-                fontWeight: FontWeight.w300,
-                fontSize: 16.sp,
-                letterSpacing: 0,
-              ),),),
-
-
-              SizedBox(height: 80.h),
-
-              // The rules take whatever the label leaves, rather than two
-              // fixed 130.w bars that only happened to fit the design width.
-              // At 130 + 130 + the label this overflowed on any narrower
-              // screen — iPhone first, because iOS lays the text out wider.
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    minHeight:
+                        constraints.maxHeight - (AppSize.screenVertical.h * 2),
+                  ),
+                  child: IntrinsicHeight(
+                    child: Column(
                 children: [
-                  const Expanded(
-                    child: Divider(color: Colors.grey, thickness: 0.5),
-                  ),
-                  Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 8.w),
-                    child: Text(
-                      "Or sign-Up with",
-                      style: TextStyle(
-                        fontSize: 16.sp,
-                        fontWeight: FontWeight.w500,
-                        color: AppColor.Textcolor,
-                      ),
-                    ),
-                  ),
-                  const Expanded(
-                    child: Divider(color: Colors.grey, thickness: 0.5),
-                  ),
-                ],
-              ),
+                  SizedBox(height: 380.h),
 
-              SizedBox(height: 40.h),
-
-              SizedBox(
-                width: double.infinity,
-                height: 60.h,
-                child: Row(
-                  children: [
-                    // ---- GOOGLE SIGN-IN BUTTON ----
-                    Consumer<GoogleSignInIntergration>(
-                      builder: (context, viewModel, child) {
-                        return GestureDetector(
-                          onTap: (viewModel.isLoading || _finishing)
-                              ? null
-                              : () async {
-                            setState(() => _finishing = true);
-                            final success = await viewModel.signInWithGoogle();
-
-                            if (!context.mounted) return;
-
-                            // A refusal stays on this screen and explains
-                            // itself, rather than falling through to the
-                            // generic failure snack bar below.
-                            final refused = viewModel.refusal;
-                            if (refused != null) {
-                              setState(() => _finishing = false);
-                              await showLoginRefusedDialog(context, refused);
-                              return;
-                            }
-
-                            if (success) {
-                              // Hand the session to AuthProvider, which is
-                              // what AuthGate watches. Without this the
-                              // tokens were stored but the gate still showed
-                              // the login screen until some later rebuild —
-                              // the flicker between signing in and landing on
-                              // home.
-                              final result = viewModel.authResult;
-                              if (result != null) {
-                                await context
-                                    .read<AuthProvider>()
-                                    .adoptSession(result);
-                              }
-                              if (!context.mounted) return;
-                              setState(() => _finishing = false);
-
-                              // No "Welcome back" toast, and no navigation.
-                              // The home screen already greets them by name,
-                              // and AuthGate swaps its own root — to the
-                              // course picker for a new account, to home
-                              // otherwise. pushReplacement here removed
-                              // AuthGate, and with it the session watcher.
-                              Navigator.of(context).popUntil((r) => r.isFirst);
-                            } else {
-                              // Without this the button stays disabled after
-                              // a failed attempt and the student cannot try
-                              // again.
-                              setState(() => _finishing = false);
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(viewModel.errorMessage ?? 'Sign-in failed'),
-                                ),
-                              );
-                            }
-                          },
-                          child: Container(
-                            width: 192.w,
-                            height: 60.h,
-                            decoration: BoxDecoration(
-                              color: AppColor.buttoncolor,
-                              borderRadius: BorderRadius.circular(12.r),
+                  SizedBox(
+                    width: double.infinity,
+                    child: Column(
+                      children: [
+                        Container(
+                          width: double.infinity,
+                          height: 60.h,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(12.r),
+                            color: AppColor.Screenbackground,
+                            border: Border.all(
+                              color: Colors.grey,
+                              width: 1,
                             ),
-                            child: Center(
-                              child: (viewModel.isLoading || _finishing)
-                                  ? const CircularProgressIndicator()
-                                  : Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Image.asset(
-                                    "asset/icons/googleicon.png",
-                                    height: 24.h,
-                                    width: 24.w,
+                          ),
+                          child: Padding(
+                            padding: EdgeInsets.symmetric(vertical: 15.h, horizontal: 20.w),
+                            child:  TextField(
+                              obscureText: _obscurePassword,
+                              textAlign: TextAlign.left,
+                              style: TextStyle(
+                                fontWeight: FontWeight.w300,
+                                fontSize: 16.sp,
+                                letterSpacing: 0,
+                              ),
+                              decoration: InputDecoration(
+                                hintText: "Enter your Password",
+                                hintStyle: TextStyle(
+                                  fontWeight: FontWeight.w300,
+                                  fontSize: 16.sp,
+                                  letterSpacing: 0,
+                                ),
+                                border: InputBorder.none,
+                                isCollapsed: true,
+                                suffixIcon: IconButton(
+                                  icon: Icon(
+                                    _obscurePassword
+                                        ? Icons.visibility_off
+                                        : Icons.visibility,
                                   ),
-                                  SizedBox(width: 10.w),
-                                  Text(
-                                    "Google",
-                                    style: TextStyle(
-                                      color: AppColor.Buttontextcolor,
-                                      fontSize: 16.sp,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ],
+                                  onPressed: () {
+                                    setState(() {
+                                      _obscurePassword = !_obscurePassword;
+                                    });
+                                  },
+                                ),
                               ),
                             ),
                           ),
-                        );
-                      },
+                        ),
+                        SizedBox(height: AppSize.gap.h),
+                        Container(
+                          width: double.infinity,
+                          height: 60.h,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(12.r),
+                            color: AppColor.buttoncolor,
+                          ),
+                          child: Center(
+                            child: SizedBox(
+                              //height: 20.h,
+                              child: Text(
+                                "Login",
+                                style: TextStyle(
+                                  color: AppColor.Buttontextcolor,
+                                  fontWeight: FontWeight.w500,
+                                  fontSize: 20.sp,
+                                  letterSpacing: 0,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
+                  ),
+                  SizedBox(height: AppSize.gap.h),
+              
+                  Center(child: Text("Forgot Password", style: TextStyle(
+                    fontWeight: FontWeight.w300,
+                    fontSize: 16.sp,
+                    letterSpacing: 0,
+                  ),),),
 
-                    const Spacer(),
 
-                    Container(
-                      width: 192.w,
-                      height: 60.h,
-                      decoration: BoxDecoration(
-                        color: AppColor.buttoncolor,
-                        borderRadius: BorderRadius.circular(12.r),
+                  SizedBox(height: 80.h),
+
+                  const WebsiteEmailNote(),
+
+                  SizedBox(height: 18.h),
+
+                  // The rules take whatever the label leaves, rather than two
+                  // fixed 130.w bars that only happened to fit the design width.
+                  // At 130 + 130 + the label this overflowed on any narrower
+                  // screen — iPhone first, because iOS lays the text out wider.
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      const Expanded(
+                        child: Divider(color: Colors.grey, thickness: 0.5),
                       ),
-                      child: Center(
-                        child: Image.asset(
-                          "asset/icons/Appleicon.png",
-                          height: 34.h,
-                          width: 88.w,
+                      Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 8.w),
+                        child: Text(
+                          "Or sign-Up with",
+                          style: TextStyle(
+                            fontSize: 16.sp,
+                            fontWeight: FontWeight.w500,
+                            color: AppColor.Textcolor,
+                          ),
                         ),
                       ),
+                      const Expanded(
+                        child: Divider(color: Colors.grey, thickness: 0.5),
+                      ),
+                    ],
+                  ),
+
+                  SizedBox(height: 40.h),
+
+                  SizedBox(
+                    width: double.infinity,
+                    height: 60.h,
+                    child: Row(
+                      children: [
+                        // ---- GOOGLE SIGN-IN BUTTON ----
+                        Consumer<GoogleSignInIntergration>(
+                          builder: (context, viewModel, child) {
+                            return GestureDetector(
+                              onTap: (viewModel.isLoading || _finishing)
+                                  ? null
+                                  : () async {
+                                setState(() => _finishing = true);
+                                final success = await viewModel.signInWithGoogle();
+
+                                if (!context.mounted) return;
+
+                                // A refusal stays on this screen and explains
+                                // itself, rather than falling through to the
+                                // generic failure snack bar below.
+                                final refused = viewModel.refusal;
+                                if (refused != null) {
+                                  setState(() => _finishing = false);
+                                  await showLoginRefusedDialog(context, refused);
+                                  return;
+                                }
+
+                                if (success) {
+                                  // Hand the session to AuthProvider, which is
+                                  // what AuthGate watches. Without this the
+                                  // tokens were stored but the gate still showed
+                                  // the login screen until some later rebuild —
+                                  // the flicker between signing in and landing on
+                                  // home.
+                                  final result = viewModel.authResult;
+                                  if (result != null) {
+                                    await context
+                                        .read<AuthProvider>()
+                                        .adoptSession(result);
+                                  }
+                                  if (!context.mounted) return;
+                                  setState(() => _finishing = false);
+
+                                  // No "Welcome back" toast, and no navigation.
+                                  // The home screen already greets them by name,
+                                  // and AuthGate swaps its own root — to the
+                                  // course picker for a new account, to home
+                                  // otherwise. pushReplacement here removed
+                                  // AuthGate, and with it the session watcher.
+                                  Navigator.of(context).popUntil((r) => r.isFirst);
+                                } else {
+                                  // Without this the button stays disabled after
+                                  // a failed attempt and the student cannot try
+                                  // again.
+                                  setState(() => _finishing = false);
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(viewModel.errorMessage ?? 'Sign-in failed'),
+                                    ),
+                                  );
+                                }
+                              },
+                              child: Container(
+                                width: 192.w,
+                                height: 60.h,
+                                decoration: BoxDecoration(
+                                  color: AppColor.buttoncolor,
+                                  borderRadius: BorderRadius.circular(12.r),
+                                ),
+                                child: Center(
+                                  child: (viewModel.isLoading || _finishing)
+                                      ? const CircularProgressIndicator()
+                                      : Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Image.asset(
+                                        "asset/icons/googleicon.png",
+                                        height: 24.h,
+                                        width: 24.w,
+                                      ),
+                                      SizedBox(width: 10.w),
+                                      Text(
+                                        "Google",
+                                        style: TextStyle(
+                                          color: AppColor.Buttontextcolor,
+                                          fontSize: 16.sp,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+
+                        const Spacer(),
+
+                        Container(
+                          width: 192.w,
+                          height: 60.h,
+                          decoration: BoxDecoration(
+                            color: AppColor.buttoncolor,
+                            borderRadius: BorderRadius.circular(12.r),
+                          ),
+                          child: Center(
+                            child: Image.asset(
+                              "asset/icons/Appleicon.png",
+                              height: 34.h,
+                              width: 88.w,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-              ),
-                  ],
+                  ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
             ),
           ),
         ),
-      ),
+        // The whole screen while the session is being set up — the account
+        // chooser closes on the form, and a button-sized spinner there reads
+        // as nothing happening. It stays until AuthGate takes over, which is
+        // the logo animation and then home.
+        if (signingIn) const AppLoadingScreen(message: 'Signing you in…'),
+      ],
     );
   }
 }

@@ -10,9 +10,6 @@ class PlanProvider extends ChangeNotifier {
   String? plansErrorMessage;
   List<PlanModel> plans = [];
 
-  bool isSubscribing = false;
-  String? subscribeErrorMessage;
-
   /// The course the loaded plans belong to. A different course means the
   /// cached list is the wrong list, so that one does show the spinner.
   int? _loadedCourseId;
@@ -30,24 +27,6 @@ class PlanProvider extends ChangeNotifier {
     } finally {
       isLoadingPlans = false;
       notifyListeners();
-    }
-  }
-
-  Future<bool> subscribe(int planId) async {
-    isSubscribing = true;
-    subscribeErrorMessage = null;
-    notifyListeners();
-
-    try {
-      await _service.subscribeToPlan(planId);
-      isSubscribing = false;
-      notifyListeners();
-      return true;
-    } catch (e) {
-      subscribeErrorMessage = e.toString().replaceFirst('Exception: ', '');
-      isSubscribing = false;
-      notifyListeners();
-      return false;
     }
   }
 }

@@ -1,54 +1,113 @@
 // lib/view/Home/notifications/notifications_screen.dart
 //
-// What is waiting for the student.
+// What the backend has sent this student.
 //
-// There is no notifications endpoint, so rather than show a list the server
-// invented, these are read off state the app already holds: today's MCQ,
-// unfinished videos, and quizzes in the course tree that have not been
-// opened. That makes every row true — it is about this student, right now,
-// and tapping it goes to the thing it names.
+// The list is the server's, not the app's. It decides what a student can see,
+// and that changes with the course they have selected — so nothing is cached
+// here, and switching course switches the list.
 //
-// When a real feed arrives, replace [_buildFeed] and keep the rows.
+// A row carries the same data map a push does, so tapping one goes exactly
+// where tapping the notification would.
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/constant/local_storage.dart';
 import '../../../core/theam /app_color.dart';
-import '../../../models/daily_quiz_model.dart';
+import '../../../models/notification_model.dart';
 import '../../../models/selection_content_model.dart';
-import '../../../repository/daily_quiz_provider.dart';
+import '../../../repository/notification_feed_provider.dart';
+import '../../../repository/plan_access_provider.dart';
 import '../../../repository/selection_content_provider.dart';
+import '../../../widget/app_loading.dart';
+import '../../../widget/learning_plan_dialog.dart';
+import '../../../widget/loading_wave.dart';
+import '../../../widget/app_refresh.dart';
+import '../../subjectSelection/select_exam_screen.dart';
+import '../Qbank/qbank_tab.dart';
+import '../Qbank/quiz_screen.dart';
 import '../lessons/student_lesson_detail_screen.dart';
+import '../recall/recall_cards_screen.dart';
+import '../tests/tests_tab.dart';
 
-/// One row. [onOpen] is null when there is nowhere useful to go.
-class AppNotification {
-  final IconData icon;
-  final String title;
-  final String body;
+class NotificationsScreen extends StatefulWidget {
+  const NotificationsScreen({super.key});
 
-  /// Unread is "not acted on yet" — a quiz still unanswered, a video still
-  /// unfinished. Nothing is stored: the state itself is the read receipt.
-  final bool unread;
+  static const String routeName = 'notifications';
 
-  final VoidCallback? onOpen;
+  /// Opens the list, replacing one already on top.
+  ///
+  /// Two ways in — the bell, and a tapped notification — and both can fire
+  /// while it is already open. Stacked copies meant Back walked through the
+  /// same screen twice.
+  static Future<void> open(BuildContext context) {
+    final navigator = Navigator.of(context);
+    navigator.popUntil((route) => route.settings.name != routeName);
+    return navigator.push(MaterialPageRoute(
+      settings: const RouteSettings(name: routeName),
+      builder: (_) => const NotificationsScreen(),
+    ));
+  }
 
-  const AppNotification({
-    required this.icon,
-    required this.title,
-    required this.body,
-    this.unread = false,
-    this.onOpen,
-  });
+  @override
+  State<NotificationsScreen> createState() => _NotificationsScreenState();
 }
 
-class NotificationsScreen extends StatelessWidget {
-  const NotificationsScreen({super.key});
+class _NotificationsScreenState extends State<NotificationsScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // After the first frame: both of these notify the provider, and notifying
+    // during a build throws.
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      final feed = context.read<NotificationFeedProvider>();
+      await feed.load();
+      // Opening the screen is what marks them read — there is one timestamp
+      // per student, and no endpoint for a single row.
+      await feed.markRead();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
-    final summary = context.watch<HomeSummaryProvider>().home;
-    final content = context.watch<SelectionContentProvider>().content;
-    final items = _buildFeed(context, summary?.dailyQuiz, content);
+    final feed = context.watch<NotificationFeedProvider>();
+    final items = feed.items;
+
+    final Widget body;
+    if (!feed.hasLoaded && items.isEmpty) {
+      // Shaped like the rows it is about to show, rather than a spinner in
+      // the middle of a blank screen.
+      body = const _NotificationsSkeleton();
+    } else if (items.isEmpty) {
+      body = AppRefresh.fill(
+        onRefresh: feed.load,
+        child: _Message(
+          text: feed.errorMessage ??
+              'Nothing yet. New tests, lessons and quizzes for your course '
+                  'will show up here.',
+        ),
+      );
+    } else {
+      body = AppRefresh(
+        onRefresh: feed.load,
+        child: ListView.separated(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: EdgeInsets.fromLTRB(16.w, 12.h, 16.w, 24.h),
+          // One extra row at the foot while there are older pages to fetch.
+          itemCount: items.length + (feed.hasMore ? 1 : 0),
+          separatorBuilder: (_, _) => SizedBox(height: 12.h),
+          itemBuilder: (context, index) {
+            if (index >= items.length) return _LoadMore(feed: feed);
+            final item = items[index];
+            return _NotificationCard(
+              item: item,
+              onTap: () => openNotification(context, item),
+            );
+          },
+        ),
+      );
+    }
 
     return Scaffold(
       backgroundColor: AppColor.Screenbackground,
@@ -78,162 +137,124 @@ class NotificationsScreen extends StatelessWidget {
           ],
         ),
       ),
-      body: items.isEmpty
-          ? _Empty()
-          : ListView.separated(
-              padding: EdgeInsets.fromLTRB(16.w, 12.h, 16.w, 24.h),
-              itemCount: items.length,
-              separatorBuilder: (_, __) => SizedBox(height: 12.h),
-              itemBuilder: (context, i) => _NotificationCard(item: items[i]),
-            ),
+      body: body,
     );
-  }
-
-  /// Reads the feed off what the app already knows.
-  ///
-  /// Ordered by what is most worth doing next, not by time: none of these
-  /// have a timestamp, and inventing one would be the same lie as inventing
-  /// the notification.
-  List<AppNotification> _buildFeed(
-    BuildContext context,
-    DailyQuizSummary? daily,
-    SelectionContentModel? content,
-  ) {
-    final items = <AppNotification>[];
-
-    if (daily != null) {
-      final done = daily.state == DailyQuizState.completed;
-      items.add(AppNotification(
-        icon: done ? Icons.check_rounded : Icons.today_rounded,
-        title: done ? 'Daily goal reached' : "Today's MCQ is waiting",
-        body: done
-            ? 'You answered today\'s question. A new one arrives tomorrow.'
-            : 'Answer today\'s question to keep your streak going.',
-        unread: !done,
-      ));
-    }
-
-    // Videos left part-way through. The student started these, so they are
-    // the most likely thing they meant to come back to.
-    for (final chapter in content?.chapters ?? const <StudentChapterModel>[]) {
-      for (final lesson in chapter.lessons) {
-        if (items.length >= 6) break;
-        if (!lesson.isVideo || lesson.locked || lesson.completed) continue;
-        if (lesson.lastPositionSeconds <= 0) continue;
-
-        items.add(AppNotification(
-          icon: Icons.play_arrow_rounded,
-          title: 'Continue ${lesson.title}',
-          body: 'You left this part-way through.',
-          unread: true,
-          onOpen: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => StudentLessonDetailScreen(lesson: lesson),
-            ),
-          ),
-        ));
-      }
-    }
-
-    // Then anything not started at all, so the list ends with what is new
-    // rather than what is half-done.
-    for (final chapter in content?.chapters ?? const <StudentChapterModel>[]) {
-      for (final lesson in chapter.lessons) {
-        if (items.length >= 6) break;
-        if (!lesson.isVideo || lesson.locked) continue;
-        if (lesson.completed || lesson.lastPositionSeconds > 0) continue;
-
-        items.add(AppNotification(
-          icon: Icons.play_arrow_rounded,
-          title: 'New AI video added',
-          body: lesson.title,
-          onOpen: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => StudentLessonDetailScreen(lesson: lesson),
-            ),
-          ),
-        ));
-      }
-    }
-
-    return items;
   }
 }
 
-class _NotificationCard extends StatelessWidget {
-  final AppNotification item;
+/// The foot of the list: asks for the next page as soon as it is built, which
+/// is when the student has scrolled to it.
+class _LoadMore extends StatefulWidget {
+  final NotificationFeedProvider feed;
 
-  const _NotificationCard({required this.item});
+  const _LoadMore({required this.feed});
+
+  @override
+  State<_LoadMore> createState() => _LoadMoreState();
+}
+
+class _LoadMoreState extends State<_LoadMore> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) widget.feed.loadMore();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) =>
+      Padding(padding: EdgeInsets.symmetric(vertical: 16.h), child: const AppLoading());
+}
+
+class _NotificationCard extends StatelessWidget {
+  final NotificationItem item;
+  final VoidCallback onTap;
+
+  const _NotificationCard({required this.item, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
+    // A row already read sits back: same card, quieter ink, no dot. It is
+    // what separates "this is new" from "you have seen this" at a glance.
+    final read = item.read;
+
     return InkWell(
-      onTap: item.onOpen,
+      onTap: onTap,
       borderRadius: BorderRadius.circular(18.r),
       child: Container(
-        padding: EdgeInsets.fromLTRB(14.w, 16.h, 14.w, 16.h),
+        padding: EdgeInsets.fromLTRB(14.w, 16.h, 16.w, 16.h),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(18.r),
         ),
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Container(
-              width: 42.w,
-              height: 42.w,
+              width: 46.w,
+              height: 46.w,
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: AppColor.buttoncolor.withValues(alpha: 0.12),
+                color: AppColor.Screenbackground,
                 shape: BoxShape.circle,
               ),
-              child: Icon(item.icon,
-                  size: 21.sp, color: AppColor.buttoncolor),
+              child: Icon(
+                iconFor(item.type),
+                size: 22.sp,
+                color: read
+                    ? Colors.grey.shade500
+                    // Amber for the one row with a deadline on it.
+                    : item.type == 'subscription_expiring'
+                        ? const Color(0xFF8A5B18)
+                        : AppColor.buttoncolor,
+              ),
             ),
             SizedBox(width: 14.w),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(item.title,
+                  Text(
+                    item.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 15.sp,
+                      height: 1.25,
+                      fontWeight: FontWeight.w700,
+                      color: read ? Colors.grey.shade600 : Colors.black87,
+                    ),
+                  ),
+                  if (item.body.isNotEmpty) ...[
+                    SizedBox(height: 5.h),
+                    Text(
+                      item.body,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                          fontSize: 15.sp,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.black87)),
-                  SizedBox(height: 4.h),
-                  Text(item.body,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                          fontSize: 12.5.sp,
-                          height: 1.35,
-                          color: Colors.grey.shade600)),
+                        fontSize: 13.sp,
+                        height: 1.4,
+                        color: read ? Colors.grey.shade500 : Colors.grey.shade700,
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
-            // The unread dot, and the space it takes whether or not it shows
-            // — otherwise the text reflows as rows are read.
-            SizedBox(
-              width: 16.w,
-              child: item.unread
-                  ? Align(
-                      alignment: Alignment.topCenter,
-                      child: Container(
-                        margin: EdgeInsets.only(top: 6.h),
-                        width: 8.w,
-                        height: 8.w,
-                        decoration: BoxDecoration(
-                          color: AppColor.buttoncolor,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                    )
-                  : null,
-            ),
+            // Centred beside the text, as in the design — and absent once
+            // read, rather than greyed, so the column reads as a list of what
+            // is still new.
+            if (!read) ...[
+              SizedBox(width: 10.w),
+              Container(
+                width: 9.w,
+                height: 9.w,
+                decoration: BoxDecoration(
+                  color: AppColor.buttoncolor,
+                  shape: BoxShape.circle,
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -241,34 +262,233 @@ class _NotificationCard extends StatelessWidget {
   }
 }
 
-class _Empty extends StatelessWidget {
+/// Three rows in the shape of the real ones, lit in turn by the app's wave.
+class _NotificationsSkeleton extends StatelessWidget {
+  const _NotificationsSkeleton();
+
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: 40.w),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.notifications_none_rounded,
-                size: 44.sp, color: Colors.grey.shade400),
-            SizedBox(height: 14.h),
-            Text('Nothing waiting',
-                style: TextStyle(
-                    fontSize: 15.sp,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.black87)),
-            SizedBox(height: 6.h),
-            Text(
-              'You are up to date. New lessons and your daily question will '
-              'show up here.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                  fontSize: 12.5.sp, height: 1.4, color: Colors.grey.shade600),
-            ),
-          ],
+    return LoadingWave(
+      steps: 3,
+      builder: (context, lift) => ListView.separated(
+        physics: const NeverScrollableScrollPhysics(),
+        padding: EdgeInsets.fromLTRB(16.w, 12.h, 16.w, 24.h),
+        itemCount: 3,
+        separatorBuilder: (_, _) => SizedBox(height: 12.h),
+        itemBuilder: (context, index) => Container(
+          padding: EdgeInsets.fromLTRB(14.w, 16.h, 16.w, 16.h),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(18.r),
+          ),
+          child: Row(
+            children: [
+              WaveBar(
+                  width: 46.w, height: 46.w, radius: 23.w, lift: lift(index)),
+              SizedBox(width: 14.w),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    WaveBar(width: 150.w, height: 13.h, lift: lift(index)),
+                    SizedBox(height: 9.h),
+                    WaveBar(height: 11.h, lift: lift(index)),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
+}
+
+class _Message extends StatelessWidget {
+  final String text;
+
+  const _Message({required this.text});
+
+  @override
+  Widget build(BuildContext context) => Center(
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: 36.w),
+          child: Text(
+            text,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+                fontSize: 13.sp, height: 1.5, color: Colors.grey.shade600),
+          ),
+        ),
+      );
+}
+
+/// What a row looks like, by type. An unknown type still draws: types are
+/// added on the server without an app release.
+IconData iconFor(String type) => switch (type) {
+      'new_course' => Icons.auto_stories_rounded,
+      'course_join' => Icons.celebration_rounded,
+      'new_test' => Icons.description_outlined,
+      'new_quiz' => Icons.help_outline_rounded,
+      'new_lesson' => Icons.play_circle_outline_rounded,
+      'new_rapid_recall' => Icons.style_outlined,
+      'new_questions' => Icons.quiz_outlined,
+      'admin_message' => Icons.campaign_outlined,
+      'subscription_expiring' => Icons.schedule_rounded,
+      _ => Icons.notifications_none_rounded,
+    };
+
+/// Where a notification leads.
+enum NotificationAction {
+  courseList,
+  selectedCourse,
+  tests,
+  lesson,
+  quiz,
+  rapidRecall,
+  questionBank,
+
+  /// A plan about to run out: the renewal prompt, which leads to the website.
+  subscription,
+
+  /// An announcement, or a type this app has not heard of: stay put.
+  none,
+}
+
+/// The target of a row, and the id it names.
+@immutable
+class NotificationTarget {
+  final NotificationAction action;
+  final int? id;
+
+  const NotificationTarget(this.action, [this.id]);
+}
+
+/// Read from the row's own data map — every value a string, ids included,
+/// because FCM refuses a message with a number in it.
+NotificationTarget targetOf(NotificationItem item) => switch (item.type) {
+      'new_course' => const NotificationTarget(NotificationAction.courseList),
+      'course_join' => NotificationTarget(
+          NotificationAction.selectedCourse, item.idFrom('courseId')),
+      'new_test' =>
+        NotificationTarget(NotificationAction.tests, item.idFrom('testId')),
+      'new_lesson' =>
+        NotificationTarget(NotificationAction.lesson, item.idFrom('lessonId')),
+      'new_quiz' =>
+        NotificationTarget(NotificationAction.quiz, item.idFrom('lessonId')),
+      'new_rapid_recall' => NotificationTarget(
+          NotificationAction.rapidRecall, item.idFrom('rapidRecallId')),
+      'new_questions' => NotificationTarget(
+          NotificationAction.questionBank, item.idFrom('subjectId')),
+      'subscription_expiring' => NotificationTarget(
+          NotificationAction.subscription, item.idFrom('courseId')),
+      _ => const NotificationTarget(NotificationAction.none),
+    };
+
+/// Opens what a row names.
+Future<void> openNotification(
+    BuildContext context, NotificationItem item) async {
+  final target = targetOf(item);
+
+  switch (target.action) {
+    case NotificationAction.courseList:
+      await openCoursePicker(context);
+
+    case NotificationAction.selectedCourse:
+      // The app shows one course at a time — the selected one, which is home.
+      // A notification about another course opens the picker rather than
+      // switching what the whole app shows without asking.
+      final selected =
+          context.read<SelectionContentProvider>().content?.course?.id;
+      if (target.id != null && target.id == selected) {
+        Navigator.of(context).popUntil((route) => route.isFirst);
+      } else {
+        await openCoursePicker(context);
+      }
+
+    case NotificationAction.tests:
+      // The paper itself needs data this row does not carry, so this opens
+      // the list it is at the top of.
+      _push(context, const TestsTab());
+
+    case NotificationAction.lesson:
+      final lesson = _lessonById(context, target.id);
+      if (lesson != null) {
+        _push(context, StudentLessonDetailScreen(lesson: lesson));
+      }
+
+    case NotificationAction.quiz:
+      final lesson = _lessonById(context, target.id);
+      if (lesson != null) {
+        _push(
+          context,
+          QuizScreen(
+            lessonId: lesson.id,
+            lessonTitle: lesson.title,
+            knownAttempt: lesson.attempt,
+            attemptStateKnown: true,
+          ),
+        );
+      }
+
+    case NotificationAction.rapidRecall:
+      if (target.id != null) {
+        _push(context, RecallCardsScreen(deckId: target.id!));
+      }
+
+    case NotificationAction.questionBank:
+      _push(context, const QbankTab());
+
+    case NotificationAction.subscription:
+      // Stays on this screen. Renewing happens on the website like every
+      // other purchase, so a plans screen in between would be a step whose
+      // only button is the same link.
+      //
+      // The days are read from the plan as it stands now, not from the row: a
+      // reminder left unread for three days would otherwise still say three
+      // days. The row's own number is the fallback for a plan not loaded yet.
+      final live = context.read<PlanAccessProvider>().daysLeftOnPlan;
+      await showRenewPlanDialog(context,
+          daysLeft: live ?? item.idFrom('daysLeft'));
+
+    case NotificationAction.none:
+      break; // An announcement: it has been read by being on screen.
+  }
+}
+
+void _push(BuildContext context, Widget screen) => Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => screen),
+    );
+
+/// The lesson with this id in the course tree the app already holds. Null
+/// when it is not in the student's course — locked, moved, or unpublished.
+StudentLessonModel? _lessonById(BuildContext context, int? id) {
+  if (id == null) return null;
+  final content = context.read<SelectionContentProvider>().content;
+  for (final chapter in content?.chapters ?? const <StudentChapterModel>[]) {
+    for (final lesson in chapter.lessons) {
+      if (lesson.id == id) return lesson;
+    }
+  }
+  return null;
+}
+
+/// The course picker, with the tokens it needs.
+Future<void> openCoursePicker(BuildContext context) async {
+  final tokens = await Future.wait([
+    LocalStorage.getAccessToken(),
+    LocalStorage.getRefreshToken(),
+    LocalStorage.getDeviceId(),
+  ]);
+  if (!context.mounted) return;
+
+  _push(
+    context,
+    ExamSelectionScreen(
+      accessToken: tokens[0] ?? '',
+      refreshToken: tokens[1] ?? '',
+      deviceId: tokens[2] ?? '',
+    ),
+  );
 }

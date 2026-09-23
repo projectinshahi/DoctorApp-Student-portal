@@ -131,11 +131,15 @@ class RapidRecallProvider extends ChangeNotifier {
   // under a lesson, and the lesson under a chapter; a deck with neither
   // belongs to the whole course and lands in "General", last.
 
-  /// Topics — the chapters the decks' lessons sit in.
+  /// Topics — the chapters the decks belong to.
+  ///
+  /// The deck's own chapter, not its lesson's: a deck filed under the subject
+  /// with no lesson has a chapter too, and reading it through the lesson
+  /// dropped those into "General", where nobody would look for them.
   List<RecallGroup> get topics => _group(
         decks,
-        id: (deck) => deck.lesson?.chapter?.id,
-        title: (deck) => deck.lesson?.chapter?.title,
+        id: (deck) => deck.chapterId,
+        title: (deck) => deck.chapter?.title,
       );
 
   /// The lessons inside one topic.
@@ -143,16 +147,39 @@ class RapidRecallProvider extends ChangeNotifier {
   /// Lesson titles are not unique — two live lessons are both called
   /// "Obstetrics" — but they are reached through their chapter, which is this
   /// screen's title, so the pair never appears side by side.
-  List<RecallGroup> lessonsIn(int? chapterId) => _group(
-        decks.where((deck) => deck.lesson?.chapter?.id == chapterId),
-        id: (deck) => deck.lesson?.id,
-        title: (deck) => deck.lesson?.title,
-      );
+  List<RecallGroup> lessonsIn(int? chapterId) {
+    final inChapter =
+        decks.where((deck) => deck.chapterId == chapterId).toList();
+    final groups = _group(
+      inChapter,
+      id: (deck) => deck.lesson?.id,
+      title: (deck) => deck.lesson?.title,
+    );
+
+    // The chapter's own decks — filed under the subject rather than a lesson —
+    // are the group with no lesson id, and it sorts last. Named after the
+    // subject the student just chose: "All Internal Medicine" says what is in
+    // it, where "General" says nothing.
+    final chapterTitle = inChapter
+        .map((deck) => deck.chapter?.title)
+        .firstWhere((title) => title != null && title.isNotEmpty,
+            orElse: () => null);
+    if (chapterId == null || chapterTitle == null) return groups;
+
+    return [
+      for (final group in groups)
+        if (group.id == null)
+          RecallGroup(
+              id: null, title: 'All $chapterTitle', decks: group.decks)
+        else
+          group,
+    ];
+  }
 
   /// The decks inside one lesson of one topic.
   List<RapidRecallDeck> decksIn({int? chapterId, int? lessonId}) => decks
       .where((deck) =>
-          deck.lesson?.chapter?.id == chapterId && deck.lesson?.id == lessonId)
+          deck.chapterId == chapterId && deck.lesson?.id == lessonId)
       .toList()
     ..sort(_byOrder);
 
@@ -195,7 +222,7 @@ class RapidRecallProvider extends ChangeNotifier {
     final current = deck(deckId);
     if (current == null) return const [];
     return decksIn(
-      chapterId: current.lesson?.chapter?.id,
+      chapterId: current.chapterId,
       lessonId: current.lesson?.id,
     ).where((other) => other.id != deckId).toList();
   }

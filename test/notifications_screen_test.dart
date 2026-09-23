@@ -1,91 +1,352 @@
-import 'package:dr_app/models/selection_content_model.dart';
-import 'package:dr_app/repository/daily_quiz_provider.dart';
+import 'dart:async';
+
+import 'package:dr_app/models/notification_model.dart';
+import 'package:dr_app/models/quiz_model.dart'
+    show QuizErrorKind, QuizException;
+import 'package:dr_app/repository/notification_feed_provider.dart';
 import 'package:dr_app/repository/selection_content_provider.dart';
+import 'package:dr_app/services/notification_feed_service.dart';
 import 'package:dr_app/view/Home/notifications/notifications_screen.dart';
+import 'package:dr_app/widget/loading_wave.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-Future<void> _pump(WidgetTester tester) async {
+Map<String, dynamic> _row(
+  int id, {
+  String type = 'new_test',
+  String title = 'New mock test',
+  String body = 'DHA Grand Test 3',
+  Map<String, String> data = const {'testId': '9', 'courseId': '22'},
+  bool read = false,
+}) =>
+    {
+      'id': id,
+      'type': type,
+      'title': title,
+      'body': body,
+      'data': data,
+      'createdAt': '2026-09-23T06:10:00.000Z',
+      'read': read,
+    };
+
+class _FakeFeedService extends NotificationFeedService {
+  /// Pages, oldest call first. Each is what the server would answer.
+  final List<Map<String, dynamic>> pages;
+  final List<String> calls = [];
+  int _page = 0;
+
+  _FakeFeedService({List<Map<String, dynamic>>? pages})
+      : pages = pages ??
+            [
+              {
+                'notifications': [
+                  _row(12),
+                  _row(11,
+                      type: 'admin_message',
+                      title: 'From the academy',
+                      body: 'Classes resume on Monday.'),
+                ],
+                'unreadCount': 2,
+                'nextBefore': null,
+              }
+            ];
+
+  bool failMarkRead = false;
+
+  /// Held open to freeze the fetch mid-flight.
+  Completer<void>? gate;
+
+  @override
+  Future<NotificationFeed> fetch({int limit = 30, String? before}) async {
+    calls.add(before == null ? 'fetch' : 'fetch before=$before');
+    if (gate != null) await gate!.future;
+    // A page back is the next one along; no `before` starts again at the top.
+    _page = before == null ? 0 : _page + 1;
+    return NotificationFeed.fromJson(
+        pages[_page.clamp(0, pages.length - 1)]);
+  }
+
+  @override
+  Future<int> markRead() async {
+    calls.add('read');
+    // What the real service throws, and the only thing the provider catches.
+    if (failMarkRead) throw QuizException(QuizErrorKind.network, 'offline');
+    return 0;
+  }
+}
+
+Future<NotificationFeedProvider> _pump(
+  WidgetTester tester, {
+  _FakeFeedService? service,
+  bool settle = true,
+}) async {
   tester.view.physicalSize = const Size(440, 956);
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
 
+  final feed = NotificationFeedProvider(service: service ?? _FakeFeedService());
+
   await tester.pumpWidget(
     MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => HomeSummaryProvider()),
+        ChangeNotifierProvider<NotificationFeedProvider>.value(value: feed),
         ChangeNotifierProvider(create: (_) => SelectionContentProvider()),
       ],
       child: ScreenUtilInit(
         designSize: const Size(440, 956),
         minTextAdapt: true,
-        builder: (context, _) =>
-            const MaterialApp(home: NotificationsScreen()),
+        builder: (context, _) => const MaterialApp(home: NotificationsScreen()),
       ),
     ),
   );
-  await tester.pump();
+  if (settle) {
+    await tester.pumpAndSettle();
+  } else {
+    await tester.pump();
+    await tester.pump();
+  }
+  return feed;
 }
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
-  testWidgets('shows its heading and subtitle', (tester) async {
-    await _pump(tester);
+  group('reading the server', () {
+    test('a row keeps its data map, ids and all, as strings', () {
+      final item = NotificationItem.fromJson(_row(12));
 
-    expect(find.text('Notifications'), findsOneWidget);
-    expect(find.text('Check your notifications'), findsOneWidget);
+      expect(item.id, 12);
+      expect(item.title, 'New mock test');
+      expect(item.data['testId'], '9');
+      // FCM refuses a number in data, so ids arrive as text and are parsed.
+      expect(item.idFrom('testId'), 9);
+      expect(item.idFrom('missing'), isNull);
+      expect(item.read, isFalse);
+      expect(item.createdAt, isNotNull);
+    });
+
+    test('a page says whether there is another', () {
+      final last = NotificationFeed.fromJson({
+        'notifications': [_row(1)],
+        'unreadCount': 0,
+        'nextBefore': null,
+      });
+      expect(last.nextBefore, isNull, reason: 'the last page: stop asking');
+
+      final more = NotificationFeed.fromJson({
+        'notifications': [_row(2)],
+        'unreadCount': 1,
+        'nextBefore': '2026-09-21T09:00:00.000Z',
+      });
+      expect(more.nextBefore, '2026-09-21T09:00:00.000Z');
+    });
   });
 
-  testWidgets('with nothing to report it says so, rather than sitting blank',
-      (tester) async {
-    // No feed endpoint exists, so an account with no state has genuinely
-    // nothing here — and an empty screen with no words reads as broken.
-    await _pump(tester);
+  group('where a row leads', () {
+    NotificationItem item(String type, Map<String, String> data) =>
+        NotificationItem.fromJson(_row(1, type: type, data: data));
 
-    expect(find.text('Nothing waiting'), findsOneWidget);
-    expect(tester.takeException(), isNull);
+    test('each type opens what it names', () {
+      expect(targetOf(item('new_course', {})).action,
+          NotificationAction.courseList);
+      expect(targetOf(item('course_join', {'courseId': '22'})).id, 22);
+      expect(targetOf(item('new_test', {'testId': '9'})).id, 9);
+      expect(targetOf(item('new_lesson', {'lessonId': '4'})).action,
+          NotificationAction.lesson);
+      expect(targetOf(item('new_quiz', {'lessonId': '4'})).action,
+          NotificationAction.quiz);
+      expect(targetOf(item('new_rapid_recall', {'rapidRecallId': '7'})).id, 7);
+      expect(targetOf(item('new_questions', {'subjectId': '8'})).action,
+          NotificationAction.questionBank);
+    });
+
+    test('a plan about to run out leads to the renewal prompt', () {
+      final target = targetOf(item('subscription_expiring',
+          {'subscriptionId': '5', 'courseId': '22', 'daysLeft': '3'}));
+
+      expect(target.action, NotificationAction.subscription);
+      expect(target.id, 22, reason: 'the course, not the subscription row');
+      expect(iconFor('subscription_expiring'), Icons.schedule_rounded);
+    });
+
+    test('an announcement, and a type this app has never heard of, stay put',
+        () {
+      // Types are added on the server without an app release, so an unknown
+      // one must be a row that does nothing — never a crash.
+      expect(targetOf(item('admin_message', {})).action,
+          NotificationAction.none);
+      expect(targetOf(item('something_new_in_2027', {})).action,
+          NotificationAction.none);
+      expect(iconFor('something_new_in_2027'), isNotNull);
+    });
   });
 
-  test('the model carries what a row needs', () {
-    // onOpen null is a row with nowhere to go — a statement, not a link.
-    const item = AppNotification(
-      icon: Icons.check_rounded,
-      title: 'Daily goal reached',
-      body: 'You answered today.',
-    );
+  group('the list', () {
+    test('a second page is added to the first, and then it stops asking',
+        () async {
+      final service = _FakeFeedService(pages: [
+        {
+          'notifications': [_row(12)],
+          'unreadCount': 1,
+          'nextBefore': '2026-09-21T09:00:00.000Z',
+        },
+        {
+          'notifications': [_row(11)],
+          'unreadCount': 1,
+          'nextBefore': null,
+        },
+      ]);
+      final feed = NotificationFeedProvider(service: service);
 
-    expect(item.unread, isFalse, reason: 'read unless it says otherwise');
-    expect(item.onOpen, isNull);
+      await feed.load();
+      expect(feed.items, hasLength(1));
+      expect(feed.hasMore, isTrue);
+
+      await feed.loadMore();
+      expect(feed.items.map((i) => i.id), [12, 11]);
+      expect(feed.hasMore, isFalse);
+
+      await feed.loadMore();
+      expect(service.calls, ['fetch', 'fetch before=2026-09-21T09:00:00.000Z'],
+          reason: 'the last page is not asked for twice');
+    });
+
+    test('marking read clears the badge', () async {
+      final service = _FakeFeedService();
+      final feed = NotificationFeedProvider(service: service);
+      await feed.load();
+      expect(feed.unreadCount, 2);
+
+      await feed.markRead();
+      expect(feed.unreadCount, 0);
+      expect(service.calls, contains('read'));
+    });
+
+    test('a failed mark-read puts the badge back, rather than lying', () async {
+      final service = _FakeFeedService()..failMarkRead = true;
+      final feed = NotificationFeedProvider(service: service);
+      await feed.load();
+
+      await feed.markRead();
+      expect(feed.unreadCount, 2);
+    });
+
+    test('a push while the app is open moves the badge on its own', () async {
+      // The row is already stored on the server; the list catches up later.
+      final feed = NotificationFeedProvider(service: _FakeFeedService());
+      await feed.load();
+
+      feed.bumpUnread();
+      expect(feed.unreadCount, 3);
+    });
+
+    test('signing out empties it', () async {
+      final feed = NotificationFeedProvider(service: _FakeFeedService());
+      await feed.load();
+
+      feed.clear();
+      expect(feed.items, isEmpty);
+      expect(feed.unreadCount, 0);
+    });
   });
 
-  test('a lesson row knows where it is going', () {
-    var opened = false;
-    final item = AppNotification(
-      icon: Icons.play_arrow_rounded,
-      title: 'Continue Cardiology',
-      body: 'You left this part-way through.',
-      unread: true,
-      onOpen: () => opened = true,
-    );
+  group('the screen', () {
+    testWidgets('shows the rows, and marks them read on opening',
+        (tester) async {
+      final service = _FakeFeedService();
+      final feed = await _pump(tester, service: service);
 
-    item.onOpen!();
-    expect(opened, isTrue);
-  });
+      expect(find.text('New mock test'), findsOneWidget);
+      expect(find.text('DHA Grand Test 3'), findsOneWidget);
+      // Opening the screen is what clears the badge — there is one timestamp
+      // per student, and no endpoint for a single row.
+      expect(service.calls, ['fetch', 'read']);
+      expect(feed.unreadCount, 0);
+    });
 
-  test('a chapter with no watchable lessons produces no rows', () {
-    // Locked and completed lessons are not news.
-    final chapter = StudentChapterModel(
-      id: 1,
-      title: 'C',
-      displayOrder: 1,
-      lessons: const [],
-    );
-    expect(chapter.lessons, isEmpty);
+    testWidgets('an empty list says so, and is not an error', (tester) async {
+      await _pump(
+        tester,
+        service: _FakeFeedService(pages: [
+          {'notifications': [], 'unreadCount': 0, 'nextBefore': null}
+        ]),
+      );
+
+      expect(find.textContaining('Nothing yet'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('waits with a skeleton, rather than saying "nothing yet"',
+        (tester) async {
+      // The screen is built before its own fetch has even started, so
+      // "loading" cannot mean "a request is in flight" — it means nothing has
+      // come back yet.
+      final gate = Completer<void>();
+      final service = _FakeFeedService()..gate = gate;
+      await _pump(tester, service: service, settle: false);
+
+      expect(find.byType(WaveBar), findsWidgets);
+      expect(find.textContaining('Nothing yet'), findsNothing);
+
+      gate.complete();
+      await tester.pumpAndSettle();
+
+      expect(find.text('New mock test'), findsOneWidget);
+      expect(find.byType(WaveBar), findsNothing);
+    });
+
+    testWidgets('opening it twice leaves one, so Back goes straight home',
+        (tester) async {
+      // The bell and a tapped notification both open it, and either can fire
+      // while it is already up.
+      final feed = NotificationFeedProvider(service: _FakeFeedService());
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider<NotificationFeedProvider>.value(value: feed),
+            ChangeNotifierProvider(create: (_) => SelectionContentProvider()),
+          ],
+          child: ScreenUtilInit(
+            designSize: const Size(440, 956),
+            minTextAdapt: true,
+            builder: (context, _) => MaterialApp(
+              home: Builder(
+                builder: (context) => Scaffold(
+                  body: TextButton(
+                    onPressed: () => NotificationsScreen.open(context),
+                    child: const Text('bell'),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('bell'));
+      await tester.pumpAndSettle();
+      expect(find.byType(NotificationsScreen), findsOneWidget);
+
+      // A second open, from the screen itself — what a tapped push does.
+      NotificationsScreen.open(tester.element(find.byType(NotificationsScreen)));
+      await tester.pumpAndSettle();
+      expect(find.byType(NotificationsScreen), findsOneWidget,
+          reason: 'the second replaced the first rather than stacking');
+
+      tester.state<NavigatorState>(find.byType(Navigator)).pop();
+      await tester.pumpAndSettle();
+      expect(find.text('bell'), findsOneWidget, reason: 'one Back, not two');
+    });
+
+    testWidgets('lays out on a short phone', (tester) async {
+      tester.view.physicalSize = const Size(375, 667);
+      await _pump(tester);
+      expect(tester.takeException(), isNull);
+    });
   });
 }
