@@ -28,6 +28,8 @@ import '../../repository/refresh_api_provider.dart';
 import '../../repository/quiz_prefetch.dart';
 import '../../repository/rapid_recall_provider.dart';
 import '../../repository/saved_provider.dart';
+import '../../repository/settings_provider.dart';
+import '../../services/notification_service.dart';
 import '../../repository/selection_content_provider.dart';
 import '../Authendication/login/login_screen.dart';
 import '../subjectSelection/select_exam_screen.dart';
@@ -51,6 +53,10 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+
+    // A tapped notification comes here: this is where it is known whether
+    // anyone is signed in to open anything for.
+    NotificationService.instance.onOpen = _openFromNotification;
 
     _splashTimer = Timer(AnimatedSplash.hold, () {
       if (mounted) setState(() => _splashOver = true);
@@ -92,6 +98,7 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
     // Outlives a frame, so it has to go or it fires setState on a gate that
     // is gone.
     _splashTimer?.cancel();
+    NotificationService.instance.onOpen = null;
     WidgetsBinding.instance.removeObserver(this);
     _auth?.removeListener(_onAuthChanged);
     super.dispose();
@@ -128,6 +135,20 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final navigatorContext = navigatorKey.currentContext;
       if (navigatorContext == null || !mounted) return;
+
+      // The notification permission and the study reminder, now that there
+      // is a signed-in student to ask on behalf of. Asked at launch, before
+      // sign-in, the prompt has no context and gets refused.
+      //
+      // The FCM token is sent here too: this runs right after a successful
+      // sign-in and on every launch with the session restored, so the
+      // backend's copy never goes stale.
+      final settings = navigatorContext.read<SettingsProvider>();
+      unawaited(AuthProvider.currentStudentId().then(
+          (studentId) => settings.applyForSession(studentId: studentId)));
+      final pending = NotificationService.instance.takePendingOpen();
+      if (pending != null) unawaited(_openFromNotification(pending));
+
       try {
         await navigatorContext.read<SelectionContentProvider>().loadContent();
         if (!mounted) return;
@@ -138,6 +159,59 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
         // Warming is an optimisation. Every screen still loads on its own.
       }
     });
+  }
+
+  /// Where a tapped notification goes.
+  ///
+  /// The app uses Navigator 1.0 — one global navigatorKey and pushed
+  /// MaterialPageRoutes, no named routes — so "/course/:courseId" is a push
+  /// here, not a URL. And it shows one course at a time, the selected one,
+  /// which *is* home: so a course_join for that course goes home, and one for
+  /// any other course opens the picker with it listed. Switching the student's
+  /// course silently would change everything the app shows without asking.
+  Future<void> _openFromNotification(Map<String, dynamic> data) async {
+    final type = data['type'];
+    if (type != NotificationService.newCourseType &&
+        type != NotificationService.courseJoinType) {
+      return; // A reminder, or anything unknown: opening the app was enough.
+    }
+
+    if (_auth?.status != AuthStatus.authenticated) {
+      // Tapped before the session was restored. _warmUp picks it up.
+      NotificationService.instance.pendingOpen = data;
+      return;
+    }
+
+    if (type == NotificationService.courseJoinType) {
+      final courseId = NotificationService.courseIdFrom(data);
+      final navigator = navigatorKey.currentState;
+      final selected = navigator?.context
+          .read<SelectionContentProvider>()
+          .content
+          ?.course
+          ?.id;
+      if (courseId != null && courseId == selected) {
+        navigator?.popUntil((route) => route.isFirst);
+        return;
+      }
+    }
+
+    await _openCoursePicker();
+  }
+
+  Future<void> _openCoursePicker() async {
+    final tokens = await Future.wait([
+      LocalStorage.getAccessToken(),
+      LocalStorage.getRefreshToken(),
+      LocalStorage.getDeviceId(),
+    ]);
+    navigatorKey.currentState?.push(MaterialPageRoute(
+      builder: (_) => ExamSelectionScreen(
+        accessToken: tokens[0] ?? '',
+        refreshToken: tokens[1] ?? '',
+        deviceId: tokens[2] ?? '',
+      ),
+    ));
   }
 
   void _onAuthChanged() {
@@ -178,6 +252,8 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
     context.read<QuizPrefetch>().clear();
     // Decks and their bookmarks belong to that account's course too.
     context.read<RapidRecallProvider>().clear();
+    // Course alerts and the study reminder are for a signed-in student.
+    unawaited(context.read<SettingsProvider>().clearForSignOut());
 
     // The session can die while a quiz, a test paper or the player is on
     // top. Swapping this root does not remove those, and without the reset

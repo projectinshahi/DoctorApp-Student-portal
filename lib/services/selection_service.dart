@@ -1,11 +1,12 @@
 import 'dart:convert';
 import 'package:dr_app/core/constant/local_storage.dart';
+import 'package:dr_app/core/constant/api_constant.dart';
 import 'package:http/http.dart' as http;
 
 import '../View_model/selection_model.dart';
 
 class SelectionService {
-  static const String _baseUrl = 'https://doctorapp-backend-30gd.onrender.com/api/users/me/selection';
+  static const String _baseUrl = '${ApiConstant.baseUrl}/users/me/selection';
 
   Future<SelectionResult> selectCourse({
     int? courseId,

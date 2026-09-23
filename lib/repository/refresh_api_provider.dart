@@ -1,3 +1,4 @@
+import 'dart:convert';
 // lib/providers/auth_provider.dart
 import 'package:flutter/foundation.dart';
 
@@ -10,6 +11,32 @@ import '../services/selection_content_service.dart';
 enum AuthStatus { unknown, authenticated, unauthenticated }
 
 class AuthProvider extends ChangeNotifier {
+  /// The signed-in student's id, read from the stored access token.
+  ///
+  /// The token is the one place the id is known both right after a sign-in
+  /// and on an app launch with the session restored — the sign-in response
+  /// only covers the first, and that is the rarer of the two.
+  static Future<int?> currentStudentId() async =>
+      userIdFromToken(await LocalStorage.getAccessToken());
+
+  /// The `userId` claim of a JWT. Read, not verified — the server verifies
+  /// every request; this only needs to know whose token it is.
+  @visibleForTesting
+  static int? userIdFromToken(String? token) {
+    if (token == null) return null;
+    final parts = token.split('.');
+    if (parts.length != 3) return null;
+    try {
+      final claims = jsonDecode(
+          utf8.decode(base64Url.decode(base64Url.normalize(parts[1]))));
+      if (claims is! Map) return null;
+      final id = claims['userId'];
+      return id is int ? id : int.tryParse('${id ?? ''}');
+    } catch (_) {
+      return null;
+    }
+  }
+
   AuthStatus _status = AuthStatus.unknown;
   String? _sessionMessage;
   bool _isLoggingOut = false;

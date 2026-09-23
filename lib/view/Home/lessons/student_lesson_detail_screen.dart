@@ -3,6 +3,8 @@ import 'package:dr_app/view/Home/lessons/videoplay/FullscreenVideoPage.dart';
 import 'package:dr_app/view/Home/lessons/videoplay/PdfViewerModal.dart';
 
 import 'package:flutter/material.dart';
+
+import '../../../services/app_analytics.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
@@ -84,6 +86,10 @@ class _StudentLessonDetailScreenState extends State<StudentLessonDetailScreen> {
   @override
   void initState() {
     super.initState();
+    AppAnalytics.log('lesson_opened', {
+      'lesson_id': widget.lesson.id,
+      'type': widget.lesson.type,
+    });
     _lesson = widget.lesson;
 
     // Blanking the frames is not enough on its own: the audio keeps playing

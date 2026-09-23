@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import '../models/selection_content_model.dart' show LessonAttemptInfo;
 
 import '../models/quiz_model.dart';
+import '../services/app_analytics.dart';
 import '../services/quiz_service.dart';
 
 /// One instance per open quiz — created by QuizScreen, never registered
@@ -521,6 +522,11 @@ class QuizProvider extends ChangeNotifier {
     try {
       result = await _service.finishAttempt(attemptId);
       finished = true;
+      AppAnalytics.log('quiz_finished', {
+        'lesson_id': _lessonId,
+        'correct': correctCount,
+        'total': totalQuestions,
+      });
       isSubmitting = false;
       notifyListeners();
 
@@ -649,6 +655,7 @@ class QuizProvider extends ChangeNotifier {
           'quiz retake', () => _service.startAttempt(_lessonId),
           detail: (a) => '${a.questions.length} questions');
       attempt = started;
+      AppAnalytics.log('quiz_retest', {'lesson_id': _lessonId});
       _seedFrom(started);
       _reportKeyAvailability();
     } on QuizException catch (e) {

@@ -3,6 +3,8 @@
 // Today's ten. Opening this screen is what starts the day's attempt — which
 // is why the home card never fetches the set, only the summary.
 import 'package:flutter/material.dart';
+
+import '../../../services/quiz_sounds.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 
@@ -262,7 +264,8 @@ class _QuestionBody extends StatelessWidget {
             correctId: answer?.correctOptionId,
             revealed: revealed,
             pending: provider.pendingOptionId == question.options[i].id,
-            onTap: () => provider.answer(question.id, question.options[i].id),
+            onTap: () =>
+                _answerWithSound(provider, question.id, question.options[i].id),
           ),
           SizedBox(height: 10.h),
         ],
@@ -553,4 +556,20 @@ class _Message extends StatelessWidget {
                   fontSize: 13.sp, height: 1.4, color: Colors.grey.shade700)),
         ),
       );
+}
+
+/// Commits an answer and plays its sound when the verdict appears.
+///
+/// answer() sets a local verdict before its request goes out, so when the set
+/// shipped its key the sound plays with the reveal instead of after the POST.
+void _answerWithSound(DailyQuizProvider provider, int questionId, int optionId) {
+  if (provider.answerFor(questionId) != null) return;
+
+  final saving = provider.answer(questionId, optionId);
+  final local = provider.answerFor(questionId);
+  if (local != null) {
+    QuizSounds.verdict(local.isCorrect);
+    return;
+  }
+  saving.then((_) => QuizSounds.verdict(provider.answerFor(questionId)?.isCorrect));
 }

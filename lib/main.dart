@@ -19,6 +19,8 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 
 import 'repository/rapid_recall_provider.dart';
+import 'repository/settings_provider.dart';
+import 'services/notification_service.dart';
 import 'core/theam /app_theme.dart';
 import 'core/utils/app_navigator.dart';
 import 'core/utils/refresh_on_visible.dart';
@@ -42,6 +44,11 @@ void main() async {
   // FullscreenVideoPage and youtube_player_flutter restore exactly this
   // value, so there is a single orientation the app returns to.
   await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+
+  // Notification channels, the time zone the study reminder is scheduled
+  // in, and course alerts. Before runApp, so a notification that launched
+  // the app is caught rather than lost.
+  await NotificationService.instance.init();
 
   runApp(const MyApp());
 }
@@ -69,6 +76,9 @@ class MyApp extends StatelessWidget {
         // Rapid Recall. One list for all four of its screens — four copies
         // would each fetch their own.
         ChangeNotifierProvider(create: (_) => RapidRecallProvider()),
+        // The student's settings, applied app-wide: course alerts, the
+        // study reminder, quiz sounds and analytics consent.
+        ChangeNotifierProvider(create: (_) => SettingsProvider()),
         // The home card's read-only summary. Separate from the quiz provider
         // on purpose: this one never starts the day's attempt.
         ChangeNotifierProvider(create: (_) => HomeSummaryProvider())

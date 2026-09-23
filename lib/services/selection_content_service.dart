@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../core/constant/local_storage.dart';
+import '../core/constant/api_constant.dart';
 import '../models/selection_content_model.dart';
 
 class SelectionContentResult {
@@ -27,7 +28,7 @@ class SelectionContentResult {
 }
 
 class SelectionContentService {
-  static const String _baseUrl = 'https://doctorapp-backend-30gd.onrender.com/api';
+  static const String _baseUrl = ApiConstant.baseUrl;
 
   Future<SelectionContentResult> fetchSelectionContent() async {
     var token = await LocalStorage.getAccessToken();

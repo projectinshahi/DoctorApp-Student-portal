@@ -24,13 +24,39 @@ dependencies:
   safe_device: ^1.4.1
   device_info_plus: ^10.1.2
   firebase_core: ^4.14.0
+  firebase_messaging: ^16.7.0
+  firebase_analytics: ^12.6.0
+  flutter_local_notifications: ^22.3.1
+  timezone: ^0.11.1
+  flutter_timezone: ^5.1.0
+  audioplayers: ^6.8.1
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4
 
 flutter:
   uses-material-design: true
   assets:
     - asset/icons/
+    - asset/sounds/
+
+# Launcher icons, from the badge on the splash screen. Regenerate after
+# changing either image with:  dart run flutter_launcher_icons
+# The sources live outside asset/icons/ so they are not bundled into the app.
+flutter_launcher_icons:
+  android: true
+  ios: true
+  # The badge on the splash's cream, opaque: iOS, and Android before 8.
+  image_path: "asset/launcher/icon.png"
+  min_sdk_android: 21
+  # Android 8+ shapes the icon itself, so the badge comes alone, already
+  # sized inside the safe zone — hence no extra inset.
+  adaptive_icon_background: "#EFF4E2"
+  adaptive_icon_foreground: "asset/launcher/foreground.png"
+  adaptive_icon_foreground_inset: 0
+  # The App Store rejects an icon with an alpha channel.
+  remove_alpha_ios: true
+  background_color_ios: "#EFF4E2"

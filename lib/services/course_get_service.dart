@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:dr_app/core/constant/local_storage.dart';
+import 'package:dr_app/core/constant/api_constant.dart';
 import 'package:http/http.dart' as http;
 
 import '../View_model/Course_get_model.dart';
@@ -36,7 +37,7 @@ class CourseListGetService {
       queryParams['search'] = search;
     }
 
-    final uri = Uri.parse('https://doctorapp-backend-30gd.onrender.com/api/courses')
+    final uri = Uri.parse('${ApiConstant.baseUrl}/courses')
         .replace(queryParameters: queryParams);
 
     final response = await http.get(

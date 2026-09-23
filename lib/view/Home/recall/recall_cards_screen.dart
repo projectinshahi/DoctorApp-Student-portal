@@ -14,6 +14,7 @@ import 'package:provider/provider.dart';
 
 import '../../../models/rapid_recall_model.dart';
 import '../../../repository/rapid_recall_provider.dart';
+import '../../../services/app_analytics.dart';
 import '../../../widget/app_bottom_nav.dart';
 import '../../../widget/app_loading.dart';
 import '../../../widget/app_snackbar.dart';
@@ -46,6 +47,7 @@ class _RecallCardsScreenState extends State<RecallCardsScreen> {
       if (!mounted) return;
       final recall = context.read<RapidRecallProvider>()
         ..markOpened(widget.deckId);
+      AppAnalytics.log('recall_deck_opened', {'deck_id': widget.deckId});
 
       // The deck the student tapped first, then the thumbnails for the decks
       // listed under it — never the other way round, or the list's images

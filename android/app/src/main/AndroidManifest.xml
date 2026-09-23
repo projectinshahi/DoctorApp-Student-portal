@@ -1,5 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Puts the daily study reminder back after the phone restarts; a
+         scheduled notification is otherwise forgotten on reboot. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
     <!-- Lets the app be told a screen recording started, so it can cover its
          content. Normal permission: granted at install, no runtime prompt.
          Android 15+ only; older versions ignore it. -->
@@ -8,6 +11,27 @@
         android:label="Dr. SKM&apos;s Academy"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
+        <!-- Analytics starts off. The student's consent from Settings turns
+             it on at launch, so nothing is sent before that choice is read. -->
+        <meta-data
+            android:name="firebase_analytics_collection_enabled"
+            android:value="false" />
+        <!-- Course alerts arriving while the app is closed use the same
+             channel the backend names, so a student can mute them alone. -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="new_courses" />
+        <!-- Deliver scheduled notifications (the study reminder), and
+             reschedule them after a reboot or an app update. -->
+        <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver" />
+        <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED"/>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="com.htc.intent.action.QUICKBOOT_POWERON"/>
+            </intent-filter>
+        </receiver>
         <activity
             android:name=".MainActivity"
             android:exported="true"

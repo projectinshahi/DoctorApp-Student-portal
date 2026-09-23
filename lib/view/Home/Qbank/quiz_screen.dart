@@ -11,6 +11,7 @@ import '../../../core/constant/local_storage.dart';
 import '../../../models/quiz_model.dart';
 import '../../../repository/quiz_provider.dart';
 import '../../../repository/saved_provider.dart';
+import '../../../services/quiz_sounds.dart';
 import '../../subjectSelection/select_exam_screen.dart';
 import '../../../widget/pro_plan_dialog.dart';
 
@@ -466,7 +467,7 @@ class _QuestionView extends StatelessWidget {
                       busy: checking && isSelected,
                       verdict: verdict,
                       onTap: () =>
-                          context.read<QuizProvider>().answer(question.id, option.id),
+                          _answerWithSound(context, question.id, option.id),
                     ),
                   );
                 }),
@@ -1436,4 +1437,26 @@ class _EmptyState extends StatelessWidget {
 String _trimNumber(double value) {
   final text = value.toStringAsFixed(2);
   return text.replaceFirst(RegExp(r'\.?0+$'), '');
+}
+
+/// Commits an answer, then plays the right or wrong sound once the verdict is
+/// on screen — if the student turned Sound effect on in Settings.
+///
+/// With the key shipped in the question the verdict is local and this returns
+/// at once. Without it the sound waits for the server, as the reveal does. A
+/// save that failed reveals nothing, so it plays nothing.
+Future<void> _answerWithSound(
+    BuildContext context, int questionId, int optionId) async {
+  final provider = context.read<QuizProvider>();
+  if (provider.isAnswered(questionId)) return;
+
+  await provider.answer(questionId, optionId);
+  if (!provider.isAnswered(questionId)) return;
+
+  for (final question in provider.questions) {
+    if (question.id == questionId) {
+      QuizSounds.verdict(provider.resultFor(question)?.isCorrect);
+      return;
+    }
+  }
 }

@@ -5,10 +5,11 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 import '../View_model/profile_model.dart';
 import '../core/constant/local_storage.dart';
+import '../core/constant/api_constant.dart';
 
 class ProfileService {
-  static const String _profileUrl = 'https://doctorapp-backend-30gd.onrender.com/api/users/me';
-  static const String _signatureUrl = 'https://doctorapp-backend-30gd.onrender.com/api/uploads/signature';
+  static const String _profileUrl = '${ApiConstant.baseUrl}/users/me';
+  static const String _signatureUrl = '${ApiConstant.baseUrl}/uploads/signature';
 
   Future<ProfileModel> getProfile() async {
     final token = await LocalStorage.getAccessToken();

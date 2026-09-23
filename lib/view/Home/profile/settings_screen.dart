@@ -2,74 +2,52 @@
 //
 // Notifications, Privacy and Support.
 //
-// Every switch here persists, so a student's choice survives a restart and
-// any feature can read it. Three of them do not yet change anything, and the
-// note above each row says what it still needs — a switch that flips and
-// silently does nothing is worse than no switch at all, and the next person
-// should not have to guess which is which.
+// A view of SettingsProvider, which is where each switch takes effect: push
+// subscribes to course alerts, the reminder schedules a daily notification,
+// and sound and analytics switch their services on or off. So what this
+// screen shows is what the app is doing.
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:provider/provider.dart';
 
 import '../../../core/theam /app_color.dart';
+import '../../../repository/settings_provider.dart';
+import '../../../widget/app_snackbar.dart';
 import 'info_screens.dart';
 
-/// Keys are namespaced so a later feature cannot collide with them.
-class SettingsKeys {
-  static const pushNotifications = 'settings.pushNotifications';
-  static const dailyReminder = 'settings.dailyReminder';
-  static const soundEffects = 'settings.soundEffects';
-  static const usageAnalytics = 'settings.usageAnalytics';
-}
-
-class SettingsScreen extends StatefulWidget {
+class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
-
-  @override
-  State<SettingsScreen> createState() => _SettingsScreenState();
-}
-
-class _SettingsScreenState extends State<SettingsScreen> {
-  SharedPreferences? _prefs;
-
-  bool _push = false;
-  bool _reminder = false;
-  bool _sound = false;
-  bool _analytics = false;
 
   /// Must match `version:` in pubspec.yaml.
   static const String _version = '1.0.0';
 
-  @override
-  void initState() {
-    super.initState();
-    _load();
+  /// Shows why a switch did not stay on — permission refused.
+  Future<void> _report(BuildContext context, Future<String?> change) async {
+    final problem = await change;
+    if (problem != null && context.mounted) {
+      showAppSnackBar(context, problem, kind: AppMessage.failure);
+    }
   }
 
-  Future<void> _load() async {
-    final prefs = await SharedPreferences.getInstance();
-    if (!mounted) return;
-    setState(() {
-      _prefs = prefs;
-      _push = prefs.getBool(SettingsKeys.pushNotifications) ?? false;
-      _reminder = prefs.getBool(SettingsKeys.dailyReminder) ?? false;
-      _sound = prefs.getBool(SettingsKeys.soundEffects) ?? false;
-      _analytics = prefs.getBool(SettingsKeys.usageAnalytics) ?? false;
-    });
+  Future<void> _pickReminderTime(
+      BuildContext context, SettingsProvider settings) async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: _timeOf(settings.reminderMinutes),
+      helpText: 'Remind me at',
+    );
+    if (picked != null) {
+      await settings.setReminderTime(picked.hour * 60 + picked.minute);
+    }
   }
 
-  void _set(String key, bool value, void Function(bool) apply) {
-    setState(() => apply(value));
-    _prefs?.setBool(key, value);
-  }
-
-  void _open(Widget screen) => Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => screen),
-      );
+  static TimeOfDay _timeOf(int minutes) =>
+      TimeOfDay(hour: minutes ~/ 60, minute: minutes % 60);
 
   @override
   Widget build(BuildContext context) {
+    final settings = context.watch<SettingsProvider>();
+
     return Scaffold(
       backgroundColor: AppColor.Screenbackground,
       appBar: AppBar(
@@ -88,58 +66,64 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
       // Nothing rendered until the stored values are in, or every switch
       // would flick from its default to the real value a frame later.
-      body: _prefs == null
+      body: !settings.loaded
           ? const SizedBox.shrink()
           : ListView(
               padding: EdgeInsets.fromLTRB(16.w, 8.h, 16.w, 24.h),
               children: [
                 const _SectionLabel('Notifications'),
                 _Card(children: [
-                  // Needs a push service — FCM on Android, APNs on iOS — and
-                  // the device token registered with the backend. Until then
-                  // this records the choice and nothing sends anything.
                   _SwitchRow(
                     title: 'Push notification',
-                    subtitle: 'Receive alerts and updates',
-                    value: _push,
-                    onChanged: (on) => _set(
-                        SettingsKeys.pushNotifications, on, (v) => _push = v),
+                    // Firebase is set up for Android only. On a phone without
+                    // it the switch is disabled and says so, rather than
+                    // flipping on and delivering nothing.
+                    subtitle: settings.pushAvailable
+                        ? 'Get told when a new course is published'
+                        : 'Not available on this device yet',
+                    value: settings.pushAvailable && settings.push,
+                    onChanged: settings.pushAvailable
+                        ? (on) => _report(context, settings.setPush(on))
+                        : null,
                   ),
                   const _RowDivider(),
-                  // The closest to working: a local notification needs no
-                  // server at all, only flutter_local_notifications and a
-                  // scheduled time.
                   _SwitchRow(
                     title: 'Daily study reminder',
-                    subtitle: 'Get reminded to study every day',
-                    value: _reminder,
-                    onChanged: (on) => _set(
-                        SettingsKeys.dailyReminder, on, (v) => _reminder = v),
+                    subtitle: 'A reminder to study at the same time each day',
+                    value: settings.dailyReminder,
+                    onChanged: (on) =>
+                        _report(context, settings.setDailyReminder(on)),
                   ),
+                  if (settings.dailyReminder) ...[
+                    const _RowDivider(),
+                    _LinkRow(
+                      title: 'Reminder time',
+                      trailing: _timeOf(settings.reminderMinutes)
+                          .format(context),
+                      onTap: () => _pickReminderTime(context, settings),
+                    ),
+                  ],
                   const _RowDivider(),
-                  // The quiz plays no sounds today. When it does, it reads
-                  // this key before playing one.
                   _SwitchRow(
                     title: 'Sound effect',
-                    subtitle: 'Play sound during quizzes',
-                    value: _sound,
-                    onChanged: (on) =>
-                        _set(SettingsKeys.soundEffects, on, (v) => _sound = v),
+                    subtitle: 'Play a sound for right and wrong answers',
+                    value: settings.sound,
+                    onChanged: (on) => settings.setSound(on),
                   ),
                 ]),
 
                 SizedBox(height: 18.h),
                 const _SectionLabel('Privacy'),
                 _Card(children: [
-                  // Off by default, deliberately: analytics a student has not
-                  // agreed to is the wrong default — and there is no
-                  // analytics SDK in the app to honour it either way.
                   _SwitchRow(
                     title: 'Usage analytics',
-                    subtitle: 'Help us improve the app',
-                    value: _analytics,
-                    onChanged: (on) => _set(
-                        SettingsKeys.usageAnalytics, on, (v) => _analytics = v),
+                    subtitle: settings.analyticsAvailable
+                        ? 'Share anonymous usage to help us improve the app'
+                        : 'Not available on this device yet',
+                    value: settings.analyticsAvailable && settings.analytics,
+                    onChanged: settings.analyticsAvailable
+                        ? (on) => settings.setAnalytics(on)
+                        : null,
                   ),
                 ]),
 
@@ -148,14 +132,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 _Card(children: [
                   _LinkRow(
                     title: 'Help & support',
-                    onTap: () => _open(const ContactUsScreen()),
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const ContactUsScreen()),
+                    ),
                   ),
                   const _RowDivider(),
                   _LinkRow(
                     title: 'Rate the app',
                     // No store listing yet, so this opens the FAQ rather than
                     // a dead link. Point it at the store URL on release.
-                    onTap: () => _open(const FaqScreen()),
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const FaqScreen()),
+                    ),
                   ),
                   const _RowDivider(),
                   // Not a link: there is nothing to open, and a chevron would
@@ -247,7 +237,9 @@ class _SwitchRow extends StatelessWidget {
   final String title;
   final String subtitle;
   final bool value;
-  final ValueChanged<bool> onChanged;
+
+  /// Null disables the switch — for a feature this phone cannot provide.
+  final ValueChanged<bool>? onChanged;
 
   const _SwitchRow({
     required this.title,
@@ -295,9 +287,13 @@ class _SwitchRow extends StatelessWidget {
 
 class _LinkRow extends StatelessWidget {
   final String title;
+
+  /// A value shown before the chevron — the reminder's time.
+  final String? trailing;
+
   final VoidCallback onTap;
 
-  const _LinkRow({required this.title, required this.onTap});
+  const _LinkRow({required this.title, required this.onTap, this.trailing});
 
   @override
   Widget build(BuildContext context) {
@@ -314,6 +310,14 @@ class _LinkRow extends StatelessWidget {
                       fontWeight: FontWeight.w600,
                       color: Colors.black87)),
             ),
+            if (trailing != null) ...[
+              Text(trailing!,
+                  style: TextStyle(
+                      fontSize: 14.sp,
+                      fontWeight: FontWeight.w700,
+                      color: AppColor.buttoncolor)),
+              SizedBox(width: 4.w),
+            ],
             Icon(Icons.chevron_right_rounded,
                 size: 22.sp, color: Colors.grey.shade500),
           ],
