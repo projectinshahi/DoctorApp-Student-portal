@@ -53,12 +53,30 @@ class TestService {
 
   /// 4 — Mark the paper. Safe to call twice; the second call returns the same
   /// sheet.
-  Future<TestResult> submit(int attemptId) async =>
-      TestResult.fromJson(await _send('POST', '$_base/test-attempts/$attemptId/submit'));
+  Future<TestResult> submit(int attemptId) async => _marked(
+      await _send('POST', '$_base/test-attempts/$attemptId/submit'));
 
   /// Re-open a marked paper.
-  Future<TestResult> fetchResult(int attemptId) async =>
-      TestResult.fromJson(await _send('GET', '$_base/test-attempts/$attemptId/result'));
+  Future<TestResult> fetchResult(int attemptId) async => _marked(
+      await _send('GET', '$_base/test-attempts/$attemptId/result'));
+
+  /// The marked paper, with a line in the debug log saying how many of its
+  /// questions came back with an image.
+  ///
+  /// The review screen can only draw what the result sends, and the response
+  /// log is truncated well before the results array — so without this,
+  /// "the image is missing" cannot be told apart from "the image was never
+  /// in the response".
+  TestResult _marked(Map<String, dynamic> json) {
+    final result = TestResult.fromJson(json);
+    if (kDebugMode) {
+      final withImage =
+          result.results.where((r) => r.questionImageUrl != null).length;
+      debugPrint('TEST RESULT  ${result.results.length} questions, '
+          '$withImage with an image');
+    }
+    return result;
+  }
 
   /// 5 — Leaderboard. `me` comes back separately from the top N.
   Future<Leaderboard> fetchLeaderboard(int testId, {int limit = 50}) async =>

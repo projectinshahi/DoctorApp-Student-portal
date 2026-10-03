@@ -11,6 +11,17 @@
 //   GET    /users/me/test-attempts/:id/result
 //   GET    /users/me/tests/:id/leaderboard?limit=50
 
+/// Text the server sent, or null when it sent nothing worth drawing.
+///
+/// An empty string is not a value: the API fills every column it has, so a
+/// text-only question arrives with `questionImageUrl: ""` and a two-option
+/// question with `optionC: ""`. Kept as-is, those drew an "Image
+/// unavailable" box under the question and two options nobody could answer.
+String? _text(dynamic value) {
+  final text = value?.toString().trim() ?? '';
+  return text.isEmpty ? null : text;
+}
+
 int _toInt(dynamic value) {
   if (value is int) return value;
   if (value is num) return value.toInt();
@@ -179,16 +190,16 @@ class TestQuestion {
   factory TestQuestion.fromJson(Map<String, dynamic> json) => TestQuestion(
         id: _toInt(json['id']),
         questionOrder: _toInt(json['questionOrder']),
-        questionText: json['questionText']?.toString(),
-        questionImageUrl: json['questionImageUrl']?.toString(),
-        optionA: json['optionA']?.toString(),
-        optionAImageUrl: json['optionAImageUrl']?.toString(),
-        optionB: json['optionB']?.toString(),
-        optionBImageUrl: json['optionBImageUrl']?.toString(),
-        optionC: json['optionC']?.toString(),
-        optionCImageUrl: json['optionCImageUrl']?.toString(),
-        optionD: json['optionD']?.toString(),
-        optionDImageUrl: json['optionDImageUrl']?.toString(),
+        questionText: _text(json['questionText']),
+        questionImageUrl: _text(json['questionImageUrl']),
+        optionA: _text(json['optionA']),
+        optionAImageUrl: _text(json['optionAImageUrl']),
+        optionB: _text(json['optionB']),
+        optionBImageUrl: _text(json['optionBImageUrl']),
+        optionC: _text(json['optionC']),
+        optionCImageUrl: _text(json['optionCImageUrl']),
+        optionD: _text(json['optionD']),
+        optionDImageUrl: _text(json['optionDImageUrl']),
       );
 
   /// The letters this question actually offers. A paper is not always A–D:
@@ -351,15 +362,15 @@ class TestQuestionResult {
   factory TestQuestionResult.fromJson(Map<String, dynamic> json) =>
       TestQuestionResult(
         questionId: _toInt(json['testQuestionId'] ?? json['questionId'] ?? json['id']),
-        questionText: json['questionText']?.toString(),
-        questionImageUrl: json['questionImageUrl']?.toString(),
-        selectedOption: json['selectedOption']?.toString(),
-        correctOption: json['correctOption']?.toString(),
+        questionText: _text(json['questionText']),
+        questionImageUrl: _text(json['questionImageUrl']),
+        selectedOption: _text(json['selectedOption']),
+        correctOption: _text(json['correctOption']),
         isCorrect: json['isCorrect'] == true,
         answered: json['answered'] == true,
         marksAwarded: _toDouble(json['marksAwarded']),
-        explanation: json['explanation']?.toString(),
-        subject: json['subject']?.toString(),
+        explanation: _text(json['explanation']),
+        subject: _text(json['subject']),
       );
 }
 

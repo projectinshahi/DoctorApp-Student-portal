@@ -361,4 +361,49 @@ void main() {
     // read 0 here and draw three empty rings on a scored paper.
     expect(result.totalQuestions, 2);
   });
+
+  group('what the server fills in with nothing', () {
+    // Every column comes back filled: a text-only question still carries
+    // questionImageUrl: "", and a two-option question still carries
+    // optionC: "". Those blanks used to read as values.
+    final question = TestQuestion.fromJson({
+      'id': 9,
+      'questionOrder': 1,
+      'questionText': 'Which nerve is affected?',
+      'questionImageUrl': '',
+      'optionA': 'Ulnar',
+      'optionAImageUrl': '',
+      'optionB': 'Radial',
+      'optionBImageUrl': '',
+      'optionC': '',
+      'optionCImageUrl': '',
+      'optionD': '   ',
+      'optionDImageUrl': '',
+    });
+
+    test('a blank image url is no image', () {
+      expect(question.questionImageUrl, isNull,
+          reason: 'drew an "Image unavailable" box under the question');
+      expect(question.imageFor('A'), isNull);
+    });
+
+    test('a blank option is not an option', () {
+      expect(question.letters, ['A', 'B'],
+          reason: 'C and D were offered with nothing in them');
+    });
+
+    test('the reviewed question keeps its image', () {
+      final result = TestQuestionResult.fromJson({
+        'questionId': 9,
+        'questionText': '',
+        'questionImageUrl': 'https://cdn.test/ecg.png',
+        'isCorrect': false,
+        'answered': true,
+        'marksAwarded': -0.25,
+      });
+
+      expect(result.questionImageUrl, 'https://cdn.test/ecg.png');
+      expect(result.questionText, isNull, reason: 'an image-only stem');
+    });
+  });
 }

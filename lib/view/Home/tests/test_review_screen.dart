@@ -9,6 +9,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
+import '../../../widget/question_image.dart';
+
 import '../../../models/test_model.dart';
 
 const Color _kPrimary = Color(0xFF87986B);
@@ -16,7 +18,7 @@ const Color _kBg = Color(0xFFEFF4E2);
 const Color _kWrong = Color(0xFFD65745);
 
 /// Questions per tab. 20 is what fits a band label — "1 - 20" — without the
-/// tab bar scrolling on a phone.
+/// tab bar scrolling on a phone. 
 const int _kBand = 20;
 
 enum ReviewFilter { all, correct, wrong, skipped }
@@ -233,7 +235,7 @@ class _ReviewCardState extends State<_ReviewCard> {
               children: [
                 Expanded(
                   child: Text(
-                    '${widget.number}.  ${result.questionText ?? 'Image question'}',
+                    '${widget.number}.  ${result.questionText ?? 'Image question — tap to view'}',
                     maxLines: _open ? null : 3,
                     overflow: _open ? null : TextOverflow.ellipsis,
                     style: TextStyle(
@@ -261,6 +263,14 @@ class _ReviewCardState extends State<_ReviewCard> {
                   style: TextStyle(fontSize: 11.sp, color: Colors.grey.shade600)),
             ],
             if (_open) ...[
+              // The question itself, for a paper where the stem is an ECG or
+              // a slide. Parsed all along and never drawn, so an image
+              // question was reviewed with the image missing.
+              if (result.questionImageUrl != null) ...[
+                SizedBox(height: 12.h),
+                QuestionImage(
+                    url: result.questionImageUrl!, loadingHeight: 120.h),
+              ],
               SizedBox(height: 12.h),
               Divider(height: 1, color: Colors.grey.shade200),
               SizedBox(height: 12.h),

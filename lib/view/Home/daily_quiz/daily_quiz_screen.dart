@@ -10,7 +10,7 @@ import 'package:provider/provider.dart';
 
 import '../../../models/daily_quiz_model.dart';
 import '../../../repository/daily_quiz_provider.dart';
-import '../../../widget/app_loading.dart';
+import '../../../widget/question_image.dart';
 import '../../../widget/quiz_loading.dart';
 import 'daily_quiz_result_screen.dart';
 
@@ -249,7 +249,7 @@ class _QuestionBody extends StatelessWidget {
         // A question can be an image alone.
         if (question.questionImageUrl != null) ...[
           SizedBox(height: 12.h),
-          _Image(url: question.questionImageUrl!),
+          QuestionImage(url: question.questionImageUrl!),
         ],
         SizedBox(height: 18.h),
         for (var i = 0; i < question.options.length; i++) ...[
@@ -431,7 +431,7 @@ class _OptionTile extends StatelessWidget {
                     if (option.optionText != null &&
                         option.optionText!.isNotEmpty)
                       SizedBox(height: 8.h),
-                    _Image(url: option.optionImageUrl!),
+                    QuestionImage(url: option.optionImageUrl!),
                   ],
                 ],
               ),
@@ -508,34 +508,6 @@ class _Footer extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _Image extends StatelessWidget {
-  final String url;
-
-  const _Image({required this.url});
-
-  @override
-  Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(12.r),
-      child: Image.network(
-        url,
-        fit: BoxFit.contain,
-        loadingBuilder: (context, child, progress) => progress == null
-            ? child
-            : AppLoading(height: 150.h),
-        // A missing image must not take the question down with it.
-        errorBuilder: (context, _, __) => Container(
-          height: 80.h,
-          alignment: Alignment.center,
-          color: Colors.grey.shade200,
-          child: Text('Image unavailable',
-              style: TextStyle(fontSize: 11.sp, color: Colors.grey.shade600)),
-        ),
       ),
     );
   }

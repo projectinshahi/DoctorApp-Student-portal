@@ -70,13 +70,8 @@ class MyApp extends StatelessWidget {
        ChangeNotifierProvider(create: (_) => ProfileProvider()),
         ChangeNotifierProvider(create: (_) => PlanProvider()),
         ChangeNotifierProvider(create: (_) => SelectionContentProvider()),
-        // App-wide: the QBank badge, the toggle inside a quiz and the saved
-        // list all read the same counts, so there is one instance, not three.
-        // Primed from HomeScreen, which is the first place a token exists.
         ChangeNotifierProvider(create: (_) => SavedProvider()),
         ChangeNotifierProvider(create: (_) => QuizPrefetch()),
-        // Rapid Recall. One list for all four of its screens — four copies
-        // would each fetch their own.
         ChangeNotifierProvider(create: (_) => RapidRecallProvider()),
         // The student's settings, applied app-wide: course alerts, the
         // study reminder, quiz sounds and analytics consent.

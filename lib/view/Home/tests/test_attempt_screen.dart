@@ -9,7 +9,7 @@ import 'package:provider/provider.dart';
 import '../../../models/quiz_model.dart' show QuizErrorKind;
 import '../../../models/test_model.dart';
 import '../../../repository/test_provider.dart';
-import '../../../widget/app_loading.dart';
+import '../../../widget/question_image.dart';
 import '../../../widget/quiz_loading.dart';
 import 'test_question_palette.dart';
 import 'test_result_screen.dart';
@@ -154,9 +154,41 @@ class _AttemptViewState extends State<_AttemptView> {
     );
   }
 
+  /// The question whose images have already been fetched ahead.
+  int? _precachedFor;
+
+  /// Downloads the next question's images while this one is being read.
+  ///
+  /// Paging is local — the whole paper arrives in one call — so the image is
+  /// the only thing left to wait for when Next is tapped, and these are
+  /// full-size infographics. One question ahead is enough to cover the time
+  /// it takes to read a stem, and it is one question's worth of data rather
+  /// than a hundred and forty-eight.
+  void _precacheAhead(TestProvider provider) {
+    final index = provider.currentIndex + 1;
+    if (_precachedFor == index || index >= provider.questions.length) return;
+    _precachedFor = index;
+
+    final question = provider.questions[index];
+    final urls = [
+      question.questionImageUrl,
+      for (final letter in question.letters) question.imageFor(letter),
+    ];
+    for (final url in urls) {
+      if (url == null) continue;
+      // Failures are not the student's problem: the image will be requested
+      // again, and show its own error box, when they reach the question.
+      precacheImage(NetworkImage(url), context, onError: (_, __) {});
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<TestProvider>();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _precacheAhead(provider);
+    });
 
     return PopScope(
       canPop: false,
@@ -369,7 +401,7 @@ class _QuestionBody extends StatelessWidget {
             ),
           if (question.questionImageUrl != null) ...[
             SizedBox(height: 12.h),
-            _Image(url: question.questionImageUrl!),
+            QuestionImage(url: question.questionImageUrl!),
           ],
           SizedBox(height: 18.h),
           for (final letter in question.letters) ...[
@@ -395,86 +427,6 @@ class _QuestionBody extends StatelessWidget {
                 style: TextStyle(fontSize: 11.5.sp, color: Colors.grey.shade600, height: 1.4),
               ),
             ),
-        ],
-      ),
-    );
-  }
-}
-
-class _Image extends StatelessWidget {
-  final String url;
-
-  const _Image({required this.url});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      // The answer often lives in a detail — an ECG lead, one cell on a slide
-      // — that is unreadable at column width. Tapping opens it full screen.
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(
-          fullscreenDialog: true,
-          builder: (_) => _FullScreenImage(url: url),
-        ),
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(12.r),
-        child: Image.network(
-        url,
-        fit: BoxFit.contain,
-        loadingBuilder: (context, child, progress) => progress == null
-            ? child
-            : AppLoading(height: 160.h),
-        // A missing image must not take the question down with it — the
-        // student can still read the options and answer.
-        errorBuilder: (context, _, __) => Container(
-          height: 90.h,
-          alignment: Alignment.center,
-          color: Colors.grey.shade200,
-          child: Text('Image unavailable',
-              style: TextStyle(fontSize: 11.sp, color: Colors.grey.shade600)),
-        ),
-        ),
-      ),
-    );
-  }
-}
-
-/// The question image on its own, on black, pinch to zoom.
-class _FullScreenImage extends StatelessWidget {
-  final String url;
-
-  const _FullScreenImage({required this.url});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: Stack(
-        children: [
-          Positioned.fill(
-            child: InteractiveViewer(
-              minScale: 1,
-              maxScale: 5,
-              child: Center(
-                child: Image.network(
-                  url,
-                  fit: BoxFit.contain,
-                  errorBuilder: (context, _, __) => Text('Image unavailable',
-                      style: TextStyle(fontSize: 13.sp, color: Colors.white70)),
-                ),
-              ),
-            ),
-          ),
-          Positioned(
-            top: MediaQuery.of(context).padding.top + 8.h,
-            right: 8.w,
-            child: IconButton(
-              onPressed: () => Navigator.maybePop(context),
-              icon: Icon(Icons.close_rounded, size: 28.sp, color: Colors.white),
-            ),
-          ),
         ],
       ),
     );
@@ -546,7 +498,7 @@ class _OptionTile extends StatelessWidget {
                   // An option can be a slide with no words at all.
                   if (imageUrl != null) ...[
                     if (text != null && text!.isNotEmpty) SizedBox(height: 8.h),
-                    _Image(url: imageUrl!),
+                    QuestionImage(url: imageUrl!),
                   ],
                 ],
               ),
