@@ -179,4 +179,52 @@ void main() {
       expect(content.completedModules, 0);
     });
   });
+
+  group('who gets in', () {
+    StudentLessonModel lesson(Map<String, dynamic> json) =>
+        StudentLessonModel.fromJson({'id': 1, 'title': 'Cardiology', ...json});
+
+    test('the server decides — a locked lesson is shut', () {
+      // The app used to let a "free" quiz through whatever locked said, which
+      // meant no padlock on the row and a paywall on the tap.
+      expect(
+        lesson({'type': 'quiz', 'accessType': 'free', 'locked': true}).isOpen,
+        isFalse,
+      );
+      expect(
+        lesson({'type': 'quiz', 'accessType': 'premium', 'locked': true})
+            .isOpen,
+        isFalse,
+      );
+    });
+
+    test('a free sample the panel marked comes back unlocked, and opens', () {
+      expect(
+        lesson({
+          'type': 'quiz',
+          'accessType': 'premium',
+          'isFreePreview': true,
+          'locked': false,
+        }).isOpen,
+        isTrue,
+      );
+    });
+
+    test('an unlocked video with no url stays shut', () {
+      // The media is stripped on the way out. An empty player is a worse
+      // answer than a padlock.
+      expect(
+        lesson({'type': 'video', 'accessType': 'free', 'locked': false}).isOpen,
+        isFalse,
+      );
+      expect(
+        lesson({
+          'type': 'video',
+          'accessType': 'free',
+          'videoUrl': 'https://cdn.test/a.mp4',
+        }).isOpen,
+        isTrue,
+      );
+    });
+  });
 }

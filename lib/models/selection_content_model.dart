@@ -110,6 +110,7 @@ class SelectedCourseInfo {
   }
 
   bool get isPremium => accessType == 'premium';
+
 }
 
 class SelectedCourseTypeInfo {
@@ -398,6 +399,25 @@ class StudentLessonModel {
   bool get isVideo => type == 'video' || hasVideo;
 
   bool get isPremium => accessType == 'premium';
+  /// Whether to let the student in.
+  ///
+  /// The server decides. A lesson it will not serve is shut here too, so a
+  /// student is refused at the row rather than after tapping into it.
+  ///
+  /// This used to override `locked` for anything marked free, because the
+  /// admin panel could not say "free inside a premium course" and the server
+  /// locked every lesson in one — which padlocked the free samples. The panel
+  /// writes `isFreePreview` now and the server unlocks those lessons, so the
+  /// override had become the mismatch it was written to avoid: no padlock on
+  /// the row, a paywall on the tap.
+  ///
+  /// Media is still the exception. An unlocked video whose `videoUrl` was
+  /// stripped has nothing to play, and an empty player is a worse answer than
+  /// a padlock.
+  bool get isOpen {
+    if (locked) return false;
+    return isQuiz || hasMedia;
+  }
 }
 
 /// The `attempt` object the content tree carries on each quiz lesson. Enough

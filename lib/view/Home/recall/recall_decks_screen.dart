@@ -9,6 +9,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../../widget/app_refresh.dart';
+import '../../../widget/learning_plan_dialog.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 
@@ -93,7 +94,9 @@ class _RecallDecksScreenState extends State<RecallDecksScreen> {
       body: decks.isEmpty
           ? AppRefresh.fill(
               onRefresh: _refresh,
-              child: const RecallMessage(text: 'No recall cards here yet.'))
+              child: recall.featureLocked
+                  ? const PlanRequiredNotice(feature: 'Rapid Recall')
+                  : const RecallMessage(text: 'No recall cards here yet.'))
           : AppRefresh(
             onRefresh: _refresh,
             child: ListView(
@@ -105,12 +108,7 @@ class _RecallDecksScreenState extends State<RecallDecksScreen> {
                     RecallDeckTile.wired(
                       recall,
                       deck,
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => RecallCardsScreen(deckId: deck.id),
-                        ),
-                      ),
+                      onTap: () => openRecallDeck(context, deck),
                     ),
                     SizedBox(height: 12.h),
                   ],
@@ -145,6 +143,24 @@ class _RecallDecksScreenState extends State<RecallDecksScreen> {
       ),
     );
   }
+}
+
+/// Opens a deck, or says why it cannot be opened.
+///
+/// The same shape as a locked paper in the tests list: refused at the row,
+/// before the request, because the server answers a locked deck with a 403
+/// and a raw error is no answer to a student.
+Future<void> openRecallDeck(BuildContext context, RapidRecallDeck deck) async {
+  if (deck.locked) {
+    await showPlanRequiredDialog(context, lessonTitle: deck.title);
+    return;
+  }
+
+  if (!context.mounted) return;
+  await Navigator.push(
+    context,
+    MaterialPageRoute(builder: (_) => RecallCardsScreen(deckId: deck.id)),
+  );
 }
 
 /// One deck. Thumbnail, title, what is in it, and the bookmark.
@@ -244,12 +260,26 @@ class RecallDeckTile extends StatelessWidget {
                                 color: Colors.black87),
                           ),
                           SizedBox(height: 5.h),
-                          Text(
-                            deck.summary,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                                fontSize: 11.sp, color: Colors.grey.shade600),
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  deck.summary,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                      fontSize: 11.sp,
+                                      color: Colors.grey.shade600),
+                                ),
+                              ),
+                              // Listed, not hidden: a student cannot decide
+                              // to subscribe for a deck they never see.
+                              if (deck.locked) ...[
+                                SizedBox(width: 6.w),
+                                Icon(Icons.lock_outline_rounded,
+                                    size: 14.sp, color: Colors.grey.shade500),
+                              ],
+                            ],
                           ),
                         ],
                       ),

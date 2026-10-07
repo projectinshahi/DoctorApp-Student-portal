@@ -44,11 +44,19 @@ bool learningPlanInactive({
 
 /// The gate shown over home when the plan is not active.
 ///
-/// Not a dialog and not dismissible: no close button, the screen behind it
-/// takes no taps, and it is rebuilt from the providers — so it closes only
-/// when the plan is active, and comes back on the next app open if it is not.
+/// Closable, and what is behind it is not empty: without a plan a student
+/// still has the free lessons and the free questions of their course. The
+/// lock lives on each premium item — a locked lesson opens its paywall — so
+/// this says what is missing once rather than standing between them and the
+/// parts they can use.
+///
+/// Closing lasts for this run of the app. It is rebuilt from the providers
+/// on a fresh launch, which is where the plan is checked again.
 class LearningPlanGate extends StatelessWidget {
-  const LearningPlanGate({super.key});
+  /// Null leaves the gate without a close button — nothing passes null today.
+  final VoidCallback? onClose;
+
+  const LearningPlanGate({super.key, this.onClose});
 
   @override
   Widget build(BuildContext context) {
@@ -60,12 +68,14 @@ class LearningPlanGate extends StatelessWidget {
         color: Colors.transparent,
         child: Stack(
           children: [
-            // Swallows every tap meant for home — the nav bar included.
-            const ModalBarrier(dismissible: false, color: Color(0xB3000000)),
+            // Swallows taps meant for home while it is up: the card has to
+            // be answered or closed, not tapped around.
+            ModalBarrier(dismissible: onClose != null, onDismiss: onClose,
+                color: const Color(0xB3000000)),
             Center(
               child: SingleChildScrollView(
                 padding: EdgeInsets.symmetric(horizontal: 26.w, vertical: 32.h),
-                child: const LearningPlanCard(),
+                child: LearningPlanCard(onClose: onClose),
               ),
             ),
           ],
@@ -73,6 +83,141 @@ class LearningPlanGate extends StatelessWidget {
       ),
     );
   }
+}
+
+/// A whole feature behind a plan the student does not hold — said in place
+/// of the list, because there is no list to show.
+///
+/// The same words and the same way out as the notice on home: a plan is not
+/// something the app can sell, so every road here leads to the website.
+class PlanRequiredNotice extends StatelessWidget {
+  /// What they cannot reach: "Rapid Recall", "Grand Tests".
+  final String feature;
+
+  const PlanRequiredNotice({super.key, required this.feature});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: 34.w, vertical: 24.h),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 58.w,
+              height: 58.w,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: AppColor.buttoncolor.withValues(alpha: 0.12),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.lock_outline_rounded,
+                  size: 27.sp, color: AppColor.buttoncolor),
+            ),
+            SizedBox(height: 16.h),
+            Text(
+              '$feature is not in your plan',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                  fontSize: 16.sp,
+                  fontWeight: FontWeight.w800,
+                  color: const Color(0xFF1F2418)),
+            ),
+            SizedBox(height: 9.h),
+            Text(
+              'Plans are bought on our website, and your access appears here '
+              'straight after.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                  fontSize: 13.sp, height: 1.55, color: Colors.grey.shade700),
+            ),
+            SizedBox(height: 20.h),
+            ElevatedButton.icon(
+              onPressed: () => openWebsite(context),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColor.buttoncolor,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                padding: EdgeInsets.symmetric(horizontal: 22.w, vertical: 13.h),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14.r)),
+              ),
+              icon: Icon(Icons.open_in_new_rounded, size: 17.sp),
+              label: Text('Explore plans',
+                  style:
+                      TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// "Your learning plan is not active" — the same words as the notice on
+/// home, for a premium lesson tapped without a plan.
+///
+/// Shown before the lesson is opened rather than after: the server refuses it
+/// with a 403, and a student who taps a padlock is owed the reason and the
+/// way out, not an error screen.
+Future<void> showPlanRequiredDialog(BuildContext context,
+    {String? lessonTitle}) async {
+  final explore = await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      backgroundColor: const Color(0xFFEDF6D8),
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22.r)),
+      icon: Icon(Icons.lock_outline_rounded,
+          size: 30.sp, color: AppColor.buttoncolor),
+      title: Text(
+        'Your learning plan is not active',
+        textAlign: TextAlign.center,
+        style: TextStyle(
+            fontSize: 17.sp,
+            fontWeight: FontWeight.w800,
+            color: Colors.black87),
+      ),
+      content: Text(
+        lessonTitle == null || lessonTitle.isEmpty
+            ? 'This one is premium. Plans are bought on our website, and your '
+                'access appears here straight after.'
+            : '$lessonTitle is premium. Plans are bought on our website, and '
+                'your access appears here straight after.',
+        textAlign: TextAlign.center,
+        style: TextStyle(
+            fontSize: 13.sp,
+            height: 1.5,
+            color: Colors.black.withValues(alpha: 0.72)),
+      ),
+      actionsAlignment: MainAxisAlignment.center,
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(dialogContext, false),
+          child: Text('Not now',
+              style: TextStyle(
+                  fontSize: 13.sp,
+                  color: Colors.black.withValues(alpha: 0.6))),
+        ),
+        ElevatedButton(
+          onPressed: () => Navigator.pop(dialogContext, true),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColor.buttoncolor,
+            foregroundColor: Colors.white,
+            elevation: 0,
+            padding: EdgeInsets.symmetric(horizontal: 22.w, vertical: 12.h),
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(22.r)),
+          ),
+          child: Text('Explore plans',
+              style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700)),
+        ),
+      ],
+    ),
+  );
+
+  if (explore == true && context.mounted) await openWebsite(context);
 }
 
 /// "Your plan ends in 3 days" — the prompt an expiry reminder opens.
@@ -161,7 +306,9 @@ Future<bool> pollUntilActive({
 
 /// The card: what is wrong, and the one way out of it.
 class LearningPlanCard extends StatefulWidget {
-  const LearningPlanCard({super.key});
+  final VoidCallback? onClose;
+
+  const LearningPlanCard({super.key, this.onClose});
 
   @override
   State<LearningPlanCard> createState() => _LearningPlanCardState();
@@ -233,7 +380,8 @@ class _LearningPlanCardState extends State<LearningPlanCard>
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: EdgeInsets.fromLTRB(26.w, 30.h, 26.w, 22.h),
+      padding: EdgeInsets.fromLTRB(
+          26.w, widget.onClose == null ? 30.h : 14.h, 26.w, 22.h),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(28.r),
@@ -248,6 +396,20 @@ class _LearningPlanCardState extends State<LearningPlanCard>
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          if (widget.onClose != null)
+            Align(
+              alignment: Alignment.topRight,
+              child: GestureDetector(
+                onTap: widget.onClose,
+                // A plain icon is a 20px target. This one closes the only
+                // thing between the student and the free half of the course.
+                child: Padding(
+                  padding: EdgeInsets.only(left: 12.w, bottom: 4.h),
+                  child: Icon(Icons.close_rounded,
+                      size: 22.sp, color: Colors.grey.shade500),
+                ),
+              ),
+            ),
           Container(
             width: 62.w,
             height: 62.w,
@@ -272,9 +434,9 @@ class _LearningPlanCardState extends State<LearningPlanCard>
           ),
           SizedBox(height: 12.h),
           Text(
-            'Courses, tests and revision cards unlock with a plan. Plans are '
-            'bought on our website — it opens in your browser, and your '
-            'access appears here straight after.',
+            'The free lessons and questions in your course are open — close '
+            'this to use them. Everything marked premium unlocks with a plan, '
+            'bought on our website.',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 13.sp,

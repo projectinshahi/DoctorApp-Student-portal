@@ -2,7 +2,6 @@ import 'package:dr_app/models/student_plans_model.dart';
 import 'package:dr_app/repository/plan_access_provider.dart';
 import 'package:dr_app/services/student_plans_service.dart';
 import 'package:dr_app/widget/app_bottom_nav.dart';
-import 'package:dr_app/widget/feature_locked_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -83,39 +82,8 @@ void main() {
     });
   });
 
-  group('which tabs a plan covers', () {
-    test('a plan that lists mock tests and recalls covers those two', () {
-      const copy = ['Mock Test', 'Rapid Recalls'];
-
-      expect(planAllows(copy, PlanFeature.tests), isTrue);
-      expect(planAllows(copy, PlanFeature.recall), isTrue);
-      expect(planAllows(copy, PlanFeature.qbank), isFalse);
-      expect(planAllows(copy, PlanFeature.aiVideos), isFalse);
-    });
-
-    test('other wordings are recognised', () {
-      expect(planAllows(['MCQ Bank'], PlanFeature.qbank), isTrue);
-      expect(
-          planAllows(['Live Classes with Faculty'], PlanFeature.aiVideos),
-          isTrue);
-      expect(planAllows(['Video Lectures'], PlanFeature.aiVideos), isTrue);
-    });
-
-    test('nothing known locks nothing', () {
-      // The rule fails open on purpose: copy is written by hand and gets
-      // reworded, and locking a tab somebody paid for is the costly mistake.
-      // The server still refuses content that is not theirs.
-      for (final feature in PlanFeature.values) {
-        expect(planAllows(null, feature), isTrue, reason: '$feature');
-        expect(planAllows(const [], feature), isTrue, reason: '$feature');
-        expect(planAllows(const ['Everything in Plan C'], feature), isTrue,
-            reason: 'unrecognised copy: $feature');
-      }
-    });
-  });
-
   group('the provider', () {
-    test('marks the tabs the plan does not mention', () async {
+    test('reads the plan the student is on', () async {
       final access = PlanAccessProvider(
         service: _FakePlansService({
           'plans': [_plan(15, 'Plan B', isCurrent: true)],
@@ -129,105 +97,39 @@ void main() {
       );
       await access.load();
 
-      // 1 QBank and 3 AI Videos; 2 Tests and 4 Recall are in the copy.
-      expect(access.lockedTabs, {1, 3});
       expect(access.subscription?.planTitle, 'Plan B');
-    });
-
-    test('a withdrawn plan locks nothing, because its copy is unknown',
-        () async {
-      final access = PlanAccessProvider(
-        service: _FakePlansService({
-          'plans': [_plan(15, 'Plan B')],
-          'currentSubscription': {
-            'id': 5,
-            'planId': 7,
-            'plan': {'id': 7, 'title': 'Onam offere price'},
-            'daysLeft': 14,
-          },
-        }),
-      );
-      await access.load();
-
-      expect(access.currentFeatures, isNull);
-      expect(access.lockedTabs, isEmpty);
-    });
-
-    test('no subscription locks nothing either', () async {
-      // The learning-plan gate covers this student; tab padlocks on top
-      // would be a second answer to the same question.
-      final access = PlanAccessProvider(
-        service: _FakePlansService({
-          'plans': [_plan(15, 'Plan B')],
-          'currentSubscription': null,
-        }),
-      );
-      await access.load();
-
-      expect(access.lockedTabs, isEmpty);
-    });
-
-    test('signing out forgets the plan', () async {
-      final access = PlanAccessProvider(
-        service: _FakePlansService({'plans': [], 'currentSubscription': null}),
-      );
-      await access.load();
-
-      access.clear();
-      expect(access.plans, isNull);
-      expect(access.lockedTabs, isEmpty);
+      expect(access.plans?.isSubscribed, isTrue);
     });
   });
 
   group('what the student sees', () {
-    Future<void> pump(WidgetTester tester, Widget child) async {
+    testWidgets('every tab is open — access is decided inside them',
+        (tester) async {
+      // Locking a tab also shuts out the free lessons behind it, which is
+      // the part an unsubscribed student came for.
       tester.view.physicalSize = const Size(440, 956);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
 
+      final tapped = <int>[];
       await tester.pumpWidget(
         ScreenUtilInit(
           designSize: const Size(440, 956),
           minTextAdapt: true,
-          builder: (context, _) => MaterialApp(home: Scaffold(body: child)),
-        ),
-      );
-      await tester.pump();
-    }
-
-    testWidgets('a locked tab wears a padlock, and is still there',
-        (tester) async {
-      // Marked, not removed: a tab that vanishes reads as a broken app.
-      await pump(
-        tester,
-        AppBottomNav(currentIndex: 0, locked: const {1, 3}, onTap: (_) {}),
-      );
-
-      expect(find.byIcon(Icons.lock_rounded), findsNWidgets(2));
-      expect(find.text('QBank'), findsOneWidget);
-      expect(find.text('AI Videos'), findsOneWidget);
-    });
-
-    testWidgets('tapping one says what is missing and names the plan',
-        (tester) async {
-      await pump(
-        tester,
-        Builder(
-          builder: (context) => TextButton(
-            onPressed: () => showFeatureLockedDialog(context,
-                feature: 'QBank', planTitle: 'Plan B'),
-            child: const Text('tap'),
+          builder: (context, _) => MaterialApp(
+            home: Scaffold(
+              body: AppBottomNav(currentIndex: 0, onTap: tapped.add),
+            ),
           ),
         ),
       );
+      await tester.pump();
 
-      await tester.tap(find.text('tap'));
-      await tester.pumpAndSettle();
+      expect(find.byIcon(Icons.lock_rounded), findsNothing);
 
-      expect(find.text('QBank is not in your plan'), findsOneWidget);
-      expect(find.textContaining('Plan B'), findsOneWidget);
-      expect(find.text('See plans'), findsOneWidget);
+      await tester.tap(find.text('QBank'));
+      expect(tapped, [1]);
     });
   });
 

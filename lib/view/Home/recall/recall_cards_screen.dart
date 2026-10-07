@@ -17,6 +17,7 @@ import '../../../repository/rapid_recall_provider.dart';
 import '../../../services/app_analytics.dart';
 import '../../../widget/app_bottom_nav.dart';
 import '../../../widget/app_loading.dart';
+import '../../../widget/learning_plan_dialog.dart';
 import '../../../widget/app_snackbar.dart';
 import '../../../widget/loading_wave.dart';
 import '../lessons/videoplay/PdfViewerModal.dart';
@@ -58,6 +59,26 @@ class _RecallCardsScreenState extends State<RecallCardsScreen> {
           recall.siblingsOf(widget.deckId).map((deck) => deck.id),
         ));
       });
+    });
+  }
+
+  /// A deck that was open when the list was drawn and is not any more.
+  ///
+  /// A subscription expiring mid-session does exactly that, and the row check
+  /// cannot catch it — the list in hand is older than the tap. Says the same
+  /// thing the row would have said, then goes back, because there is nothing
+  /// on this screen to stay for.
+  bool _refusalShown = false;
+
+  void _answerPaywall() {
+    if (_refusalShown || !mounted) return;
+    _refusalShown = true;
+
+    final title = context.read<RapidRecallProvider>().deck(widget.deckId)?.title;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      await showPlanRequiredDialog(context, lessonTitle: title);
+      if (mounted) Navigator.of(context).maybePop();
     });
   }
 
@@ -109,6 +130,7 @@ class _RecallCardsScreenState extends State<RecallCardsScreen> {
     final others = recall.siblingsOf(widget.deckId);
 
     final error = recall.deckError(widget.deckId);
+    if (recall.deckNeedsPlan(widget.deckId)) _answerPaywall();
 
     // Only a deck never opened waits — and not once its fetch has failed,
     // which would leave a spinner turning above the error. One opened before
@@ -433,7 +455,13 @@ class _MoreDecks extends StatelessWidget {
         ),
         SizedBox(height: 12.h),
         for (final deck in decks) ...[
-          RecallDeckTile.wired(recall, deck, onTap: () => onOpen(deck.id)),
+          RecallDeckTile.wired(
+            recall,
+            deck,
+            onTap: () => deck.locked
+                ? showPlanRequiredDialog(context, lessonTitle: deck.title)
+                : onOpen(deck.id),
+          ),
           SizedBox(height: 12.h),
         ],
       ],

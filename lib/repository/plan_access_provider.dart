@@ -1,24 +1,17 @@
 // lib/repository/plan_access_provider.dart
 //
-// Which tabs this student's plan covers.
+// The plan this student is on: which one, and how long it has left.
 //
-// A hint, not the authority. The server decides access — it checks the plan's
-// entitlement codes, which it deliberately does not send to the phone — and
-// all this does is mark a tab the plan's own card copy does not mention, so a
-// student is not sent into a section that will refuse them.
-//
-// It fails open on purpose. Copy is written by hand and gets reworded, so an
-// unrecognised bullet leaves the tab open and the server turns the student
-// away if it really is not theirs. The opposite mistake — locking a tab
-// somebody paid for because a bullet was renamed — is the one that costs.
+// It decides nothing. Access is per item and the server decides it — a
+// premium lesson comes back locked with its media stripped, a premium
+// question is never in the set at all. This once marked whole tabs as locked
+// by reading the plan's marketing bullets for words like "Mock Test", which
+// shut an unsubscribed student out of the free lessons behind those tabs too.
 import 'package:flutter/foundation.dart';
 
 import '../models/quiz_model.dart' show QuizException;
 import '../models/student_plans_model.dart';
 import '../services/student_plans_service.dart';
-
-/// The tabs a plan can cover.
-enum PlanFeature { qbank, tests, aiVideos, recall }
 
 class PlanAccessProvider extends ChangeNotifier {
   final StudentPlansService _service;
@@ -52,17 +45,9 @@ class PlanAccessProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// The card copy of the plan they hold, or null when it cannot be known —
-  /// no subscription yet, or a plan that has since been taken off sale and so
-  /// has no card. Null means "do not lock anything".
-  List<String>? get currentFeatures {
-    final data = plans;
-    if (data == null || !data.isSubscribed) return null;
-    return data.currentCard?.features;
-  }
-
-  /// The plan they are on, for the banner. Straight off currentSubscription,
-  /// never looked up among the cards — a withdrawn plan is not there.
+  /// The plan they are on, for the banner and the countdown. Straight off
+  /// currentSubscription, never looked up among the cards — a plan taken off
+  /// sale still has students on it and has no card.
   CurrentSubscription? get subscription => plans?.currentSubscription;
 
   /// Days left on the plan, whatever that number is. Null with no plan.
@@ -80,16 +65,6 @@ class PlanAccessProvider extends ChangeNotifier {
   /// How close to the end the countdown starts.
   static const int renewalWindow = 10;
 
-  bool allows(PlanFeature feature) => planAllows(currentFeatures, feature);
-
-  /// The tabs to mark locked, by their index in the bottom bar.
-  Set<int> get lockedTabs => {
-        if (!allows(PlanFeature.qbank)) 1,
-        if (!allows(PlanFeature.tests)) 2,
-        if (!allows(PlanFeature.aiVideos)) 3,
-        if (!allows(PlanFeature.recall)) 4,
-      };
-
   void clear() {
     plans = null;
     errorMessage = null;
@@ -97,36 +72,6 @@ class PlanAccessProvider extends ChangeNotifier {
     _fetched = false;
     notifyListeners();
   }
-}
-
-/// Whether [features] — a plan's card copy — mentions [feature].
-///
-/// Matched loosely, and open when nothing is known: see the note at the top
-/// of this file. "Mock Test" covers the tests tab; "Rapid Recalls" covers
-/// recall; neither mentions videos, so that one is marked.
-@visibleForTesting
-bool planAllows(List<String>? features, PlanFeature feature) {
-  if (features == null || features.isEmpty) return true;
-
-  final copy = features.map((line) => line.toLowerCase()).join(' | ');
-
-  // Copy this rule cannot read at all — "Everything in Plan C" — is not a
-  // plan without features, it is a plan whose wording says nothing about
-  // them. Locking every tab on that basis is exactly the mistake worth
-  // avoiding, so an unreadable card locks nothing.
-  if (!PlanFeature.values.any((known) => _mentions(known, copy))) return true;
-
-  return _mentions(feature, copy);
-}
-
-bool _mentions(PlanFeature feature, String copy) {
-  final words = switch (feature) {
-    PlanFeature.qbank => ['mcq', 'question', 'qbank', 'q bank', 'quiz', 'practice'],
-    PlanFeature.tests => ['mock', 'test', 'grand', 'exam'],
-    PlanFeature.recall => ['recall', 'revision', 'flash', 'card'],
-    PlanFeature.aiVideos => ['video', 'lecture', 'class', 'ai ', 'patient'],
-  };
-  return words.any(copy.contains);
 }
 
 /// How many days [subscription] has left, or null when there is no plan.

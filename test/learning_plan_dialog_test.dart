@@ -185,6 +185,44 @@ void main() {
     });
   });
 
+  group('closing it', () {
+    testWidgets('the close button lets the student reach the free content',
+        (tester) async {
+      // The free lessons and questions of a premium course are open to an
+      // unsubscribed student. Without this they could not be got to.
+      tester.view.physicalSize = const Size(440, 956);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      var closed = false;
+      await tester.pumpWidget(
+        ChangeNotifierProvider(
+          create: (_) => AuthProvider(),
+          child: ScreenUtilInit(
+            designSize: const Size(440, 956),
+            minTextAdapt: true,
+            builder: (context, _) => MaterialApp(
+              home: Scaffold(
+                body: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    const SizedBox.expand(),
+                    LearningPlanGate(onClose: () => closed = true),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      await tester.tap(find.byIcon(Icons.close_rounded));
+      expect(closed, isTrue);
+    });
+  });
+
   group('waiting for a payment to land', () {
     // The webhook that marks the student paid arrives a moment after they
     // come back, so a single look would put the lock straight back on.

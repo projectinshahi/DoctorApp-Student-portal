@@ -10,6 +10,9 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../../widget/access_chip.dart';
+import '../../../widget/learning_plan_dialog.dart';
+
 import '../../../widget/app_refresh.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
@@ -123,6 +126,13 @@ class _TestsTabState extends State<TestsTab> with RefreshOnVisible<TestsTab> {
   }
 
   Future<void> _open(TestSummary test) async {
+    // A padlocked paper is answered here. Starting it would be refused by the
+    // server, and a timed paper is the worst place to find that out.
+    if (!test.isOpen) {
+      await showPlanRequiredDialog(context, lessonTitle: test.name);
+      return;
+    }
+
     // One attempt each: a finished paper opens its result and nothing else.
     if (test.isSubmitted) {
       final attempt = test.lastAttempt;
@@ -411,11 +421,30 @@ class _PendingCard extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(test.name,
-                            style: TextStyle(
-                                fontSize: 15.sp,
-                                fontWeight: FontWeight.w700,
-                                color: _kInk)),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Text(test.name,
+                                  style: TextStyle(
+                                      fontSize: 15.sp,
+                                      fontWeight: FontWeight.w700,
+                                      color: _kInk)),
+                            ),
+                            // Says what the paper is; the padlock beside it
+                            // says whether this student may sit it. Both are
+                            // absent on a server that does not mark papers.
+                            if (test.accessType != null) ...[
+                              SizedBox(width: 8.w),
+                              AccessChip(accessType: test.accessType!),
+                            ],
+                            if (!test.isOpen) ...[
+                              SizedBox(width: 6.w),
+                              Icon(Icons.lock_outline_rounded,
+                                  size: 16.sp, color: Colors.grey.shade500),
+                            ],
+                          ],
+                        ),
                         SizedBox(height: 8.h),
                         Wrap(
                           spacing: 8.w,

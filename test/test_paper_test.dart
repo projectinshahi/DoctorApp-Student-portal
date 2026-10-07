@@ -406,4 +406,97 @@ void main() {
       expect(result.questionText, isNull, reason: 'an image-only stem');
     });
   });
+
+  group('a paper with six options', () {
+    TestQuestion question(Map<String, dynamic> extra) =>
+        TestQuestion.fromJson({
+          'id': 1,
+          'questionOrder': 1,
+          'questionText': 'Which is correct?',
+          'optionA': 'Alpha',
+          'optionB': 'Bravo',
+          'optionC': 'Charlie',
+          'optionD': 'Delta',
+          ...extra,
+        });
+
+    test('all six are offered, and each letter resolves to its own option',
+        () {
+      final six = question({'optionE': 'Echo', 'optionF': 'Foxtrot'});
+
+      expect(six.letters, ['A', 'B', 'C', 'D', 'E', 'F']);
+      // The fallback used to be optionD, so E and F both read "Delta" and a
+      // question answered E could not be answered at all.
+      expect(six.textFor('E'), 'Echo');
+      expect(six.textFor('F'), 'Foxtrot');
+      expect(six.textFor('D'), 'Delta');
+    });
+
+    test('a four-option paper is unchanged', () {
+      expect(question(const {}).letters, ['A', 'B', 'C', 'D']);
+    });
+
+    test('a blank F is not a sixth option', () {
+      // The server sends an empty string for an option that is not there.
+      final five = question({'optionE': 'Echo', 'optionF': ''});
+
+      expect(five.letters, ['A', 'B', 'C', 'D', 'E']);
+      expect(five.textFor('F'), isNull);
+    });
+
+    test('a letter the app does not know draws nothing', () {
+      final six = question({'optionE': 'Echo', 'optionF': 'Foxtrot'});
+
+      expect(six.textFor('G'), isNull);
+      expect(six.imageFor('G'), isNull);
+    });
+
+    test('option images follow their own letters too', () {
+      final withImages = question({
+        'optionE': 'Echo',
+        'optionEImageUrl': 'https://cdn.test/e.png',
+        'optionF': 'Foxtrot',
+        'optionFImageUrl': '',
+      });
+
+      expect(withImages.imageFor('E'), 'https://cdn.test/e.png');
+      expect(withImages.imageFor('F'), isNull);
+    });
+  });
+
+  group('a paper that is free or premium', () {
+    TestSummary paper(Map<String, dynamic> extra) => TestSummary.fromJson({
+          'id': 3,
+          'name': 'Grand Test 2',
+          'type': 'GRAND_TEST',
+          'totalQuestions': 50,
+          'durationMinutes': 60,
+          'marksCorrect': 1,
+          'marksIncorrect': -0.25,
+          'attemptCount': 0,
+          ...extra,
+        });
+
+    test('a server that does not mark its papers locks nothing', () {
+      // What the live list sends today: no accessType, no locked. Every paper
+      // opens exactly as it did before, and no chip is drawn.
+      final plain = paper(const {});
+
+      expect(plain.accessType, isNull);
+      expect(plain.locked, isFalse);
+      expect(plain.isOpen, isTrue);
+    });
+
+    test('a premium paper this student has not paid for is shut', () {
+      final premium = paper({'accessType': 'premium', 'locked': true});
+
+      expect(premium.isPremium, isTrue);
+      expect(premium.isOpen, isFalse);
+    });
+
+    test('a free paper opens, and a paid-for premium one does too', () {
+      expect(paper({'accessType': 'free'}).isOpen, isTrue);
+      expect(paper({'accessType': 'premium', 'locked': false}).isOpen, isTrue);
+    });
+  });
 }

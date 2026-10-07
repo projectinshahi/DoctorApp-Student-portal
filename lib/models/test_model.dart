@@ -81,6 +81,15 @@ class TestSummary {
   /// Retakes are unlimited, so this only ever grows.
   final int attemptCount;
 
+  /// `free` or `premium`, when the server says. Null on a server that does
+  /// not mark its papers — then there is nothing to label and nothing to
+  /// lock, which is how this list behaved before.
+  final String? accessType;
+
+  /// Whether this student may sit it. False unless the server says otherwise,
+  /// so an older response opens every paper exactly as it used to.
+  final bool locked;
+
   final TestLastAttempt? lastAttempt;
 
   TestSummary({
@@ -92,6 +101,8 @@ class TestSummary {
     required this.marksCorrect,
     required this.marksIncorrect,
     required this.attemptCount,
+    this.accessType,
+    this.locked = false,
     this.lastAttempt,
   });
 
@@ -104,6 +115,8 @@ class TestSummary {
         marksCorrect: _toDouble(json['marksCorrect']),
         marksIncorrect: _toDouble(json['marksIncorrect']),
         attemptCount: _toInt(json['attemptCount']),
+        accessType: _text(json['accessType'])?.toLowerCase(),
+        locked: json['locked'] == true,
         lastAttempt: json['lastAttempt'] is Map
             ? TestLastAttempt.fromJson(
                 Map<String, dynamic>.from(json['lastAttempt'] as Map))
@@ -132,6 +145,13 @@ class TestSummary {
   /// Nothing left to do: submitted, or out of time.
   bool get isFinished => isSubmitted || isTimedOut;
   bool get hasNegativeMarking => marksIncorrect < 0;
+
+  bool get isPremium => accessType == 'premium';
+
+  /// The server decides, exactly as it does for a lesson: a paper it will not
+  /// serve is shut here too, so the student is refused at the card rather
+  /// than after the clock has started.
+  bool get isOpen => !locked;
 
   /// What a perfect paper scores. The list endpoint sends the two factors but
   /// not the product, and a score means nothing without it — "0.75" reads
@@ -171,6 +191,10 @@ class TestQuestion {
   final String? optionCImageUrl;
   final String? optionD;
   final String? optionDImageUrl;
+  final String? optionE;
+  final String? optionEImageUrl;
+  final String? optionF;
+  final String? optionFImageUrl;
 
   TestQuestion({
     required this.id,
@@ -185,6 +209,10 @@ class TestQuestion {
     this.optionCImageUrl,
     this.optionD,
     this.optionDImageUrl,
+    this.optionE,
+    this.optionEImageUrl,
+    this.optionF,
+    this.optionFImageUrl,
   });
 
   factory TestQuestion.fromJson(Map<String, dynamic> json) => TestQuestion(
@@ -200,6 +228,10 @@ class TestQuestion {
         optionCImageUrl: _text(json['optionCImageUrl']),
         optionD: _text(json['optionD']),
         optionDImageUrl: _text(json['optionDImageUrl']),
+        optionE: _text(json['optionE']),
+        optionEImageUrl: _text(json['optionEImageUrl']),
+        optionF: _text(json['optionF']),
+        optionFImageUrl: _text(json['optionFImageUrl']),
       );
 
   /// The letters this question actually offers. A paper is not always A–D:
@@ -209,20 +241,33 @@ class TestQuestion {
         if (optionB != null || optionBImageUrl != null) 'B',
         if (optionC != null || optionCImageUrl != null) 'C',
         if (optionD != null || optionDImageUrl != null) 'D',
+        if (optionE != null || optionEImageUrl != null) 'E',
+        if (optionF != null || optionFImageUrl != null) 'F',
       ];
 
+  /// Every letter spelled out, and an unknown one draws nothing.
+  ///
+  /// The fallback used to be optionD, so a six-option paper showed D's text
+  /// under E and under F — and a question whose answer was E could not be
+  /// answered at all.
   String? textFor(String letter) => switch (letter) {
         'A' => optionA,
         'B' => optionB,
         'C' => optionC,
-        _ => optionD,
+        'D' => optionD,
+        'E' => optionE,
+        'F' => optionF,
+        _ => null,
       };
 
   String? imageFor(String letter) => switch (letter) {
         'A' => optionAImageUrl,
         'B' => optionBImageUrl,
         'C' => optionCImageUrl,
-        _ => optionDImageUrl,
+        'D' => optionDImageUrl,
+        'E' => optionEImageUrl,
+        'F' => optionFImageUrl,
+        _ => null,
       };
 }
 

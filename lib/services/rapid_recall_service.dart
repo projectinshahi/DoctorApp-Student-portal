@@ -16,7 +16,18 @@ class RapidRecallList {
   final List<RapidRecallDeck> decks;
   final String? reason;
 
-  const RapidRecallList({required this.decks, this.reason});
+  /// The whole feature is behind a plan this student does not hold.
+  ///
+  /// Separate from a deck's own lock, and the only answer when the list comes
+  /// back empty: with no decks to padlock there is nothing else to say, and
+  /// "nothing here yet" would be a lie about a feature that is full.
+  final bool locked;
+
+  const RapidRecallList({
+    required this.decks,
+    this.reason,
+    this.locked = false,
+  });
 }
 
 class RapidRecallService {
@@ -61,6 +72,7 @@ class RapidRecallService {
               .map((d) => RapidRecallDeck.fromJson(Map<String, dynamic>.from(d)))
               .toList()
           : const [],
+      locked: json['locked'] == true,
       reason: (json['reason'] as String?)?.trim().isNotEmpty == true
           ? json['reason'] as String
           : null,

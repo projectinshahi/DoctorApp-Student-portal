@@ -44,6 +44,17 @@ class RapidRecallDeck {
   /// Empty until the deck is opened — the list endpoint sends no cards.
   final List<RecallCard> cards;
 
+  /// Whether this student may open it. The server's answer, never worked out
+  /// here: it already accounts for a free course, for a plan that names no
+  /// entitlements and so buys everything, and for two subscriptions adding
+  /// up. False unless the server says otherwise, so an older response opens
+  /// every deck exactly as it used to.
+  ///
+  /// A locked deck stays in the list on purpose — nobody subscribes for
+  /// something they cannot see — and its `noteUrl` comes back null, so the
+  /// handout cannot be fetched around the paywall.
+  final bool locked;
+
   const RapidRecallDeck({
     required this.id,
     required this.title,
@@ -58,6 +69,7 @@ class RapidRecallDeck {
     this.displayOrder = 0,
     this.cardCount = 0,
     this.cards = const [],
+    this.locked = false,
   });
 
   bool get hasHandout => (noteUrl ?? '').isNotEmpty;
@@ -113,6 +125,7 @@ class RapidRecallDeck {
               .map((c) => RecallCard.fromJson(Map<String, dynamic>.from(c)))
               .toList()
           : const [],
+      locked: json['locked'] == true,
     );
   }
 }

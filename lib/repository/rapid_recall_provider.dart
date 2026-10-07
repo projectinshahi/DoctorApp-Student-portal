@@ -6,7 +6,7 @@ import 'package:flutter/foundation.dart';
 
 import '../core/constant/local_storage.dart';
 import '../core/utils/load_timer.dart';
-import '../models/quiz_model.dart' show QuizException;
+import '../models/quiz_model.dart' show QuizException, QuizErrorKind;
 import '../models/rapid_recall_model.dart';
 import '../services/rapid_recall_service.dart';
 
@@ -34,6 +34,10 @@ class RapidRecallProvider extends ChangeNotifier {
   /// Shown instead of the empty state, which would be the wrong answer.
   String? reason;
 
+  /// Rapid Recall is not in this student's plan. Said once, for the feature,
+  /// rather than deck by deck — the list can be empty and still locked.
+  bool featureLocked = false;
+
   bool isLoading = false;
   String? errorMessage;
 
@@ -55,7 +59,11 @@ class RapidRecallProvider extends ChangeNotifier {
   /// the shared [errorMessage]: thumbnails load decks in the background, and
   /// one of those failing must not put its error on a different deck's
   /// screen.
-  final Map<int, String> _deckErrors = {};
+  ///
+  /// The whole exception, not its sentence: a 403 for a deck that needs a
+  /// subscription is answered with the plan dialog, and telling it apart from
+  /// a network failure means keeping the kind.
+  final Map<int, QuizException> _deckErrors = {};
 
   /// Bookmarked deck ids. Device-local: there is no saved-recall endpoint, so
   /// these do not follow the student to another phone.
@@ -75,6 +83,7 @@ class RapidRecallProvider extends ChangeNotifier {
       final list = RapidRecallService.parseList(jsonDecode(stored));
       decks = list.decks;
       reason = list.reason;
+      featureLocked = list.locked;
       // Not _fetched: that means the server answered, and this did not.
       notifyListeners();
     } catch (_) {
@@ -116,6 +125,7 @@ class RapidRecallProvider extends ChangeNotifier {
           detail: (l) => '${l.decks.length} decks');
       decks = list.decks;
       reason = list.reason;
+      featureLocked = list.locked;
       _fetched = true;
     } on QuizException catch (e) {
       errorMessage = e.message;
@@ -266,13 +276,18 @@ class RapidRecallProvider extends ChangeNotifier {
         detail: (d) => '${d.cards.length} cards',
       );
     } on QuizException catch (e) {
-      _deckErrors[id] = e.message;
+      _deckErrors[id] = e;
     }
 
     notifyListeners();
   }
 
-  String? deckError(int id) => _deckErrors[id];
+  String? deckError(int id) => _deckErrors[id]?.message;
+
+  /// This deck needs a subscription the student does not have. A list can go
+  /// stale — a plan expiring mid-session locks a deck that was open when the
+  /// screen was drawn — so the screen asks after a failed fetch too.
+  bool deckNeedsPlan(int id) => _deckErrors[id]?.kind == QuizErrorKind.locked;
 
   /// Fetches the cards for decks about to be shown in a list — their first
   /// image is the row's thumbnail, and the deck then opens instantly.
@@ -324,6 +339,7 @@ class RapidRecallProvider extends ChangeNotifier {
   void clear() {
     decks = const [];
     reason = null;
+    featureLocked = false;
     errorMessage = null;
     isLoading = false;
     _fetched = false;

@@ -14,14 +14,13 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../../../widget/app_refresh.dart';
+import '../../../widget/learning_plan_dialog.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/utils/refresh_on_visible.dart';
 import '../../../models/rapid_recall_model.dart';
-import '../../../repository/plan_access_provider.dart';
 import '../../../repository/rapid_recall_provider.dart';
-import '../../../widget/feature_locked_dialog.dart';
 import '../../../widget/app_bottom_nav.dart';
 import '../../../widget/app_loading.dart';
 import '../Qbank/qbank_subjects_screen.dart' show QbankRowTile;
@@ -105,6 +104,12 @@ class _RecallTopicsScreenState extends State<RecallTopicsScreen>
       body = AppRefresh.fill(
           onRefresh: onRefresh,
           child: RecallMessage(text: recall.errorMessage!));
+    } else if (recall.featureLocked && recall.decks.isEmpty) {
+      // Locked with nothing to padlock. "No recall cards here yet" would be a
+      // lie about a feature that is full — the student simply cannot see it.
+      body = AppRefresh.fill(
+          onRefresh: onRefresh,
+          child: const PlanRequiredNotice(feature: 'Rapid Recall'));
     } else if (recall.reason != null && recall.decks.isEmpty) {
       // The server's own sentence — "No course selected yet." — which is a
       // different answer from an empty shelf.
@@ -213,7 +218,6 @@ class _RecallTopicsScreenState extends State<RecallTopicsScreen>
       // Already on Recall: tapping it again has nowhere to go.
       bottomNavigationBar: AppBottomNav(
         currentIndex: 4,
-        locked: context.watch<PlanAccessProvider>().lockedTabs,
         onTap: (index) {
           if (index != 4) openTabFromRecall(context, index);
         },
@@ -311,17 +315,6 @@ PreferredSizeWidget recallAppBar(
 /// same stack home builds when the tab is tapped there, so back from it
 /// lands on home rather than on a Recall screen left underneath.
 void openTabFromRecall(BuildContext context, int index) {
-  // The same tabs are locked here as on home — otherwise the bar in Recall
-  // is a way around the one on home.
-  const names = {1: 'QBank', 2: 'Grand Tests', 3: 'AI Videos'};
-  final access = context.read<PlanAccessProvider>();
-  if (access.lockedTabs.contains(index)) {
-    showFeatureLockedDialog(context,
-        feature: names[index] ?? 'This section',
-        planTitle: access.subscription?.planTitle);
-    return;
-  }
-
   final navigator = Navigator.of(context);
   navigator.popUntil((route) => route.isFirst);
 

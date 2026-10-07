@@ -1,5 +1,8 @@
 // lib/view/Home/dashbord/ai_video_tab.dart
 import 'package:flutter/material.dart';
+
+import '../../../widget/access_chip.dart';
+import '../../../widget/learning_plan_dialog.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 
@@ -379,16 +382,23 @@ class _AiVideoTabState extends State<AiVideoTab> with RefreshOnVisible<AiVideoTa
                         final lesson = lessons[index];
 
                         return GestureDetector(
-                          // Locked lessons open too: the detail screen shows
-                          // the plans paywall. A snackbar here used to swallow
-                          // the tap, so a pro video had no way to sell itself.
-                          onTap: () => _open(
-                            StudentLessonDetailScreen(
-                              lesson: lesson,
-                              // all currently-visible lessons become "related"
-                              relatedLessons: lessons,
-                            ),
-                          ),
+                          // A padlocked lesson is answered here, the way a
+                          // locked quiz, paper and recall deck already are.
+                          // It used to open the detail screen for its paywall,
+                          // which is two screens to say one thing — and the
+                          // server strips the video, so there is nothing
+                          // behind it to see.
+                          onTap: () => lesson.isOpen
+                              ? _open(
+                                  StudentLessonDetailScreen(
+                                    lesson: lesson,
+                                    // all currently-visible lessons become
+                                    // "related"
+                                    relatedLessons: lessons,
+                                  ),
+                                )
+                              : showPlanRequiredDialog(context,
+                                  lessonTitle: lesson.title),
                           child: Container(
                             width: double.infinity,
                             padding: EdgeInsets.all(10.w),
@@ -437,7 +447,7 @@ class _AiVideoTabState extends State<AiVideoTab> with RefreshOnVisible<AiVideoTa
                                           ),
                                         ),
                                       ),
-                                    if (lesson.locked)
+                                    if (!lesson.isOpen)
                                       Positioned(
                                         top: 4,
                                         left: 4,
@@ -480,23 +490,10 @@ class _AiVideoTabState extends State<AiVideoTab> with RefreshOnVisible<AiVideoTa
                                       ],
                                       SizedBox(height: 6.h),
                                       _LessonProgressLine(lesson: lesson),
-                                      Container(
-                                        padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 3.h),
-                                        decoration: BoxDecoration(
-                                          color: lesson.isPremium
-                                              ? Colors.orange.withOpacity(0.12)
-                                              : Colors.green.withOpacity(0.12),
-                                          borderRadius: BorderRadius.circular(8.r),
-                                        ),
-                                        child: Text(
-                                          lesson.accessType.toUpperCase(),
-                                          style: TextStyle(
-                                            fontSize: 9.sp,
-                                            fontWeight: FontWeight.w700,
-                                            color: lesson.isPremium ? Colors.orange : Colors.green,
-                                            letterSpacing: 0.4,
-                                          ),
-                                        ),
+                                      Align(
+                                        alignment: Alignment.centerLeft,
+                                        child: AccessChip(
+                                            accessType: lesson.accessType),
                                       ),
                                     ],
                                   ),

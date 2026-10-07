@@ -2,6 +2,7 @@ import 'package:dr_app/models/selection_content_model.dart';
 import 'package:dr_app/view/Home/Qbank/qbank_subjects_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:dr_app/widget/learning_plan_dialog.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 LessonAttemptInfo _attempt({
@@ -156,5 +157,82 @@ void main() {
     );
     expect(tester.takeException(), isNull);
     expect(find.text('Retest'), findsOneWidget);
+  });
+
+  testWidgets('a row says whether it is free or premium, as the admin set it',
+      (tester) async {
+    await _pump(
+      tester,
+      QbankRowTile(
+        icon: Icons.help_outline_rounded,
+        title: 'Cardiology',
+        subtitle: '40 MCQs',
+        accessType: 'premium',
+        locked: true,
+        onTap: () {},
+      ),
+    );
+
+    expect(find.text('Premium'), findsOneWidget);
+    // The chip says what the lesson is; the padlock says this student cannot
+    // open it. A subscriber sees the chip with no padlock.
+    expect(find.byIcon(Icons.lock_outline_rounded), findsOneWidget);
+  });
+
+  testWidgets('a free row is labelled free and carries no padlock',
+      (tester) async {
+    await _pump(
+      tester,
+      QbankRowTile(
+        icon: Icons.help_outline_rounded,
+        title: 'Cardiology',
+        subtitle: '12 MCQs',
+        accessType: 'free',
+        onTap: () {},
+      ),
+    );
+
+    expect(find.text('Free'), findsOneWidget);
+    expect(find.byIcon(Icons.lock_outline_rounded), findsNothing);
+  });
+
+  testWidgets('a row that is not a lesson wears no chip at all',
+      (tester) async {
+    // Topics and Recall decks share this row and have no access of their own.
+    await _pump(
+      tester,
+      QbankRowTile(
+        icon: Icons.style_outlined,
+        title: 'Internal Medicine',
+        subtitle: '4 decks',
+        onTap: () {},
+      ),
+    );
+
+    expect(find.text('Free'), findsNothing);
+    expect(find.text('Premium'), findsNothing);
+  });
+
+  testWidgets('a padlocked quiz says why, and offers the website',
+      (tester) async {
+    // The server answers a locked lesson with 403 "Subscribe to unlock it",
+    // so the quiz screen is never opened: the student gets the reason here.
+    await _pump(
+      tester,
+      Builder(
+        builder: (context) => TextButton(
+          onPressed: () =>
+              showPlanRequiredDialog(context, lessonTitle: 'Cardiology'),
+          child: const Text('tap'),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('tap'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Your learning plan is not active'), findsOneWidget);
+    expect(find.textContaining('Cardiology is premium'), findsOneWidget);
+    expect(find.text('Explore plans'), findsOneWidget);
   });
 }

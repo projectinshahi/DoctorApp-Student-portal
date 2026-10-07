@@ -2,6 +2,9 @@ import 'dart:async';
 // lib/view/Home/Qbank/qbank_subjects_screen.dart
 import 'package:flutter/material.dart';
 
+import '../../../widget/access_chip.dart';
+import '../../../widget/learning_plan_dialog.dart';
+
 import '../../../widget/app_refresh.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
@@ -78,6 +81,15 @@ class _QbankSubjectsScreenState extends State<QbankSubjectsScreen>
     StudentLessonModel lesson, {
     bool retake = false,
   }) async {
+    // A padlock is answered here, not by the quiz screen. The server refuses
+    // a locked lesson with a 403 — "This lesson is locked. Subscribe to
+    // unlock it." — so opening it only to fail is a screen the student has no
+    // reason to see. A free lesson comes back unlocked and goes straight in.
+    if (!lesson.isOpen) {
+      await showPlanRequiredDialog(context, lessonTitle: lesson.title);
+      return;
+    }
+
     await Navigator.push(
       context,
       MaterialPageRoute(
@@ -159,7 +171,8 @@ class _QbankSubjectsScreenState extends State<QbankSubjectsScreen>
                     subtitle: lesson.quizQuestionCount == null
                         ? "MCQs"
                         : "${lesson.quizQuestionCount} MCQs",
-                    locked: lesson.locked,
+                    locked: !lesson.isOpen,
+                    accessType: lesson.accessType,
                     attempt: lesson.attempt,
                     onTap: () => _openQuiz(context, lesson),
                     onRetake: () => _openQuiz(context, lesson, retake: true),
@@ -177,6 +190,10 @@ class QbankRowTile extends StatelessWidget {
   final String title;
   final String subtitle;
   final bool locked;
+
+  /// `free` or `premium`. Null on rows that are not a lesson — a topic, a
+  /// Recall deck — which have no access of their own.
+  final String? accessType;
 
   /// This student's latest attempt, straight off the content tree. Null on a
   /// quiz never started and on every non-quiz row, so it stays nullable.
@@ -197,6 +214,7 @@ class QbankRowTile extends StatelessWidget {
     required this.subtitle,
     required this.onTap,
     this.locked = false,
+    this.accessType,
     this.attempt,
     this.onRetake,
   });
@@ -250,6 +268,10 @@ class QbankRowTile extends StatelessWidget {
             ],
           ),
         ),
+        if (accessType != null) ...[
+          SizedBox(width: 6.w),
+          AccessChip(accessType: accessType!),
+        ],
         if (locked) ...[
           SizedBox(width: 6.w),
           Icon(Icons.lock_outline_rounded, size: 16.sp, color: Colors.grey.shade500),

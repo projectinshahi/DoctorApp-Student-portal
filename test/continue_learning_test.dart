@@ -139,17 +139,19 @@ void main() {
       expect(items.single.lesson.id, 2);
     });
 
-    test('a locked lesson keeps its place but loses its url', () {
+    test('the next video shows even when it is locked', () {
+      // It is still the next video. The card wears a padlock and its tap is
+      // answered by the plan dialog, the same as in AI Videos.
       final items = pickLearningItems(
         inProgress: const [],
         content: _content([_lesson(id: 3, locked: true, position: 40)]),
       );
 
-      // The resume point is not the media — but a null url is what sends the
-      // tap to the paywall instead of a null controller.
+      expect(items.single.lesson.id, 3);
       expect(items.single.lesson.locked, isTrue);
+      // Stripped on the way out, which is what routes the tap away from a
+      // player with nothing in it.
       expect(items.single.lesson.videoUrl, isNull);
-      expect(items.single.resumeAt, '0:40');
     });
   });
 

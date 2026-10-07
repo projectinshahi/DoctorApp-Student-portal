@@ -900,4 +900,96 @@ void main() {
       expect(find.text('No recall cards here yet.'), findsNothing);
     });
   });
+
+  group('a feature behind the paywall', () {
+    test('a locked feature with no decks is not an empty shelf', () {
+      // What the live server sends an unsubscribed student today:
+      // {"locked": true, "rapidRecalls": []}.
+      final list = RapidRecallService.parseList(const {
+        'locked': true,
+        'rapidRecalls': [],
+      });
+
+      expect(list.locked, isTrue);
+      expect(list.decks, isEmpty);
+    });
+
+    test('a server that sends no feature lock locks nothing', () {
+      final list = RapidRecallService.parseList(const {
+        'rapidRecalls': [
+          {'id': 4, 'title': 'ECG', 'cardCount': 3},
+        ],
+      });
+
+      expect(list.locked, isFalse);
+      expect(list.decks.single.locked, isFalse);
+    });
+  });
+
+  group('a deck behind the paywall', () {
+    RapidRecallDeck deck(Map<String, dynamic> extra) =>
+        RapidRecallDeck.fromJson({
+          'id': 4,
+          'title': 'ECG rapid recall',
+          'cardCount': 12,
+          ...extra,
+        });
+
+    test('a server that sends no lock opens every deck', () {
+      // What an older response looks like. Nothing padlocked.
+      expect(deck(const {}).locked, isFalse);
+    });
+
+    test('the lock is the server\'s answer, taken as sent', () {
+      expect(deck({'locked': true}).locked, isTrue);
+      expect(deck({'locked': false}).locked, isFalse);
+    });
+
+    test('a locked deck keeps its place in the list', () {
+      // Listed, never hidden: nobody subscribes for a deck they cannot see.
+      final locked = deck({'locked': true, 'noteUrl': null});
+
+      expect(locked.title, 'ECG rapid recall');
+      expect(locked.cardCount, 12);
+      // The server nulls the handout while locked, so the button goes with it.
+      expect(locked.hasHandout, isFalse);
+    });
+  });
+
+  group('a deck that locks between the list and the tap', () {
+    test('a 403 is told apart from a failure worth retrying', () async {
+      final provider = RapidRecallProvider(
+        service: _LockedDeckService(),
+      );
+      await provider.loadDeck(4);
+
+      expect(provider.deckNeedsPlan(4), isTrue);
+      expect(provider.deckError(4), contains('Subscribe'));
+    });
+
+    test('a network failure is not a paywall', () async {
+      final provider = RapidRecallProvider(service: _OfflineDeckService());
+      await provider.loadDeck(4);
+
+      expect(provider.deckNeedsPlan(4), isFalse);
+      expect(provider.deckError(4), isNotNull);
+    });
+  });
+}
+
+/// The server's answer for a deck this student has not paid for.
+class _LockedDeckService extends RapidRecallService {
+  @override
+  Future<RapidRecallDeck> fetchDeck(int id) async => throw QuizException(
+        QuizErrorKind.locked,
+        'Rapid Recall is part of a subscription. Subscribe to open this deck.',
+      );
+}
+
+class _OfflineDeckService extends RapidRecallService {
+  @override
+  Future<RapidRecallDeck> fetchDeck(int id) async => throw QuizException(
+        QuizErrorKind.network,
+        'Could not reach the server. Check your connection and try again.',
+      );
 }

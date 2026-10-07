@@ -24,7 +24,6 @@ import 'lessons/student_lesson_detail_screen.dart';
 import '../../repository/daily_quiz_provider.dart';
 import 'daily_quiz/daily_quiz_card.dart';
 import '../../widget/home_loading.dart';
-import '../../widget/feature_locked_dialog.dart';
 import '../../widget/learning_plan_dialog.dart';
 import '../../widget/app_bottom_nav.dart';
 import '../../core/utils/refresh_on_visible.dart';
@@ -53,29 +52,13 @@ class _HomescreenState extends State<Homescreen> with RefreshOnVisible<Homescree
     });
   }
 
-  /// What each tab is called, for the message when it is not in the plan.
-  static const Map<int, String> _tabNames = {
-    1: 'QBank',
-    2: 'Grand Tests',
-    3: 'AI Videos',
-    4: 'Rapid Recall',
-  };
-
   // ── Handles nav bar taps: some tabs just update the selected visual
   // state, others (like AI Videos) actually navigate to a real screen. ──
   void _handleNavTap(int index) {
-    final access = context.read<PlanAccessProvider>();
-    if (access.lockedTabs.contains(index)) {
-      // Stay put and say why. The server would refuse the content anyway;
-      // this saves the student the trip.
-      showFeatureLockedDialog(
-        context,
-        feature: _tabNames[index] ?? 'This section',
-        planTitle: access.subscription?.planTitle,
-      );
-      return;
-    }
-
+    // Every tab opens. Access is decided per item inside them — a premium
+    // lesson shows its paywall, a premium question is never in the set — so
+    // a locked door at the tab would also shut out the free content behind
+    // it, which is the part an unsubscribed student is here for.
     setState(() => _currentNavIndex = index);
 
     switch (index) {
@@ -102,28 +85,6 @@ class _HomescreenState extends State<Homescreen> with RefreshOnVisible<Homescree
       // Home (index 0) — nothing to navigate, already on this screen.
         break;
     }
-  }
-
-  // ── Also called when the user taps the "AI picks for you" video card,
-  // so it opens the same detail screen with that specific lesson. ──
-  void _openAiPickVideo() {
-    final StudentLessonModel pickedLesson = StudentLessonModel(
-      id: 102,
-      title: "Inferior STEMI walkthrough",
-      description: "Cardiology",
-      type: "video",
-      content: null,
-      videoUrl: "https://your-cdn.com/videos/inferior_stemi.mp4",
-      thumbnailUrl: "https://your-cdn.com/thumbs/inferior_stemi.jpg",
-      noteUrl: null,
-      noteFileType: null,
-      displayOrder: 1,
-      isFreePreview: true,
-      accessType: "free",
-      locked: false,
-    );
-
-    _pushScreen(StudentLessonDetailScreen(lesson: pickedLesson));
   }
 
   @override
@@ -156,6 +117,11 @@ class _HomescreenState extends State<Homescreen> with RefreshOnVisible<Homescree
       context.read<PlanAccessProvider>().load(),
     ]);
   }
+
+  /// The plan notice has been closed. Lives on the screen's state, so it
+  /// stays closed while the app runs and is asked again on the next launch —
+  /// which is where the plan itself is checked again.
+  bool _gateDismissed = false;
 
   /// The MCQ card has reported in, or the cap ran out.
   bool _mcqReady = false;
@@ -484,6 +450,17 @@ class _HomescreenState extends State<Homescreen> with RefreshOnVisible<Homescree
 
                           SizedBox(height: 26.h),
 
+                          // The notice has been closed and the plan is still
+                          // not active. Said once more, quietly, where the
+                          // student is already reading — closing the card is
+                          // not the same as deciding against a plan, and
+                          // without this there is nothing left on home that
+                          // sells one.
+                          if (planInactive && _gateDismissed) ...[
+                            const _NoPlanBanner(),
+                            SizedBox(height: 22.h),
+                          ],
+
                           // ── MCQ of the Day ──
                           //
                           // Replaces the old hardcoded "Continue MCQs" card.
@@ -505,7 +482,7 @@ class _HomescreenState extends State<Homescreen> with RefreshOnVisible<Homescree
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    "Continue MCQs",
+                                    "Today MCQs",
                                     style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700, color: Colors.black87),
                                   ),
                                   SizedBox(height: 12.h),
@@ -550,6 +527,16 @@ class _HomescreenState extends State<Homescreen> with RefreshOnVisible<Homescree
                                   ContinueLearningRow(
                                     items: items,
                                     onOpen: (lesson) async {
+                                      // Same answer as every other list: a
+                                      // padlocked lesson says why here rather
+                                      // than opening a screen with nothing in
+                                      // it but a paywall.
+                                      if (!lesson.isOpen) {
+                                        await showPlanRequiredDialog(context,
+                                            lessonTitle: lesson.title);
+                                        return;
+                                      }
+
                                       await Navigator.push(
                                         context,
                                         MaterialPageRoute(
@@ -570,43 +557,6 @@ class _HomescreenState extends State<Homescreen> with RefreshOnVisible<Homescree
                             },
                           ),
 
-                          // ── AI picks for you ──
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                "AI picks for you",
-                                style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700, color: Colors.black87),
-                              ),
-                              Icon(Icons.chevron_right_rounded, color: Colors.grey.shade500),
-                            ],
-                          ),
-                          SizedBox(height: 12.h),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: GestureDetector(
-                                  onTap: _openAiPickVideo, // 👈 opens StudentLessonDetailScreen
-                                  child: _AiPickCard(
-                                    icon: Icons.play_arrow_rounded,
-                                    tagText: "Recommended video",
-                                    title: "Inferior STEMI walkthrough",
-                                    subtitle: "Cardiology",
-                                  ),
-                                ),
-                              ),
-                              SizedBox(width: 12.w),
-                              Expanded(
-                                child: _AiPickCard(
-                                  icon: Icons.bloodtype_rounded,
-                                  tagText: "Weak area - practice",
-                                  title: "Hematology rapid fire MCQs",
-                                  subtitle: "Hematology",
-                                ),
-                              ),
-                            ],
-                          ),
-
                           SizedBox(height: 20.h),
                         ],
                       ),
@@ -623,13 +573,91 @@ class _HomescreenState extends State<Homescreen> with RefreshOnVisible<Homescree
       bottomNavigationBar: AppBottomNav(
         currentIndex: _currentNavIndex,
         onTap: _handleNavTap,
-        locked: context.watch<PlanAccessProvider>().lockedTabs,
       ),
         ),
         // Nothing behind it is reachable while the plan is inactive: no
         // courses, no tabs, no bell.
-        if (planInactive) const LearningPlanGate(),
+        if (planInactive && !_gateDismissed)
+          LearningPlanGate(onClose: () => setState(() => _gateDismissed = true)),
       ],
+    );
+  }
+}
+
+/// The plan offer on home, once the full-screen notice has been closed.
+///
+/// A card the student scrolls past rather than a warning bar: they have
+/// already closed one notice, and repeating it in the same words would be
+/// nagging. This one is written as what they would get, not what they lack.
+class _NoPlanBanner extends StatelessWidget {
+  const _NoPlanBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => openWebsite(context),
+      child: Container(
+        padding: EdgeInsets.fromLTRB(18.w, 18.h, 18.w, 18.h),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF6E8052), Color(0xFF87986B)],
+          ),
+          borderRadius: BorderRadius.circular(20.r),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 40.w,
+              height: 40.w,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.18),
+                borderRadius: BorderRadius.circular(13.r),
+              ),
+              child: Icon(Icons.workspace_premium_rounded,
+                  size: 21.sp, color: Colors.white),
+            ),
+            SizedBox(width: 13.w),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Unlock the full course',
+                    style: TextStyle(
+                        fontSize: 14.5.sp,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white),
+                  ),
+                  SizedBox(height: 4.h),
+                  Text(
+                    'Every lesson, test and recall deck, on our website.',
+                    style: TextStyle(
+                        fontSize: 11.5.sp,
+                        height: 1.4,
+                        color: Colors.white.withValues(alpha: 0.88)),
+                  ),
+                ],
+              ),
+            ),
+            SizedBox(width: 10.w),
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 13.w, vertical: 8.h),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20.r),
+              ),
+              child: Text('Explore',
+                  style: TextStyle(
+                      fontSize: 12.sp,
+                      fontWeight: FontWeight.w800,
+                      color: const Color(0xFF3D4A2C))),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -787,77 +815,3 @@ class _HeaderIconButton extends StatelessWidget {
   }
 }
 
-class _AiPickCard extends StatelessWidget {
-  final IconData icon;
-  final String tagText;
-  final String title;
-  final String subtitle;
-
-  const _AiPickCard({
-    required this.icon,
-    required this.tagText,
-    required this.title,
-    required this.subtitle,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: EdgeInsets.all(14.w),
-      decoration: BoxDecoration(
-        color: const Color(0xFF87986B),
-        borderRadius: BorderRadius.circular(16.r),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 30.w,
-                height: 30.w,
-                decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-                child: Icon(icon, size: 15.sp, color: const Color(0xFF87986B)),
-              ),
-              SizedBox(width: 6.w),
-              Container(
-                padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 3.h),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(8.r),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.auto_awesome, size: 10.sp, color: Colors.white),
-                    SizedBox(width: 2.w),
-                    Text(
-                      "AI",
-                      style: TextStyle(fontSize: 10.sp, fontWeight: FontWeight.w600, color: Colors.white),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          SizedBox(height: 14.h),
-          Text(
-            tagText,
-            style: TextStyle(fontSize: 10.5.sp, color: Colors.white.withOpacity(0.75)),
-          ),
-          SizedBox(height: 4.h),
-          Text(
-            title,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white, height: 1.3),
-          ),
-          SizedBox(height: 4.h),
-          Text(
-            subtitle,
-            style: TextStyle(fontSize: 11.sp, color: Colors.white.withOpacity(0.7)),
-          ),
-        ],
-      ),
-    );
-  }
-}
