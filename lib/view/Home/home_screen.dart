@@ -186,10 +186,6 @@ class _HomescreenState extends State<Homescreen> with RefreshOnVisible<Homescree
       backgroundColor: kBg,
       body: Column(
         children: [
-          // Between answering the system prompt and the device being
-          // registered there is nothing to see otherwise.
-          if (context.watch<SettingsProvider>().isActivating)
-            const _ActivatingStrip(),
           // Above the header rather than inside the scroll: a plan running
           // out is not something to find by scrolling.
           if (planDaysLeft != null) _ExpiryStrip(days: planDaysLeft),
@@ -665,40 +661,6 @@ class _NoPlanBanner extends StatelessWidget {
 /// The app's green, at the strength a background strip wants.
 const Color _kStripTint = Color(0x1F87986B);
 
-/// "Activating notifications…", while the permission is answered and this
-/// device is registered with the backend.
-class _ActivatingStrip extends StatelessWidget {
-  const _ActivatingStrip();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      color: _kStripTint,
-      padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 8.h),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 14.w,
-            height: 14.w,
-            child: const CircularProgressIndicator(
-              strokeWidth: 2,
-              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF87986B)),
-            ),
-          ),
-          SizedBox(width: 10.w),
-          Text(
-            'Activating notifications…',
-            style: TextStyle(
-                fontSize: 12.sp,
-                fontWeight: FontWeight.w600,
-                color: const Color(0xFF3D4A2C)),
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 /// "Your plan ends in 6 days" — the countdown, for the last stretch of a
 /// subscription.

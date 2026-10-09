@@ -39,25 +39,6 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
-  group('the email to sign in with', () {
-    // The plan is bought on the website and tied to that address. Signing in
-    // with another one makes a second account with no plan, and the app then
-    // tells them their learning plan is not active — with no hint as to why.
-    for (final entry in <String, Widget>{
-      'the login screen': const LoginScreen(),
-      'the sign-up screen': SignupScreen(),
-      'the sign-in screen': SignInScreen(),
-    }.entries) {
-      testWidgets('${entry.key} says to use the website address',
-          (tester) async {
-        await _pump(tester, entry.value, signingIn: false);
-
-        expect(find.textContaining('registered with on our website'),
-            findsOneWidget);
-      });
-    }
-  });
-
   group('picking a Google account', () {
     testWidgets('the sign-up screen waits on a full screen, not a button',
         (tester) async {

@@ -59,7 +59,7 @@ Future<void> _pumpHome(WidgetTester tester) async {
         // The bell's unread badge reads this.
         ChangeNotifierProvider<NotificationFeedProvider>(
             create: (_) => NotificationFeedProvider()),
-        // Home shows the "activating notifications" strip from this.
+        // The plan banner and the expiry countdown read this.
         ChangeNotifierProvider<PlanAccessProvider>(
             create: (_) => PlanAccessProvider()),
         ChangeNotifierProvider<SettingsProvider>(

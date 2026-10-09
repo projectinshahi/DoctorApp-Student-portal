@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../../widget/website_email_note.dart';
 
 import '../../../widget/app_loading_screen.dart';
 
@@ -162,8 +161,6 @@ class _SignInScreenState extends State<SignInScreen> {
 
 
                   SizedBox(height: 80.h),
-
-                  const WebsiteEmailNote(),
 
                   SizedBox(height: 18.h),
 

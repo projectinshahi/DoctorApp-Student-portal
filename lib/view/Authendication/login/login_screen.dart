@@ -4,7 +4,6 @@ import 'package:dr_app/view/Authendication/login/Sign_in_screen.dart';
 import 'package:dr_app/view/Authendication/login/sign-up_screen.dart';
 import 'package:flutter/material.dart';
 
-import '../../../widget/website_email_note.dart';
 import 'package:provider/provider.dart';
 
 import '../../../repository/refresh_api_provider.dart';
@@ -111,8 +110,6 @@ class _LoginScreenState extends State<LoginScreen> {
                         );
                       },
                     ),
-
-                    const WebsiteEmailNote(),
 
                     SizedBox(height: 16.h),
 
