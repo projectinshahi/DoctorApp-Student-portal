@@ -28,6 +28,8 @@ import '../../widget/learning_plan_dialog.dart';
 import '../../widget/app_bottom_nav.dart';
 import '../../core/utils/refresh_on_visible.dart';
 import '../../core/utils/website.dart';
+import '../../core/demo/demo_content.dart';
+import '../../widget/sign_in_required.dart';
 
 
 class Homescreen extends StatefulWidget {
@@ -55,6 +57,15 @@ class _HomescreenState extends State<Homescreen> with RefreshOnVisible<Homescree
   // ── Handles nav bar taps: some tabs just update the selected visual
   // state, others (like AI Videos) actually navigate to a real screen. ──
   void _handleNavTap(int index) {
+    // The preview carries a course, so Home, QBank and AI Videos have
+    // something real to show. Grand Tests and Rapid Recall are the student's
+    // own — papers sat, decks opened — and there is nothing to sample.
+    if (DemoMode.active && (index == 2 || index == 4)) {
+      showSignInRequired(context,
+          what: index == 2 ? 'sit a grand test' : 'open your recall decks');
+      return;
+    }
+
     // Every tab opens. Access is decided per item inside them — a premium
     // lesson shows its paywall, a premium question is never in the set — so
     // a locked door at the tab would also shut out the free content behind
@@ -225,6 +236,11 @@ class _HomescreenState extends State<Homescreen> with RefreshOnVisible<Homescree
                                 height: 40.h,
                                 child: IconButton(
                                   onPressed: () {
+                                    if (DemoMode.active) {
+                                      showSignInRequired(context,
+                                          what: 'see your profile');
+                                      return;
+                                    }
                                     Navigator.push(
                                       context,
                                       MaterialPageRoute(builder: (context) => const ProfileScreen()),
@@ -308,7 +324,10 @@ class _HomescreenState extends State<Homescreen> with RefreshOnVisible<Homescree
                                 // home is open moves it.
                                 badge: context.watch<NotificationFeedProvider>().unreadCount,
                                 onTap: () =>
-                                    NotificationsScreen.open(context),
+                                    DemoMode.active
+                                        ? showSignInRequired(context,
+                                            what: 'see your notifications')
+                                        : NotificationsScreen.open(context),
                               ),
                             ],
                           ),
@@ -452,6 +471,15 @@ class _HomescreenState extends State<Homescreen> with RefreshOnVisible<Homescree
                           // not the same as deciding against a plan, and
                           // without this there is nothing left on home that
                           // sells one.
+                          // Says what this is. One line, not a nag: a
+                          // visitor who cannot tell sample content from a
+                          // real course has been misled, however good the
+                          // screen looks.
+                          if (DemoMode.active) ...[
+                            const _PreviewBanner(),
+                            SizedBox(height: 22.h),
+                          ],
+
                           if (planInactive && _gateDismissed) ...[
                             const _NoPlanBanner(),
                             SizedBox(height: 22.h),
@@ -523,6 +551,12 @@ class _HomescreenState extends State<Homescreen> with RefreshOnVisible<Homescree
                                   ContinueLearningRow(
                                     items: items,
                                     onOpen: (lesson) async {
+                                      if (DemoMode.active) {
+                                        await showSignInRequired(context,
+                                            what: 'watch this lesson');
+                                        return;
+                                      }
+
                                       // Same answer as every other list: a
                                       // padlocked lesson says why here rather
                                       // than opening a screen with nothing in
@@ -576,6 +610,66 @@ class _HomescreenState extends State<Homescreen> with RefreshOnVisible<Homescree
         if (planInactive && !_gateDismissed)
           LearningPlanGate(onClose: () => setState(() => _gateDismissed = true)),
       ],
+    );
+  }
+}
+
+/// "You are looking at a sample" — on home, before anyone signs in.
+class _PreviewBanner extends StatelessWidget {
+  const _PreviewBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => showSignInRequired(context),
+      child: Container(
+        padding: EdgeInsets.fromLTRB(16.w, 15.h, 14.w, 15.h),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF6E8052), Color(0xFF87986B)],
+          ),
+          borderRadius: BorderRadius.circular(18.r),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.visibility_outlined, size: 20.sp, color: Colors.white),
+            SizedBox(width: 12.w),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('You are viewing a sample',
+                      style: TextStyle(
+                          fontSize: 14.sp,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white)),
+                  SizedBox(height: 3.h),
+                  Text('Sign in to open your own course and track progress.',
+                      style: TextStyle(
+                          fontSize: 11.5.sp,
+                          height: 1.4,
+                          color: Colors.white.withValues(alpha: 0.9))),
+                ],
+              ),
+            ),
+            SizedBox(width: 8.w),
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 8.h),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20.r),
+              ),
+              child: Text('Sign in',
+                  style: TextStyle(
+                      fontSize: 12.sp,
+                      fontWeight: FontWeight.w800,
+                      color: const Color(0xFF3D4A2C))),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

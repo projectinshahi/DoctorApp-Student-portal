@@ -1,6 +1,8 @@
 // lib/view/Home/dashbord/ai_video_tab.dart
 import 'package:flutter/material.dart';
 
+import '../../../core/demo/demo_content.dart';
+import '../../../widget/sign_in_required.dart';
 import '../../../widget/access_chip.dart';
 import '../../../widget/learning_plan_dialog.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -388,7 +390,10 @@ class _AiVideoTabState extends State<AiVideoTab> with RefreshOnVisible<AiVideoTa
                           // which is two screens to say one thing — and the
                           // server strips the video, so there is nothing
                           // behind it to see.
-                          onTap: () => lesson.isOpen
+                          onTap: () => DemoMode.active
+                              ? showSignInRequired(context,
+                                  what: 'watch the full lesson')
+                              : lesson.isOpen
                               ? _open(
                                   StudentLessonDetailScreen(
                                     lesson: lesson,

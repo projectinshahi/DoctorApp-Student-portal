@@ -24,6 +24,9 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+
+import '../../../core/demo/demo_content.dart';
+import '../../../widget/sign_in_required.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 import '../../../models/daily_quiz_model.dart';
@@ -119,6 +122,14 @@ class _DailyQuizCardState extends State<DailyQuizCard> {
   }
 
   Future<void> _answer(DailyQuizQuestion question, int optionId) async {
+    // The sample question is there to be read, not scored: there is no
+    // account to record the answer against, and a streak nobody is keeping
+    // would be a lie.
+    if (DemoMode.active) {
+      await showSignInRequired(context, what: 'answer and keep your streak');
+      return;
+    }
+
     await _quiz?.answer(question.id, optionId);
     if (mounted) widget.onChanged();
   }

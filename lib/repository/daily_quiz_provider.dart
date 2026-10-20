@@ -3,6 +3,7 @@ import 'dart:convert';
 import '../core/utils/load_timer.dart';
 import 'package:flutter/foundation.dart';
 
+import '../core/demo/demo_content.dart';
 import '../models/daily_quiz_model.dart';
 import '../core/constant/local_storage.dart';
 import '../models/home_summary_model.dart';
@@ -53,6 +54,13 @@ class HomeSummaryProvider extends ChangeNotifier {
   /// Reads `/users/me/home`. Verified to leave the attempts table empty —
   /// nothing starts until the student opens the quiz itself.
   Future<void> load() async {
+    if (DemoMode.active) {
+      home = HomeSummary.fromJson(DemoContent.homeSummary);
+      isLoading = false;
+      notifyListeners();
+      return;
+    }
+
     isLoading = home == null;
     notifyListeners();
 
@@ -187,6 +195,14 @@ class DailyQuizProvider extends ChangeNotifier {
   }
 
   Future<void> load() async {
+    if (DemoMode.active) {
+      set = DailyQuizSet.fromJson(DemoContent.dailyQuiz);
+      isLoading = false;
+      failure = null;
+      notifyListeners();
+      return;
+    }
+
     isLoading = set == null;
     failure = null;
     notifyListeners();

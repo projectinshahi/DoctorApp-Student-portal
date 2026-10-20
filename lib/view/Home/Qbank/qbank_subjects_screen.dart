@@ -2,6 +2,8 @@ import 'dart:async';
 // lib/view/Home/Qbank/qbank_subjects_screen.dart
 import 'package:flutter/material.dart';
 
+import '../../../core/demo/demo_content.dart';
+import '../../../widget/sign_in_required.dart';
 import '../../../widget/access_chip.dart';
 import '../../../widget/learning_plan_dialog.dart';
 
@@ -85,6 +87,11 @@ class _QbankSubjectsScreenState extends State<QbankSubjectsScreen>
     // a locked lesson with a 403 — "This lesson is locked. Subscribe to
     // unlock it." — so opening it only to fail is a screen the student has no
     // reason to see. A free lesson comes back unlocked and goes straight in.
+    if (DemoMode.active) {
+      await showSignInRequired(context, what: 'answer these questions');
+      return;
+    }
+
     if (!lesson.isOpen) {
       await showPlanRequiredDialog(context, lessonTitle: lesson.title);
       return;

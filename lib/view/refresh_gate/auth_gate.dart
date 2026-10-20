@@ -15,6 +15,7 @@ import 'dart:async';
 //    removed is usually the one on top, so the reset goes through the app's
 //    navigator key rather than this widget's context.
 import 'package:dr_app/view/Home/home_screen.dart';
+import '../../core/demo/demo_content.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
@@ -34,7 +35,6 @@ import '../../repository/settings_provider.dart';
 import '../../services/notification_service.dart';
 import '../../repository/selection_content_provider.dart';
 import '../Authendication/login/login_screen.dart';
-import '../guest/guest_home_screen.dart';
 import '../Home/notifications/notifications_screen.dart';
 import '../subjectSelection/select_exam_screen.dart';
 
@@ -403,12 +403,16 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
 
     final auth = context.watch<AuthProvider>();
 
+    // Everything below reads this: the providers to show sample content
+    // instead of calling, the screens to ask for an account on any tap that
+    // would need one.
+    DemoMode.active = auth.status == AuthStatus.unauthenticated;
+
     return switch (auth.status) {
-      // The catalogue, not a login form. A stranger is shown what is inside
-      // before being asked for an account, and the exam picker is kept for
-      // after they sign in — it is a choice about their account, not a
-      // question to put to a visitor.
-      AuthStatus.unauthenticated => const GuestHomeScreen(),
+      // The app itself, on sample content, rather than a login form. A
+      // visitor sees what it does and signs in when they want their own
+      // course — the exam picker stays after sign-in, where it belongs.
+      AuthStatus.unauthenticated => const Homescreen(),
       // Reading the stored token. Brief, but it is the very first frame and
       // an empty screen there reads as a crash.
       AuthStatus.unknown => const AnimatedSplash(),
