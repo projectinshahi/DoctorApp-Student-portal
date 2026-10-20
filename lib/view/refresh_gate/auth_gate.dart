@@ -34,7 +34,6 @@ import '../../repository/settings_provider.dart';
 import '../../services/notification_service.dart';
 import '../../repository/selection_content_provider.dart';
 import '../Authendication/login/login_screen.dart';
-import '../guest/guest_home_screen.dart';
 import '../Home/notifications/notifications_screen.dart';
 import '../subjectSelection/select_exam_screen.dart';
 
@@ -404,11 +403,7 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
     final auth = context.watch<AuthProvider>();
 
     return switch (auth.status) {
-      // The catalogue, not a login form. A stranger is shown what is inside
-      // before being asked for an account, and the exam picker is kept for
-      // after they sign in — it is a choice about their account, not a
-      // question to put to a visitor.
-      AuthStatus.unauthenticated => const GuestHomeScreen(),
+      AuthStatus.unauthenticated => const LoginScreen(),
       // Reading the stored token. Brief, but it is the very first frame and
       // an empty screen there reads as a crash.
       AuthStatus.unknown => const AnimatedSplash(),
