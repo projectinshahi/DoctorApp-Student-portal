@@ -29,6 +29,7 @@ import 'package:timezone/data/latest_all.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
 
 import '../core/constant/api_constant.dart';
+import '../core/constant/local_storage.dart';
 import 'refresh_api_services.dart';
 
 class NotificationService {
@@ -325,6 +326,13 @@ class NotificationService {
       final response = await ApiClient.post(tokenUrl, body: {
         'token': token,
         'platform': defaultTargetPlatform == TargetPlatform.iOS ? 'ios' : 'android',
+        // Which phone this is. The backend files tokens by the token alone,
+        // so it cannot drop a device's tokens when that device's session
+        // ends — between a session expiring and the next sign-in, the phone
+        // keeps receiving the previous student's notifications. Sent now so
+        // the column is populated whenever that fix lands; ignored until
+        // then.
+        if (await LocalStorage.getDeviceId() case final id?) 'deviceId': id,
       });
       if (kDebugMode) {
         debugPrint('PUSH  token sent for student $studentId: '

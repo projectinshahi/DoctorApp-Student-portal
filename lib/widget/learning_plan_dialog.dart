@@ -342,10 +342,21 @@ class _LearningPlanCardState extends State<LearningPlanCard>
   /// server every time. The link is a doorbell, never the proof.
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) _recheck();
+    if (state != AppLifecycleState.resumed) return;
+    // The waiting is for the payment webhook, so it is owed only to someone
+    // who went to pay. Every other return — a glance at WhatsApp — gets a
+    // single look, which costs two requests instead of ten.
+    _recheck(attempts: _wentToBuy ? 5 : 1);
   }
 
-  Future<void> _recheck() async {
+  /// They opened the website from this card. The only signal the app has that
+  /// a payment might be on its way.
+  bool _wentToBuy = false;
+
+  /// [attempts] is 1 for an ordinary return to the app and the full wait only
+  /// when there is a payment to wait for — switching apps for ten seconds
+  /// should not cost ten requests.
+  Future<void> _recheck({int attempts = 1}) async {
     if (_checking || !mounted) return;
     setState(() {
       _checking = true;
@@ -356,12 +367,15 @@ class _LearningPlanCardState extends State<LearningPlanCard>
     final contents = context.read<SelectionContentProvider>();
 
     final active = await pollUntilActive(
+      attempts: attempts,
       // Both, because either can carry the answer: the profile's
-      // subscription block, and the course tree's own paid flag.
-      refresh: () async {
-        await profiles.loadProfile();
-        await contents.loadContent();
-      },
+      // subscription block, and the course tree's own paid flag. Together,
+      // not one after the other: they are independent calls of a second or
+      // two each, and waiting them out in turn doubled every attempt.
+      refresh: () => Future.wait([
+        profiles.loadProfile(),
+        contents.loadContent(),
+      ]),
       active: () => !learningPlanInactive(
         profile: profiles.profile,
         content: contents.content,
@@ -450,7 +464,12 @@ class _LearningPlanCardState extends State<LearningPlanCard>
             height: 52.h,
             child: ElevatedButton.icon(
               // Bought on the website, never in the app.
-              onPressed: _checking ? null : () => openWebsite(context),
+              onPressed: _checking
+                  ? null
+                  : () {
+                      _wentToBuy = true;
+                      openWebsite(context);
+                    },
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColor.buttoncolor,
                 foregroundColor: Colors.white,
@@ -488,7 +507,7 @@ class _LearningPlanCardState extends State<LearningPlanCard>
             )
           else
             TextButton(
-              onPressed: _recheck,
+              onPressed: () => _recheck(attempts: 5),
               child: Text(
                 "I've already paid — check again",
                 style: TextStyle(

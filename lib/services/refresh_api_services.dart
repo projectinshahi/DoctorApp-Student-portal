@@ -124,12 +124,15 @@ class ApiClient {
     // These mean the session is definitively dead. Refreshing here is the bug
     // this design exists to prevent: /refresh answers 401 too, so the app
     // would spin instead of telling the student why they were signed out.
+    //
+    // USER_NOT_FOUND belongs with them: the account is gone, and a refresh
+    // for a student who no longer exists can only fail a second time.
     if (code == "SESSION_ENDED" ||
         code == "SESSION_NOT_FOUND" ||
-        code == "REFRESH_TOKEN_REUSED") {
+        code == "REFRESH_TOKEN_REUSED" ||
+        code == "USER_NOT_FOUND") {
       await LocalStorage.clearAll();
-      final message = _errorMessage(response) ??
-          "Your session has ended. Please log in again.";
+      final message = signedOutMessage(code);
       _handleSessionExpired(message);
       throw SessionExpiredException(message);
     }
@@ -143,7 +146,10 @@ class ApiClient {
       }
       return response;
     } on SessionExpiredException catch (e) {
-      _handleSessionExpired(e.message);
+      // The refresh was refused. Nearly always a token that simply ran out —
+      // the server's own words for it are "Invalid or expired refresh token",
+      // which reads like a fault rather than a timeout.
+      _handleSessionExpired(timedOutMessage);
       rethrow;
     } catch (e) {
       await LocalStorage.clearAll();
@@ -211,6 +217,27 @@ class ApiClient {
       body["error"]?["message"] ?? "Session expired. Please log in again.",
     );
   }
+
+  /// What a student is told when their session ends, in the app's words.
+  ///
+  /// The server sends one sentence for five different causes — a logout, an
+  /// admin revoking sessions, a block, a reused token, a sign-in elsewhere —
+  /// and that sentence blames another device. A student who simply logged out
+  /// themselves was being told something untrue, which reads worse than
+  /// saying less. So the app says only what it is sure of.
+  ///
+  /// A sign-in that genuinely displaced another device still says so: that
+  /// comes back from the sign-in call itself, not from here.
+  @visibleForTesting
+  static String signedOutMessage(String? code) => switch (code) {
+        "USER_NOT_FOUND" => "This account is no longer available.",
+        _ => "You have been signed out. Please sign in again.",
+      };
+
+  /// The ordinary ending: nobody did anything, the session aged out.
+  @visibleForTesting
+  static const String timedOutMessage =
+      "Your session has timed out. Please sign in again.";
 
   static void _handleSessionExpired(String? message) {
     onSessionExpired?.call(message);
