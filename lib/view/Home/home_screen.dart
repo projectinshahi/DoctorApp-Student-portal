@@ -236,11 +236,6 @@ class _HomescreenState extends State<Homescreen> with RefreshOnVisible<Homescree
                                 height: 40.h,
                                 child: IconButton(
                                   onPressed: () {
-                                    if (DemoMode.active) {
-                                      showSignInRequired(context,
-                                          what: 'see your profile');
-                                      return;
-                                    }
                                     Navigator.push(
                                       context,
                                       MaterialPageRoute(builder: (context) => const ProfileScreen()),
@@ -310,6 +305,30 @@ class _HomescreenState extends State<Homescreen> with RefreshOnVisible<Homescree
                               ),
 
                               SizedBox(width: 10.w),
+                              // The way in, in the header rather than a
+                              // banner down the page: a visitor should never
+                              // have to hunt for it, and the drawer is three
+                              // taps away.
+                              if (DemoMode.active)
+                                GestureDetector(
+                                  onTap: () => showSignInRequired(context),
+                                  child: Container(
+                                    padding: EdgeInsets.symmetric(
+                                        horizontal: 16.w, vertical: 9.h),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(22.r),
+                                    ),
+                                    child: Text(
+                                      'Sign in',
+                                      style: TextStyle(
+                                          fontSize: 13.sp,
+                                          fontWeight: FontWeight.w800,
+                                          color: const Color(0xFF3D4A2C)),
+                                    ),
+                                  ),
+                                )
+                              else ...[
                               _HeaderIconButton(
                                 icon: Icons.bookmark_border_rounded,
                                 onTap: () => Navigator.push(
@@ -323,12 +342,9 @@ class _HomescreenState extends State<Homescreen> with RefreshOnVisible<Homescree
                                 // What is waiting, unread. Watched, so a push arriving while
                                 // home is open moves it.
                                 badge: context.watch<NotificationFeedProvider>().unreadCount,
-                                onTap: () =>
-                                    DemoMode.active
-                                        ? showSignInRequired(context,
-                                            what: 'see your notifications')
-                                        : NotificationsScreen.open(context),
+                                onTap: () => NotificationsScreen.open(context),
                               ),
+                              ],
                             ],
                           ),
                           SizedBox(height: 32.h),
@@ -471,12 +487,11 @@ class _HomescreenState extends State<Homescreen> with RefreshOnVisible<Homescree
                           // not the same as deciding against a plan, and
                           // without this there is nothing left on home that
                           // sells one.
-                          // Says what this is. One line, not a nag: a
-                          // visitor who cannot tell sample content from a
-                          // real course has been misled, however good the
-                          // screen looks.
+                          // Above the day's question, where the eye already
+                          // is. The header pill stays — this is the one that
+                          // says what signing in is for.
                           if (DemoMode.active) ...[
-                            const _PreviewBanner(),
+                            const _SignInBanner(),
                             SizedBox(height: 22.h),
                           ],
 
@@ -614,47 +629,61 @@ class _HomescreenState extends State<Homescreen> with RefreshOnVisible<Homescree
   }
 }
 
-/// "You are looking at a sample" — on home, before anyone signs in.
-class _PreviewBanner extends StatelessWidget {
-  const _PreviewBanner();
+/// The way in, above the day's question, before anyone has signed in.
+class _SignInBanner extends StatelessWidget {
+  const _SignInBanner();
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: () => showSignInRequired(context),
       child: Container(
-        padding: EdgeInsets.fromLTRB(16.w, 15.h, 14.w, 15.h),
+        padding: EdgeInsets.fromLTRB(18.w, 18.h, 18.w, 18.h),
         decoration: BoxDecoration(
           gradient: const LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [Color(0xFF6E8052), Color(0xFF87986B)],
           ),
-          borderRadius: BorderRadius.circular(18.r),
+          borderRadius: BorderRadius.circular(20.r),
         ),
         child: Row(
           children: [
-            Icon(Icons.visibility_outlined, size: 20.sp, color: Colors.white),
-            SizedBox(width: 12.w),
+            Container(
+              width: 40.w,
+              height: 40.w,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.18),
+                borderRadius: BorderRadius.circular(13.r),
+              ),
+              child: Icon(Icons.person_outline_rounded,
+                  size: 21.sp, color: Colors.white),
+            ),
+            SizedBox(width: 13.w),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('You are viewing a sample',
-                      style: TextStyle(
-                          fontSize: 14.sp,
-                          fontWeight: FontWeight.w800,
-                          color: Colors.white)),
-                  SizedBox(height: 3.h),
-                  Text('Sign in to open your own course and track progress.',
-                      style: TextStyle(
-                          fontSize: 11.5.sp,
-                          height: 1.4,
-                          color: Colors.white.withValues(alpha: 0.9))),
+                  Text(
+                    'Sign in to start learning',
+                    style: TextStyle(
+                        fontSize: 14.5.sp,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white),
+                  ),
+                  SizedBox(height: 4.h),
+                  Text(
+                    'Open your course, answer the day and keep your streak.',
+                    style: TextStyle(
+                        fontSize: 11.5.sp,
+                        height: 1.4,
+                        color: Colors.white.withValues(alpha: 0.9)),
+                  ),
                 ],
               ),
             ),
-            SizedBox(width: 8.w),
+            SizedBox(width: 10.w),
             Container(
               padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 8.h),
               decoration: BoxDecoration(

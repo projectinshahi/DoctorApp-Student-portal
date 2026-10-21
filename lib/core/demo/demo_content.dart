@@ -84,6 +84,26 @@ class DemoContent {
         ],
       };
 
+  /// `/users/me/profile`
+  ///
+  /// A visitor still opens the drawer — it is where the app explains itself,
+  /// with the terms, the FAQ and the way to contact anyone. The account half
+  /// of it asks them to sign in instead of pretending there is somebody
+  /// signed in.
+  static Map<String, dynamic> get profile => {
+        'id': -1,
+        'name': 'Guest',
+        'email': 'Not signed in',
+        'role': 'student',
+        'status': 'verified',
+        'selectedCourse': {
+          'id': -1,
+          'title': 'Sample exam',
+          'accessType': 'premium',
+        },
+        'subscriptionInfo': {'isPremiumCourse': true, 'hasPaid': true},
+      };
+
   /// `/users/me/home`
   static Map<String, dynamic> get homeSummary => {
         'modules': {

@@ -77,6 +77,13 @@ class HomeSummaryProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Sign-out: the streak and the half-watched videos are that student's.
+  void clear() {
+    home = null;
+    isLoading = false;
+    notifyListeners();
+  }
+
   /// Drops a video from the row the moment the player reports it finished.
   ///
   /// The progress write already answers with `completed`, so waiting for the
@@ -167,6 +174,16 @@ class DailyQuizProvider extends ChangeNotifier {
   /// The fetch still runs underneath: it is what confirms the date has not
   /// rolled over, and picks up an answer committed elsewhere.
   Future<bool> restoreCached() async {
+    // The preview has its own question. What is on disk belongs to whoever
+    // was signed in last, and reading it is a wait for something that must
+    // not be shown anyway.
+    if (DemoMode.active) {
+      set = DailyQuizSet.fromJson(DemoContent.dailyQuiz);
+      isLoading = false;
+      notifyListeners();
+      return true;
+    }
+
     if (set != null) return true;
     try {
       final stored = await LocalStorage.getCached(LocalStorage.dailyQuizKey);

@@ -4,6 +4,7 @@ import '../core/utils/load_timer.dart';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import '../View_model/profile_model.dart';
+import '../core/demo/demo_content.dart';
 import '../core/constant/local_storage.dart';
 import '../services/profile_service.dart';
 
@@ -46,8 +47,19 @@ class ProfileProvider extends ChangeNotifier {
   /// The home screen and the profile screen both refresh on becoming
   /// visible, and moving between them lands both within a second. The last
   /// of the app's loaders without this guard.
-  Future<void> loadProfile() =>
-      _inFlight ??= _fetchProfile().whenComplete(() => _inFlight = null);
+  Future<void> loadProfile() {
+    // The drawer still opens for a visitor, so it needs something to draw.
+    // "Guest", and no request: there is no session to make one with.
+    if (DemoMode.active) {
+      profile = ProfileModel.fromJson(DemoContent.profile);
+      isLoading = false;
+      notifyListeners();
+      return Future.value();
+    }
+
+    return _inFlight ??=
+        _fetchProfile().whenComplete(() => _inFlight = null);
+  }
 
   Future<void> _fetchProfile() async {
     // Only when there is nothing to show. A reopened Profile keeps the name
@@ -64,6 +76,15 @@ class ProfileProvider extends ChangeNotifier {
       isLoading = false;
       notifyListeners();
     }
+  }
+
+  /// Sign-out: the name, the photo and the email belong to whoever just
+  /// left. Without this the preview greeted them by name after logging out.
+  void clear() {
+    profile = null;
+    errorMessage = null;
+    isLoading = false;
+    notifyListeners();
   }
 
   Future<bool> saveProfile({String? name, String? phone}) async {

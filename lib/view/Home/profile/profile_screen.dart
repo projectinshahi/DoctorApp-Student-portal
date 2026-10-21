@@ -3,6 +3,9 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 
+import '../../../core/demo/demo_content.dart';
+import '../../../widget/sign_in_required.dart';
+
 import '../../../widget/app_refresh.dart';
 
 import '../../../core/constant/local_storage.dart';
@@ -415,9 +418,12 @@ class _ProfileScreenState extends State<ProfileScreen> with RefreshOnVisible<Pro
                           Stack(
                             children: [
                               GestureDetector(
-                                onTap: provider.isUploadingPhoto
-                                    ? null
-                                    : () => _pickAndUploadPhoto(provider),
+                                onTap: DemoMode.active
+                                    ? () => showSignInRequired(context,
+                                        what: 'add your photo')
+                                    : provider.isUploadingPhoto
+                                        ? null
+                                        : () => _pickAndUploadPhoto(provider),
                                 child: CircleAvatar(
                                   radius: 48.r,
                                   backgroundColor: Colors.white,
@@ -502,7 +508,10 @@ class _ProfileScreenState extends State<ProfileScreen> with RefreshOnVisible<Pro
                               ),
                               SizedBox(width: 6.w),
                               GestureDetector(
-                                onTap: () => _openEditProfileDialog(provider),
+                                onTap: () => DemoMode.active
+                                    ? showSignInRequired(context,
+                                        what: 'edit your details')
+                                    : _openEditProfileDialog(provider),
                                 child: Icon(
                                   Icons.edit_outlined,
                                   size: 18.sp,
@@ -579,7 +588,10 @@ class _ProfileScreenState extends State<ProfileScreen> with RefreshOnVisible<Pro
                               color: AppColor.Buttontextcolor.withValues(alpha: 0.25)),
                           SizedBox(height: 6.h),
                           InkWell(
-                            onTap: () => _changeCourse(context),
+                            onTap: () => DemoMode.active
+                                ? showSignInRequired(context,
+                                    what: 'choose your course')
+                                : _changeCourse(context),
                             borderRadius: BorderRadius.circular(10.r),
                             child: Padding(
                               padding: EdgeInsets.symmetric(vertical: 8.h),
@@ -623,10 +635,14 @@ class _ProfileScreenState extends State<ProfileScreen> with RefreshOnVisible<Pro
                         children: [
                           _ProfileMenuItem(
                             label: "Bookmarks",
-                            onTap: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (_) => const BookmarksScreen()),
-                            ),
+                            onTap: () => DemoMode.active
+                                ? showSignInRequired(context,
+                                    what: 'keep your bookmarks')
+                                : Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                        builder: (_) => const BookmarksScreen()),
+                                  ),
                           ),
                           _menuDivider(),
                           _ProfileMenuItem(
@@ -670,7 +686,32 @@ class _ProfileScreenState extends State<ProfileScreen> with RefreshOnVisible<Pro
 
                     SizedBox(height: 16.h),
 
-                    // ── Logout button ──
+                    // ── Log out, or the way in ──
+                    //
+                    // A visitor has no session to end. The same place on the
+                    // screen offers the one action they do have.
+                    if (DemoMode.active)
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: () => showSignInRequired(context),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColor.buttoncolor,
+                            foregroundColor: AppColor.Buttontextcolor,
+                            elevation: 0,
+                            padding: EdgeInsets.symmetric(vertical: 16.h),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(28.r),
+                            ),
+                          ),
+                          child: Text(
+                            "Sign in",
+                            style: TextStyle(
+                                fontSize: 16.sp, fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                      )
+                    else
                     Consumer<AuthProvider>(
                       builder: (context, auth, _) {
                         return SizedBox(

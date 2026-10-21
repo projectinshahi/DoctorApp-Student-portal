@@ -16,6 +16,7 @@ import 'dart:async';
 //    navigator key rather than this widget's context.
 import 'package:dr_app/view/Home/home_screen.dart';
 import '../../core/demo/demo_content.dart';
+import '../../repository/profile_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
@@ -295,6 +296,11 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
     context.read<NotificationFeedProvider>().clear();
     // The plan belongs to that account too.
     context.read<PlanAccessProvider>().clear();
+    // And the name, photo, streak and half-watched videos. What follows a
+    // sign-out is the preview, which must look like the app does before
+    // anyone has signed in — not like the student who just left.
+    context.read<ProfileProvider>().clear();
+    context.read<HomeSummaryProvider>().clear();
 
     // The session can die while a quiz, a test paper or the player is on
     // top. Swapping this root does not remove those, and without the reset

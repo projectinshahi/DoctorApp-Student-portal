@@ -1,4 +1,6 @@
+import 'package:dr_app/View_model/profile_model.dart';
 import 'package:dr_app/core/demo/demo_content.dart';
+import 'package:dr_app/repository/profile_provider.dart';
 import 'package:dr_app/models/daily_quiz_model.dart';
 import 'package:dr_app/models/home_summary_model.dart';
 import 'package:dr_app/models/selection_content_model.dart';
@@ -44,6 +46,32 @@ void main() {
     expect(home.dailyQuiz!.totalQuestions, 10);
     // Nothing in progress: there is no student to have started anything.
     expect(home.inProgressVideos, isEmpty);
+  });
+
+  test('the drawer has a guest to draw, not an error', () {
+    // The profile screen shows "Failed to load profile" when it has nothing,
+    // and a visitor opening the drawer would have hit exactly that.
+    final profile = ProfileModel.fromJson(DemoContent.profile);
+
+    expect(profile.name, 'Guest');
+    expect(profile.email, 'Not signed in');
+  });
+
+  test('a signed-out provider has nothing of the last student left', () {
+    // Logging out lands on the preview, which has to look like the app does
+    // before anyone signs in — not like whoever just left.
+    final profiles = ProfileProvider()
+      ..profile = ProfileModel.fromJson({
+        'id': 43,
+        'name': 'Shareef',
+        'email': 'shareef@example.test',
+        'role': 'student',
+        'status': 'verified',
+      });
+
+    profiles.clear();
+
+    expect(profiles.profile, isNull);
   });
 
   test('the preview is off unless it is switched on', () {
