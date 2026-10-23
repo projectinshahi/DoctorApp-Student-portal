@@ -24,6 +24,15 @@ class DemoMode {
 }
 
 class DemoContent {
+  /// The video the preview plays.
+  ///
+  /// A stand-in: it is a public test file, not a lesson, and the lesson is
+  /// titled so nobody mistakes it for one. Replace it with a link to your own
+  /// video — an mp4 url or a YouTube link, the player takes either — and the
+  /// preview plays that instead. This is the only line to change.
+  static const String sampleVideoUrl =
+      'https://flutter.github.io/assets-for-api-docs/assets/videos/bee.mp4';
+
   /// `/users/me/selection/content`
   static Map<String, dynamic> get courseTree => {
         'course': {
@@ -41,11 +50,18 @@ class DemoContent {
             'lessons': [
               {
                 'id': -101,
+                'title': 'Sample video — how a lesson plays',
+                'type': 'video',
+                'accessType': 'free',
+                'locked': false,
+                'videoUrl': sampleVideoUrl,
+                'durationMinutes': 1,
+                'lastPositionSeconds': 0,
+              },
+              {
+                'id': -105,
                 'title': 'Cardiology — ECG essentials',
                 'type': 'video',
-                // Premium until there is a real video to play. A free lesson
-                // whose url goes nowhere is worse than a padlock: it reads as
-                // a broken player rather than as something to buy.
                 'accessType': 'premium',
                 'locked': true,
                 'durationMinutes': 12,

@@ -37,7 +37,11 @@ class AppBottomNav extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      // The system's own navigation sits under this — three buttons on one
+      // phone, a gesture bar on the next — and its inset is the only part of
+      // the bar that should ever differ between devices.
+      padding: EdgeInsets.fromLTRB(
+          16, 0, 16, 16 + MediaQuery.viewPaddingOf(context).bottom * 0.5),
       child: Container(
         height: 68,
         padding: const EdgeInsets.symmetric(horizontal: 8),

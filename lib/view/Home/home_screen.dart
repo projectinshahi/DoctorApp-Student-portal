@@ -194,6 +194,10 @@ class _HomescreenState extends State<Homescreen> with RefreshOnVisible<Homescree
       children: [
         Scaffold(
       extendBody: true,
+      // The search field is on this screen, and without this the tab bar
+      // rode up on the keyboard and dropped back down again. A tab bar that
+      // moves is a tab bar people miss.
+      resizeToAvoidBottomInset: false,
       backgroundColor: kBg,
       body: Column(
         children: [

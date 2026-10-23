@@ -19,7 +19,19 @@ void main() {
 
     expect(content.course?.title, 'GP Gulf Licensing Exam');
     expect(content.chapters, hasLength(2));
-    expect(content.chapters.first.lessons, hasLength(3));
+    expect(content.chapters.first.lessons, hasLength(4));
+  });
+
+  test('the preview has a video that will actually play', () {
+    // A free video lesson whose url goes nowhere reads as a broken player.
+    final video = SelectionContentModel.fromJson(DemoContent.courseTree)
+        .chapters
+        .expand((c) => c.lessons)
+        .firstWhere((l) => l.isVideo && !l.isPremium);
+
+    expect(video.isOpen, isTrue);
+    expect(video.videoUrl, startsWith('https://'));
+    expect(video.videoUrl, DemoContent.sampleVideoUrl);
   });
 
   test('the sample shows both a free lesson and a locked one', () {

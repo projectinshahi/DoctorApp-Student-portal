@@ -9,7 +9,8 @@ import 'package:flutter_test/flutter_test.dart';
 /// from the screen's current height — so the bar came back from a video
 /// squashed, with its labels shrunk away. These pump it at the sizes that
 /// used to break it.
-Future<void> _pump(WidgetTester tester, Size screen) async {
+Future<void> _pump(WidgetTester tester, Size screen,
+    {EdgeInsets viewPadding = EdgeInsets.zero}) async {
   tester.view.physicalSize = screen;
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.resetPhysicalSize);
@@ -20,9 +21,12 @@ Future<void> _pump(WidgetTester tester, Size screen) async {
       designSize: const Size(440, 956),
       minTextAdapt: true,
       builder: (context, _) => MaterialApp(
-        home: Scaffold(
-          bottomNavigationBar:
-              AppBottomNav(currentIndex: 0, onTap: (_) {}),
+        home: MediaQuery(
+          data: MediaQueryData(size: screen, viewPadding: viewPadding),
+          child: Scaffold(
+            bottomNavigationBar:
+                AppBottomNav(currentIndex: 0, onTap: (_) {}),
+          ),
         ),
       ),
     ),
@@ -62,5 +66,19 @@ void main() {
 
     expect(landscape, portrait,
         reason: 'it used to shrink with the screen and never grow back');
+  });
+
+  testWidgets('it clears the system navigation, whatever shape it is',
+      (tester) async {
+    // Gesture bar and three buttons give very different insets, and the bar
+    // sat on top of the buttons on the phone in the photo.
+    await _pump(tester, const Size(440, 956));
+    final noInset = tester.getSize(find.byType(AppBottomNav)).height;
+
+    await _pump(tester, const Size(440, 956),
+        viewPadding: const EdgeInsets.only(bottom: 48));
+    final withButtons = tester.getSize(find.byType(AppBottomNav)).height;
+
+    expect(withButtons, greaterThan(noInset));
   });
 }

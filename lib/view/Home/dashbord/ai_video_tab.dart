@@ -390,9 +390,11 @@ class _AiVideoTabState extends State<AiVideoTab> with RefreshOnVisible<AiVideoTa
                           // which is two screens to say one thing — and the
                           // server strips the video, so there is nothing
                           // behind it to see.
-                          onTap: () => DemoMode.active
+                          // Free plays for anybody. Premium asks a visitor
+                          // for an account and a student for a plan.
+                          onTap: () => !lesson.isOpen && DemoMode.active
                               ? showSignInRequired(context,
-                                  what: 'watch the full lesson')
+                                  what: 'watch the premium lessons')
                               : lesson.isOpen
                               ? _open(
                                   StudentLessonDetailScreen(

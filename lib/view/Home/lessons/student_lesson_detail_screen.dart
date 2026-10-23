@@ -16,6 +16,7 @@ import '../../../models/selection_content_model.dart';
 import '../../../repository/saved_provider.dart';
 import '../../../repository/daily_quiz_provider.dart';
 import '../../../repository/selection_content_provider.dart';
+import '../../../core/demo/demo_content.dart';
 import '../../../services/lesson_progress_service.dart';
 import '../../../widget/app_loading.dart';
 import '../../../widget/pro_plan_dialog.dart';
@@ -108,7 +109,12 @@ class _StudentLessonDetailScreenState extends State<StudentLessonDetailScreen> {
     });
 
     if (_lesson.locked) return;
-    if (_lesson.hasVideo && _lesson.videoUrl != null && _lesson.videoUrl!.isNotEmpty) {
+    // No progress to write in the preview: there is no student whose place
+    // this would be kept, and every write would be a 401.
+    if (!DemoMode.active &&
+        _lesson.hasVideo &&
+        _lesson.videoUrl != null &&
+        _lesson.videoUrl!.isNotEmpty) {
       _progress = LessonProgressWriter(
         lessonId: _lesson.id,
         // The server answers every write with its own verdict, so the tick
@@ -1163,7 +1169,10 @@ class _StudentLessonDetailScreenState extends State<StudentLessonDetailScreen> {
               // Keyed on the lesson id so opening a related video from here
               // rebuilds the section against the new lesson instead of
               // showing the previous one's thread.
-              CommentsSection(key: ValueKey(_lesson.id), lessonId: _lesson.id),
+              // Comments belong to people with accounts, and the list
+              // itself needs one to load.
+              if (!DemoMode.active)
+                CommentsSection(key: ValueKey(_lesson.id), lessonId: _lesson.id),
 
               SizedBox(height: 30.h),
             ],
