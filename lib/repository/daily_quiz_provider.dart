@@ -283,6 +283,26 @@ class DailyQuizProvider extends ChangeNotifier {
     }
     notifyListeners();
 
+    // The preview scores its own question. There is no attempt to record it
+    // against and no server to ask, and the sample ships with its key and its
+    // explanation precisely so a visitor can answer one before signing in.
+    if (DemoMode.active) {
+      if (local != null) {
+        answers[questionId] = DailyQuizAnswer(
+          questionId: local.questionId,
+          selectedOptionId: local.selectedOptionId,
+          correctOptionId: local.correctOptionId,
+          isCorrect: local.isCorrect,
+          marksAwarded: local.marksAwarded,
+          explanation: _demoExplanation(questionId),
+        );
+      }
+      pendingOptionId = null;
+      isSubmitting = false;
+      notifyListeners();
+      return local != null;
+    }
+
     var ok = false;
     try {
       final response = await _service.answer(courseId,
@@ -312,6 +332,16 @@ class DailyQuizProvider extends ChangeNotifier {
 
   /// The verdict from the question itself, when the server sent the key with
   /// it. Null when it did not, which is the case the POST exists for.
+  /// The sample's own explanation, which the local verdict leaves out
+  /// because a real set's explanation only arrives with the POST.
+  String? _demoExplanation(int questionId) {
+    for (final raw in (DemoContent.dailyQuiz['questions'] as List)) {
+      final q = Map<String, dynamic>.from(raw as Map);
+      if (q['id'] == questionId) return q['explanation'] as String?;
+    }
+    return null;
+  }
+
   DailyQuizAnswer? _localVerdict(int questionId, int optionId) {
     final question =
         questions.where((q) => q.id == questionId).firstOrNull;

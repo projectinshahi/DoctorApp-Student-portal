@@ -1,6 +1,9 @@
 // lib/view/Home/Qbank/quiz_screen.dart
 import 'package:flutter/material.dart';
 
+import '../../../core/demo/demo_content.dart';
+import '../../../widget/sign_in_required.dart';
+
 import '../../../models/selection_content_model.dart' show LessonAttemptInfo;
 import '../../../repository/quiz_prefetch.dart';
 import '../../../widget/quiz_loading.dart';
@@ -297,7 +300,20 @@ class _QuestionView extends StatelessWidget {
       ),
     );
 
-    if (confirmed == true) await provider.finish();
+    if (confirmed != true) return;
+
+    // Nothing to submit in the preview: the questions were answered on the
+    // device, against no attempt. Scoring one needs an account, which is the
+    // honest place to ask for it — after they have seen what the quiz is
+    // like, not before.
+    if (DemoMode.active) {
+      if (context.mounted) {
+        await showSignInRequired(context, what: 'save your score');
+      }
+      return;
+    }
+
+    await provider.finish();
   }
 
   @override

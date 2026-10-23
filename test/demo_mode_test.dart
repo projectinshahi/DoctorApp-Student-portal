@@ -2,6 +2,8 @@ import 'package:dr_app/View_model/profile_model.dart';
 import 'package:dr_app/core/demo/demo_content.dart';
 import 'package:dr_app/repository/profile_provider.dart';
 import 'package:dr_app/models/daily_quiz_model.dart';
+import 'package:dr_app/repository/daily_quiz_provider.dart';
+import 'package:dr_app/repository/quiz_provider.dart';
 import 'package:dr_app/models/home_summary_model.dart';
 import 'package:dr_app/models/selection_content_model.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -72,6 +74,68 @@ void main() {
     profiles.clear();
 
     expect(profiles.profile, isNull);
+  });
+
+  test('the sample question can actually be answered', () async {
+    // A preview where the one question does nothing is a screenshot. The
+    // sample ships with its key, so the verdict is worked out on the device.
+    DemoMode.active = true;
+    final quiz = DailyQuizProvider(courseId: -1);
+    await quiz.load();
+
+    final question = quiz.questions.first;
+    final correct = question.options.firstWhere((o) => o.isCorrect == true);
+
+    await quiz.answer(question.id, correct.id);
+    final verdict = quiz.answerFor(question.id);
+
+    expect(verdict, isNotNull);
+    expect(verdict!.isCorrect, isTrue);
+    // And the reason, which a real set only gets back from the POST.
+    expect(verdict.explanation, contains('FAST'));
+  });
+
+  test('a wrong answer is marked wrong, with the right one revealed', () async {
+    DemoMode.active = true;
+    final quiz = DailyQuizProvider(courseId: -1);
+    await quiz.load();
+
+    final question = quiz.questions.first;
+    final wrong = question.options.firstWhere((o) => o.isCorrect != true);
+
+    await quiz.answer(question.id, wrong.id);
+    final verdict = quiz.answerFor(question.id)!;
+
+    expect(verdict.isCorrect, isFalse);
+    expect(verdict.correctOptionId, isNot(wrong.id));
+  });
+
+  test('the free subject opens and its questions can be answered', () async {
+    // The complaint this fixes: a row marked Free that asked for an account
+    // the moment it was tapped.
+    DemoMode.active = true;
+    final quiz = QuizProvider();
+    await quiz.load(-102);
+
+    expect(quiz.questions, hasLength(3));
+    final question = quiz.questions.first;
+
+    await quiz.answer(question.id, question.correctOptionId!);
+
+    expect(quiz.isAnswered(question.id), isTrue);
+    expect(quiz.resultFor(question)?.isCorrect, isTrue);
+  });
+
+  test('only the premium lesson is shut to a visitor', () {
+    final lessons = SelectionContentModel.fromJson(DemoContent.courseTree)
+        .chapters
+        .expand((c) => c.lessons);
+
+    final free = lessons.where((l) => !l.isPremium);
+    expect(free, isNotEmpty);
+    expect(free.every((l) => l.isOpen), isTrue,
+        reason: 'free means open, signed in or not');
+    expect(lessons.where((l) => l.isPremium).every((l) => !l.isOpen), isTrue);
   });
 
   test('the preview is off unless it is switched on', () {

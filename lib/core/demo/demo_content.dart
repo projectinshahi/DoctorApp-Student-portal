@@ -43,11 +43,12 @@ class DemoContent {
                 'id': -101,
                 'title': 'Cardiology — ECG essentials',
                 'type': 'video',
-                'accessType': 'free',
-                'locked': false,
-                'videoUrl': 'https://example.invalid/sample.mp4',
+                // Premium until there is a real video to play. A free lesson
+                // whose url goes nowhere is worse than a padlock: it reads as
+                // a broken player rather than as something to buy.
+                'accessType': 'premium',
+                'locked': true,
                 'durationMinutes': 12,
-                'lastPositionSeconds': 0,
               },
               {
                 'id': -102,
@@ -104,6 +105,82 @@ class DemoContent {
         'subscriptionInfo': {'isPremiumCourse': true, 'hasPaid': true},
       };
 
+  /// `POST /users/me/lessons/:id/quiz-attempts`
+  ///
+  /// The free subject's questions. Each carries `correctOptionId` and its
+  /// explanation, so the quiz screen reveals the verdict from the device —
+  /// the same path it already uses when the server ships the key.
+  static Map<String, dynamic> get quiz => {
+        'attemptId': -2,
+        'resumed': false,
+        'completed': false,
+        'lessonId': -102,
+        'quiz': {'id': -2, 'title': 'Cardiology — rapid MCQs'},
+        'totalQuestions': 3,
+        'totalMarks': 3,
+        'answered': const [],
+        'questions': [
+          {
+            'id': -401,
+            'questionText':
+                'A 65-year-old has crushing central chest pain with ST '
+                    'elevation in leads II, III and aVF. Which artery is most '
+                    'likely occluded?',
+            'difficulty': 'medium',
+            'marksCorrect': 1,
+            'marksIncorrect': 0,
+            'correctOptionId': -502,
+            'explanation':
+                'II, III and aVF are the inferior leads, supplied by the '
+                    'right coronary artery in about 80% of people.',
+            'options': [
+              {'id': -501, 'optionText': 'Left anterior descending', 'displayOrder': 1},
+              {'id': -502, 'optionText': 'Right coronary artery', 'displayOrder': 2},
+              {'id': -503, 'optionText': 'Left circumflex', 'displayOrder': 3},
+              {'id': -504, 'optionText': 'Left main stem', 'displayOrder': 4},
+            ],
+          },
+          {
+            'id': -402,
+            'questionText':
+                'Which murmur is best heard at the apex and radiates to the '
+                    'axilla?',
+            'difficulty': 'easy',
+            'marksCorrect': 1,
+            'marksIncorrect': 0,
+            'correctOptionId': -512,
+            'explanation':
+                'Mitral regurgitation is a pansystolic murmur at the apex '
+                    'radiating to the axilla.',
+            'options': [
+              {'id': -511, 'optionText': 'Aortic stenosis', 'displayOrder': 1},
+              {'id': -512, 'optionText': 'Mitral regurgitation', 'displayOrder': 2},
+              {'id': -513, 'optionText': 'Pulmonary stenosis', 'displayOrder': 3},
+              {'id': -514, 'optionText': 'Tricuspid stenosis', 'displayOrder': 4},
+            ],
+          },
+          {
+            'id': -403,
+            'questionText':
+                'First-line treatment for a stable patient in new atrial '
+                    'fibrillation with a fast ventricular rate?',
+            'difficulty': 'medium',
+            'marksCorrect': 1,
+            'marksIncorrect': 0,
+            'correctOptionId': -521,
+            'explanation':
+                'Rate control with a beta blocker comes first in a stable '
+                    'patient. Cardioversion is for haemodynamic instability.',
+            'options': [
+              {'id': -521, 'optionText': 'Beta blocker', 'displayOrder': 1},
+              {'id': -522, 'optionText': 'Immediate DC cardioversion', 'displayOrder': 2},
+              {'id': -523, 'optionText': 'IV adenosine', 'displayOrder': 3},
+              {'id': -524, 'optionText': 'IV magnesium', 'displayOrder': 4},
+            ],
+          },
+        ],
+      };
+
   /// `/users/me/home`
   static Map<String, dynamic> get homeSummary => {
         'modules': {
@@ -139,15 +216,39 @@ class DemoContent {
                     'weakness most suggests?',
             'difficulty': 'easy',
             'marksCorrect': 1,
+            'marksIncorrect': -0.25,
+            // The key ships with the question here, which it never does from
+            // the server — a student could read every answer out of the
+            // response. In the preview there is no server to ask and nothing
+            // to protect: the point is that a visitor can actually answer.
+            'explanation': 'Sudden one-sided weakness with facial droop and '
+                'slurred speech is the classic FAST triad. Treat as a stroke '
+                'until proven otherwise — time is brain.',
             'options': [
-              {'id': -301, 'optionText': 'Acute stroke', 'displayOrder': 1},
-              {'id': -302, 'optionText': 'Migraine', 'displayOrder': 2},
+              {
+                'id': -301,
+                'optionText': 'Acute stroke',
+                'displayOrder': 1,
+                'isCorrect': true
+              },
+              {
+                'id': -302,
+                'optionText': 'Migraine',
+                'displayOrder': 2,
+                'isCorrect': false
+              },
               {
                 'id': -303,
                 'optionText': "Bell's palsy alone",
-                'displayOrder': 3
+                'displayOrder': 3,
+                'isCorrect': false
               },
-              {'id': -304, 'optionText': 'Cluster headache', 'displayOrder': 4},
+              {
+                'id': -304,
+                'optionText': 'Cluster headache',
+                'displayOrder': 4,
+                'isCorrect': false
+              },
             ],
           },
         ],

@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 
 import '../models/selection_content_model.dart' show LessonAttemptInfo;
 
+import '../core/demo/demo_content.dart';
 import '../models/quiz_model.dart';
 import '../services/app_analytics.dart';
 import '../services/quiz_service.dart';
@@ -196,6 +197,18 @@ class QuizProvider extends ChangeNotifier {
     failure = null;
     _reset();
 
+    // The preview's own questions. No attempt is created and nothing is
+    // recorded — there is no student to record it against — but the key
+    // ships with them, so answering reveals the verdict exactly as a real
+    // quiz does when the server sends the key.
+    if (DemoMode.active) {
+      attempt = QuizAttempt.fromJson(DemoContent.quiz);
+      _seedFrom(attempt!);
+      isLoading = false;
+      notifyListeners();
+      return;
+    }
+
     if (warmed != null) {
       attempt = warmed;
       if (warmed.completed) {
@@ -376,6 +389,9 @@ class QuizProvider extends ChangeNotifier {
   /// attempt survive the app being killed, what the resume flow reads, and
   /// what the admin's per-student stats are built from.
   Future<void> _recordInBackground(int questionId, int optionId) async {
+    // Nothing to record against in the preview.
+    if (DemoMode.active) return;
+
     final attemptId = attempt?.attemptId;
     if (attemptId == null) return;
 
@@ -507,6 +523,11 @@ class QuizProvider extends ChangeNotifier {
   /// when it failed, so the screen stays put and the student can retry rather
   /// than losing the attempt.
   Future<bool> finish() async {
+    // There is no attempt on the server to score. The screen answers this by
+    // asking the visitor to sign in, which is the honest end of a preview:
+    // the questions were free to try, keeping the result is not.
+    if (DemoMode.active) return false;
+
     final attemptId = attempt?.attemptId;
     if (attemptId == null || isSubmitting) return false;
 
