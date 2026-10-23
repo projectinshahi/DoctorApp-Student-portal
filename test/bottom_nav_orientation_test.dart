@@ -68,17 +68,21 @@ void main() {
         reason: 'it used to shrink with the screen and never grow back');
   });
 
-  testWidgets('it clears the system navigation, whatever shape it is',
-      (tester) async {
-    // Gesture bar and three buttons give very different insets, and the bar
-    // sat on top of the buttons on the phone in the photo.
-    await _pump(tester, const Size(440, 956));
-    final noInset = tester.getSize(find.byType(AppBottomNav)).height;
+  testWidgets('it sits twelve above whatever is below it', (tester) async {
+    // The gap a student sees is the one between the bar and the system's own
+    // navigation — three buttons on one phone, a gesture bar on the next.
+    for (final inset in [0.0, 24.0, 48.0]) {
+      await _pump(tester, const Size(440, 956),
+          viewPadding: EdgeInsets.only(bottom: inset));
 
-    await _pump(tester, const Size(440, 956),
-        viewPadding: const EdgeInsets.only(bottom: 48));
-    final withButtons = tester.getSize(find.byType(AppBottomNav)).height;
+      final bar = tester.getSize(find.byType(AppBottomNav)).height;
+      final pill = tester
+          .getSize(find.descendant(
+              of: find.byType(AppBottomNav), matching: find.byType(Container)))
+          .height;
 
-    expect(withButtons, greaterThan(noInset));
+      expect(bar - pill - inset, 12,
+          reason: 'with $inset of system navigation underneath');
+    }
   });
 }
