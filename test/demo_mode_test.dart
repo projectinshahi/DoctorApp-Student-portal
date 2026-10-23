@@ -43,6 +43,34 @@ void main() {
     expect(videos.map((v) => v.videoUrl), DemoContent.sampleVideoUrls);
   });
 
+  test('AI Videos shows those three and nothing else', () {
+    // The tab lists every watchable lesson in the tree, so a video without a
+    // link to play would appear there with nothing behind it.
+    final watchable = SelectionContentModel.fromJson(DemoContent.courseTree)
+        .chapters
+        .expand((c) => c.lessons)
+        .where((l) => l.isWatchable)
+        .toList();
+
+    expect(watchable, hasLength(3));
+    expect(watchable.map((l) => l.videoUrl), DemoContent.sampleVideoUrls);
+  });
+
+  test('each one carries its own still, so the list is not blank', () {
+    final videos = SelectionContentModel.fromJson(DemoContent.courseTree)
+        .chapters
+        .expand((c) => c.lessons)
+        .where((l) => l.isVideo);
+
+    for (final video in videos) {
+      expect(video.thumbnailUrl, isNotNull);
+      expect(video.thumbnailUrl, contains('img.youtube.com'));
+      // The still has to be of the video it sits above.
+      expect(video.thumbnailUrl,
+          contains(YoutubeUtils.extractVideoId(video.videoUrl!)!));
+    }
+  });
+
   test('a share link with its tracking parameter still resolves', () {
     // What gets pasted out of the YouTube app: youtu.be/ID?si=…
     const shared = 'https://youtu.be/28CYhgjrBLA?si=lWC-15NK1sK3z2FE';

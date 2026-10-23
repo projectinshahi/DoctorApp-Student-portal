@@ -41,6 +41,13 @@ class DemoContent {
   /// Kept for the one caller that wants a single url.
   static String get sampleVideoUrl => sampleVideoUrls.first;
 
+  /// YouTube's own still for a video, which is public and needs no key — so
+  /// the list has a picture per row without anything being hosted.
+  static String thumbnailFor(String url) {
+    final id = Uri.parse(url).pathSegments.first;
+    return 'https://img.youtube.com/vi/$id/hqdefault.jpg';
+  }
+
   /// `/users/me/selection/content`
   static Map<String, dynamic> get courseTree => {
         'course': {
@@ -63,6 +70,7 @@ class DemoContent {
                 'accessType': 'free',
                 'locked': false,
                 'videoUrl': sampleVideoUrls[0],
+                'thumbnailUrl': thumbnailFor(sampleVideoUrls[0]),
                 'lastPositionSeconds': 0,
               },
               {
@@ -72,6 +80,7 @@ class DemoContent {
                 'accessType': 'free',
                 'locked': false,
                 'videoUrl': sampleVideoUrls[1],
+                'thumbnailUrl': thumbnailFor(sampleVideoUrls[1]),
                 'lastPositionSeconds': 0,
               },
               {
@@ -81,6 +90,7 @@ class DemoContent {
                 'accessType': 'free',
                 'locked': false,
                 'videoUrl': sampleVideoUrls[2],
+                'thumbnailUrl': thumbnailFor(sampleVideoUrls[2]),
                 'lastPositionSeconds': 0,
               },
               {
@@ -107,11 +117,14 @@ class DemoContent {
             'lessons': [
               {
                 'id': -104,
-                'title': 'Antenatal care',
-                'type': 'video',
+                'title': 'Antenatal care — question bank',
+                // A quiz, not a video: AI Videos shows every watchable
+                // lesson in the tree, and the only videos a visitor should
+                // find there are the three that have a link to play.
+                'type': 'quiz',
                 'accessType': 'premium',
                 'locked': true,
-                'durationMinutes': 18,
+                'questionCount': 28,
               },
             ],
           },
