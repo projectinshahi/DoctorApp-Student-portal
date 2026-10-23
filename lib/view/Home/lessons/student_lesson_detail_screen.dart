@@ -1169,10 +1169,7 @@ class _StudentLessonDetailScreenState extends State<StudentLessonDetailScreen> {
               // Keyed on the lesson id so opening a related video from here
               // rebuilds the section against the new lesson instead of
               // showing the previous one's thread.
-              // Comments belong to people with accounts, and the list
-              // itself needs one to load.
-              if (!DemoMode.active)
-                CommentsSection(key: ValueKey(_lesson.id), lessonId: _lesson.id),
+              CommentsSection(key: ValueKey(_lesson.id), lessonId: _lesson.id),
 
               SizedBox(height: 30.h),
             ],
