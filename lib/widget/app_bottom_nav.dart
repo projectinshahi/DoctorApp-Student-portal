@@ -4,8 +4,14 @@
 //
 // Its own file because two places draw it now — home, and every Rapid Recall
 // screen — and two hand-copied bars would drift the first time a tab changed.
+//
+// Sized in plain logical pixels rather than through ScreenUtil. Its .h and
+// .sp are taken from the screen's *current* height, so playing a video — the
+// one screen that turns the phone landscape — rescaled every one of them, and
+// coming back to a portrait home left the bar squashed with its labels
+// shrunk away. A tab bar is one row of five things; it does not need to
+// scale with the page.
 import 'package:flutter/material.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 import '../core/theam /app_color.dart';
 
@@ -31,13 +37,13 @@ class AppBottomNav extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: EdgeInsets.fromLTRB(16.w, 0, 16.w, 16.h),
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
       child: Container(
-        height: 75.h,
-        padding: EdgeInsets.symmetric(horizontal: 8.w),
+        height: 68,
+        padding: const EdgeInsets.symmetric(horizontal: 8),
         decoration: BoxDecoration(
           color: AppColor.buttoncolor,
-          borderRadius: BorderRadius.circular(30.r),
+          borderRadius: BorderRadius.circular(30),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.15),
@@ -92,22 +98,19 @@ class _NavItem extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Icon(icon, size: 25.sp, color: tint),
-              ],
-            ),
-            SizedBox(height: 3.h),
-            // scaleDown keeps 18.sp wherever it fits and shrinks only the
-            // labels that would not, so the bar adapts instead of clipping.
+            Icon(icon, size: 23, color: tint),
+            const SizedBox(height: 3),
+            // scaleDown shrinks only the labels that would not otherwise
+            // fit — "AI Videos" on a narrow phone — so the bar adapts
+            // instead of clipping. The size it starts from is fixed, so a
+            // label can no longer be scaled away to nothing.
             FittedBox(
               fit: BoxFit.scaleDown,
               child: Text(
                 label,
                 maxLines: 1,
                 style: TextStyle(
-                  fontSize: 18.sp,
+                  fontSize: 12,
                   fontWeight: isSelected ? FontWeight.w700 : FontWeight.w400,
                   color: tint,
                 ),
