@@ -1,5 +1,6 @@
 import 'package:dr_app/View_model/profile_model.dart';
 import 'package:dr_app/core/demo/demo_content.dart';
+import 'package:dr_app/core/utils/youtube_utils.dart';
 import 'package:dr_app/repository/profile_provider.dart';
 import 'package:dr_app/models/daily_quiz_model.dart';
 import 'package:dr_app/repository/daily_quiz_provider.dart';
@@ -19,19 +20,35 @@ void main() {
 
     expect(content.course?.title, 'GP Gulf Licensing Exam');
     expect(content.chapters, hasLength(2));
-    expect(content.chapters.first.lessons, hasLength(4));
+    expect(content.chapters.first.lessons, hasLength(5));
   });
 
-  test('the preview has a video that will actually play', () {
+  test('every sample video is a link the player can open', () {
     // A free video lesson whose url goes nowhere reads as a broken player.
-    final video = SelectionContentModel.fromJson(DemoContent.courseTree)
+    final videos = SelectionContentModel.fromJson(DemoContent.courseTree)
         .chapters
         .expand((c) => c.lessons)
-        .firstWhere((l) => l.isVideo && !l.isPremium);
+        .where((l) => l.isVideo && !l.isPremium)
+        .toList();
 
-    expect(video.isOpen, isTrue);
-    expect(video.videoUrl, startsWith('https://'));
-    expect(video.videoUrl, DemoContent.sampleVideoUrl);
+    expect(videos, hasLength(3));
+
+    for (final video in videos) {
+      expect(video.isOpen, isTrue);
+      // The lesson screen routes on this, and then needs an id out of it.
+      expect(YoutubeUtils.isYoutubeUrl(video.videoUrl!), isTrue);
+      expect(YoutubeUtils.extractVideoId(video.videoUrl!), isNotNull);
+    }
+
+    expect(videos.map((v) => v.videoUrl), DemoContent.sampleVideoUrls);
+  });
+
+  test('a share link with its tracking parameter still resolves', () {
+    // What gets pasted out of the YouTube app: youtu.be/ID?si=…
+    const shared = 'https://youtu.be/28CYhgjrBLA?si=lWC-15NK1sK3z2FE';
+
+    expect(YoutubeUtils.isYoutubeUrl(shared), isTrue);
+    expect(YoutubeUtils.extractVideoId(shared), '28CYhgjrBLA');
   });
 
   test('the sample shows both a free lesson and a locked one', () {

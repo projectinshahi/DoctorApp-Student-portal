@@ -24,14 +24,22 @@ class DemoMode {
 }
 
 class DemoContent {
-  /// The video the preview plays.
+  /// The videos the preview plays.
   ///
-  /// A stand-in: it is a public test file, not a lesson, and the lesson is
-  /// titled so nobody mistakes it for one. Replace it with a link to your own
-  /// video — an mp4 url or a YouTube link, the player takes either — and the
-  /// preview plays that instead. This is the only line to change.
-  static const String sampleVideoUrl =
-      'https://flutter.github.io/assets-for-api-docs/assets/videos/bee.mp4';
+  /// YouTube links, which the lesson screen already recognises and opens in
+  /// its YouTube player — nothing is hosted and nothing is bundled, so they
+  /// work on a fresh install with no backend at all.
+  ///
+  /// Replace these to change what a visitor watches. This list is the only
+  /// place they appear.
+  static const List<String> sampleVideoUrls = [
+    'https://youtu.be/28CYhgjrBLA',
+    'https://youtu.be/CA8r06-6yFE',
+    'https://youtu.be/M6Z9bkd7zF8',
+  ];
+
+  /// Kept for the one caller that wants a single url.
+  static String get sampleVideoUrl => sampleVideoUrls.first;
 
   /// `/users/me/selection/content`
   static Map<String, dynamic> get courseTree => {
@@ -50,21 +58,30 @@ class DemoContent {
             'lessons': [
               {
                 'id': -101,
-                'title': 'Sample video — how a lesson plays',
+                'title': 'Cardiology — ECG essentials',
                 'type': 'video',
                 'accessType': 'free',
                 'locked': false,
-                'videoUrl': sampleVideoUrl,
-                'durationMinutes': 1,
+                'videoUrl': sampleVideoUrls[0],
                 'lastPositionSeconds': 0,
               },
               {
                 'id': -105,
-                'title': 'Cardiology — ECG essentials',
+                'title': 'Cardiology — arrhythmias explained',
                 'type': 'video',
-                'accessType': 'premium',
-                'locked': true,
-                'durationMinutes': 12,
+                'accessType': 'free',
+                'locked': false,
+                'videoUrl': sampleVideoUrls[1],
+                'lastPositionSeconds': 0,
+              },
+              {
+                'id': -106,
+                'title': 'Cardiology — heart failure in practice',
+                'type': 'video',
+                'accessType': 'free',
+                'locked': false,
+                'videoUrl': sampleVideoUrls[2],
+                'lastPositionSeconds': 0,
               },
               {
                 'id': -102,
