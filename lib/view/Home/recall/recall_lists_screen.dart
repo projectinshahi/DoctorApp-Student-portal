@@ -13,8 +13,10 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../../../core/demo/demo_content.dart';
 import '../../../widget/app_refresh.dart';
 import '../../../widget/learning_plan_dialog.dart';
+import '../../../widget/sign_in_required.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 
@@ -315,6 +317,11 @@ PreferredSizeWidget recallAppBar(
 /// same stack home builds when the tab is tapped there, so back from it
 /// lands on home rather than on a Recall screen left underneath.
 void openTabFromRecall(BuildContext context, int index) {
+  // Same rule as home's tab bar: a visitor has no grand tests to sit.
+  if (DemoMode.active && index == 2) {
+    showSignInRequired(context, what: 'sit a grand test');
+    return;
+  }
   final navigator = Navigator.of(context);
   navigator.popUntil((route) => route.isFirst);
 
@@ -363,8 +370,6 @@ IconData recallIconFor(String title) {
 /// Checked in order, so the more specific words come first — "neonat" before
 /// anything a paediatrics title might also contain.
 const Map<String, IconData> _lessonIcons = {
-  'cardio': Icons.favorite_border_rounded,
-  'heart': Icons.favorite_border_rounded,
   'pulmo': Icons.air_rounded,
   'respir': Icons.air_rounded,
   'lung': Icons.air_rounded,

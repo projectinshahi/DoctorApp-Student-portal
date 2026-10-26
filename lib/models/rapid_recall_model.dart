@@ -55,6 +55,16 @@ class RapidRecallDeck {
   /// handout cannot be fetched around the paywall.
   final bool locked;
 
+  /// `free` | `premium`, as the admin set it — what the deck IS, shown as a
+  /// chip. [locked] is whether this student can open it. Null from a server
+  /// that predates the setting.
+  final String? accessType;
+
+  /// The first card image, sent with the list so a row has its picture
+  /// before — or without — its cards. A locked deck's cards never arrive,
+  /// so this is the only picture it can have.
+  final String? listedCoverUrl;
+
   const RapidRecallDeck({
     required this.id,
     required this.title,
@@ -70,19 +80,19 @@ class RapidRecallDeck {
     this.cardCount = 0,
     this.cards = const [],
     this.locked = false,
+    this.accessType,
+    this.listedCoverUrl,
   });
 
   bool get hasHandout => (noteUrl ?? '').isNotEmpty;
 
-  /// The first card's image, used as the deck's thumbnail.
-  ///
-  /// Null until the cards are loaded — the list response carries none — and
-  /// for a deck that is notes only.
+  /// The first card's image, used as the deck's thumbnail: from the loaded
+  /// cards, else the one the list sent. Null for a deck that is notes only.
   String? get coverImageUrl {
     for (final card in cards) {
       if (card.hasImage) return card.imageUrl;
     }
-    return null;
+    return listedCoverUrl;
   }
 
   /// What a row says under the title. The subject, when there is one, plus
@@ -126,6 +136,8 @@ class RapidRecallDeck {
               .toList()
           : const [],
       locked: json['locked'] == true,
+      accessType: _asText(json['accessType']),
+      listedCoverUrl: _asText(json['coverImageUrl']),
     );
   }
 }

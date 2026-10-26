@@ -8,6 +8,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../../widget/access_chip.dart';
 import '../../../widget/app_refresh.dart';
 import '../../../widget/learning_plan_dialog.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -198,14 +199,18 @@ class RecallDeckTile extends StatelessWidget {
     RapidRecallDeck deck, {
     required VoidCallback onTap,
   }) {
+    // The loaded copy's first image, or the cover the list sent with it.
+    final cover = recall.deck(deck.id)?.coverImageUrl;
     return RecallDeckTile(
       deck: deck,
-      // The loaded copy's first image. Null until its cards land.
-      coverUrl: recall.deck(deck.id)?.coverImageUrl,
-      // Its cards are still on the way. Not once the fetch has failed — that
+      coverUrl: cover,
+      // No cover yet and its cards are still on the way. Not once the fetch
+      // has failed, nor for a locked deck whose cards never come — either
       // would animate forever over nothing.
-      coverLoading:
-          !recall.hasCards(deck.id) && recall.deckError(deck.id) == null,
+      coverLoading: cover == null &&
+          !deck.locked &&
+          !recall.hasCards(deck.id) &&
+          recall.deckError(deck.id) == null,
       bookmarked: recall.isBookmarked(deck.id),
       isNew: !recall.isOpened(deck.id),
       onBookmark: () => recall.toggleBookmark(deck.id),
@@ -272,6 +277,12 @@ class RecallDeckTile extends StatelessWidget {
                                       color: Colors.grey.shade600),
                                 ),
                               ),
+                              // What the admin set the deck as, the same chip
+                              // a lesson row carries.
+                              if (deck.accessType != null) ...[
+                                SizedBox(width: 6.w),
+                                AccessChip(accessType: deck.accessType!),
+                              ],
                               // Listed, not hidden: a student cannot decide
                               // to subscribe for a deck they never see.
                               if (deck.locked) ...[

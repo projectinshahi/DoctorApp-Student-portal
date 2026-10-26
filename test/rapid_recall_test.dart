@@ -245,6 +245,23 @@ void main() {
       expect(deck.hasHandout, isTrue);
       expect(deck.noteFileType, 'pdf');
     });
+
+    test('a locked premium deck has its cover from the list alone', () {
+      // Its cards are refused, so the list's cover is the only picture it
+      // will ever get.
+      final deck = RapidRecallDeck.fromJson({
+        'id': 9,
+        'title': 'Gout vs Pseudo Gout',
+        'accessType': 'premium',
+        'locked': true,
+        'cardCount': 1,
+        'coverImageUrl': 'https://res.cloudinary.com/x/gout.jpg',
+      });
+
+      expect(deck.accessType, 'premium');
+      expect(deck.cards, isEmpty);
+      expect(deck.coverImageUrl, 'https://res.cloudinary.com/x/gout.jpg');
+    });
   });
 
   group('grouping', () {
@@ -495,7 +512,8 @@ void main() {
     });
 
     testWidgets('lessons get an icon from their name', (tester) async {
-      expect(recallIconFor('Cardiology'), Icons.favorite_border_rounded);
+      // No heart: the client did not want one on the cardiology rows.
+      expect(recallIconFor('Cardiology'), Icons.menu_book_rounded);
       expect(recallIconFor('Gastroenterology & Hepatology'),
           Icons.restaurant_outlined);
       expect(recallIconFor('Obstetrics'), Icons.pregnant_woman_rounded);

@@ -12,6 +12,8 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 
 import '../View_model/profile_model.dart';
+import '../core/demo/demo_content.dart';
+import 'sign_in_required.dart';
 import '../repository/plan_access_provider.dart';
 import '../repository/profile_provider.dart';
 import '../repository/refresh_api_provider.dart';
@@ -163,6 +165,11 @@ class PlanRequiredNotice extends StatelessWidget {
 /// way out, not an error screen.
 Future<void> showPlanRequiredDialog(BuildContext context,
     {String? lessonTitle}) async {
+  // A visitor has no account to put a plan on. Asking them to sign in first
+  // covers every padlock at once, rather than a branch at each one.
+  if (DemoMode.active) {
+    return showSignInRequired(context, what: 'open the premium content');
+  }
   final explore = await showDialog<bool>(
     context: context,
     builder: (dialogContext) => AlertDialog(

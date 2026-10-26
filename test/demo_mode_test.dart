@@ -1,5 +1,7 @@
 import 'package:dr_app/View_model/profile_model.dart';
 import 'package:dr_app/core/demo/demo_content.dart';
+import 'package:dr_app/repository/rapid_recall_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:dr_app/core/utils/youtube_utils.dart';
 import 'package:dr_app/repository/profile_provider.dart';
 import 'package:dr_app/models/daily_quiz_model.dart';
@@ -20,7 +22,7 @@ void main() {
 
     expect(content.course?.title, 'GP Gulf Licensing Exam');
     expect(content.chapters, hasLength(2));
-    expect(content.chapters.first.lessons, hasLength(5));
+    expect(content.chapters.first.lessons, hasLength(6));
   });
 
   test('every sample video is a link the player can open', () {
@@ -43,24 +45,32 @@ void main() {
     expect(videos.map((v) => v.videoUrl), DemoContent.sampleVideoUrls);
   });
 
-  test('AI Videos shows those three and nothing else', () {
-    // The tab lists every watchable lesson in the tree, so a video without a
-    // link to play would appear there with nothing behind it.
+  test('AI Videos shows the three free ones and three locked premium', () {
     final watchable = SelectionContentModel.fromJson(DemoContent.courseTree)
         .chapters
         .expand((c) => c.lessons)
         .where((l) => l.isWatchable)
         .toList();
 
-    expect(watchable, hasLength(3));
-    expect(watchable.map((l) => l.videoUrl), DemoContent.sampleVideoUrls);
+    final free = watchable.where((l) => !l.isPremium);
+    final premium = watchable.where((l) => l.isPremium);
+
+    expect(free.map((l) => l.videoUrl), DemoContent.sampleVideoUrls);
+    expect(premium, hasLength(3));
+    for (final lesson in premium) {
+      expect(lesson.isVideo, isTrue);
+      // Shut, and nothing to play behind the padlock — a visitor is asked
+      // to sign in rather than shown a player.
+      expect(lesson.isOpen, isFalse);
+      expect(lesson.hasVideo, isFalse);
+    }
   });
 
-  test('each one carries its own still, so the list is not blank', () {
+  test('each free one carries its own still, so the list is not blank', () {
     final videos = SelectionContentModel.fromJson(DemoContent.courseTree)
         .chapters
         .expand((c) => c.lessons)
-        .where((l) => l.isVideo);
+        .where((l) => l.isVideo && l.hasVideo);
 
     for (final video in videos) {
       expect(video.thumbnailUrl, isNotNull);
@@ -193,6 +203,46 @@ void main() {
     expect(free.every((l) => l.isOpen), isTrue,
         reason: 'free means open, signed in or not');
     expect(lessons.where((l) => l.isPremium).every((l) => !l.isOpen), isTrue);
+  });
+
+  test('Rapid Recall opens the free decks and keeps premium ones shut',
+      () async {
+    SharedPreferences.setMockInitialValues({});
+    DemoMode.active = true;
+    final recall = RapidRecallProvider();
+    await recall.load();
+
+    // One free and one premium deck per AI video, under that video's lesson.
+    expect(recall.topics.map((t) => t.title), ['Internal Medicine']);
+    expect(recall.lessonsIn(-11), hasLength(3));
+    for (final lesson in recall.lessonsIn(-11)) {
+      expect(lesson.decks.map((d) => d.accessType),
+          containsAll(['free', 'premium']));
+    }
+    expect(recall.decks.where((d) => !d.locked), hasLength(3));
+    expect(recall.decks.where((d) => d.locked), hasLength(3));
+    // Every row has its picture before any deck is opened — the premium
+    // ones too, whose cards a visitor never gets.
+    expect(recall.decks.every((d) => d.coverImageUrl != null), isTrue);
+    // The list carries counts, not cards — the same as the server's.
+    expect(recall.decks.every((d) => d.cards.isEmpty && d.cardCount > 0),
+        isTrue);
+
+    for (final deck in recall.decks) {
+      await recall.loadDeck(deck.id);
+      if (deck.locked) {
+        expect(recall.hasCards(deck.id), isFalse);
+        expect(recall.deckNeedsPlan(deck.id), isTrue);
+      } else {
+        expect(recall.deck(deck.id)!.cards, hasLength(deck.cardCount));
+        // Every free card is a frame from one of the AI videos plus its note.
+        for (final card in recall.deck(deck.id)!.cards) {
+          expect(card.hasNote, isTrue);
+          expect(card.imageUrl, startsWith('https://img.youtube.com/vi/'));
+        }
+        expect(recall.deck(deck.id)!.coverImageUrl, isNotNull);
+      }
+    }
   });
 
   test('the preview is off unless it is switched on', () {
