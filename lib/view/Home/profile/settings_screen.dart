@@ -1,6 +1,6 @@
 // lib/view/Home/profile/settings_screen.dart
 //
-// Notifications, Privacy and Support.
+// Notifications, Privacy, Support and Account.
 //
 // A view of SettingsProvider, which is where each switch takes effect: push
 // subscribes to course alerts, the reminder schedules a daily notification,
@@ -10,7 +10,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/demo/demo_content.dart';
 import '../../../core/theam /app_color.dart';
+import '../../../repository/refresh_api_provider.dart';
 import '../../../repository/settings_provider.dart';
 import '../../../widget/app_snackbar.dart';
 import 'info_screens.dart';
@@ -39,6 +41,80 @@ class SettingsScreen extends StatelessWidget {
     if (picked != null) {
       await settings.setReminderTime(picked.hour * 60 + picked.minute);
     }
+  }
+
+  Future<void> _confirmDelete(BuildContext context) async {
+    const danger = Color(0xFFD65745);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: AppColor.Screenbackground,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16.r)),
+        icon: Icon(Icons.delete_forever_rounded, size: 30.sp, color: danger),
+        title: Text('Delete account?',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+                fontSize: 17.sp,
+                fontWeight: FontWeight.w800,
+                color: AppColor.Textcolor)),
+        content: Text(
+          'Your profile, progress, saved items and subscription will be '
+          'removed for good. This cannot be undone.',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+              fontSize: 13.sp, height: 1.45, color: Colors.grey.shade700),
+        ),
+        actionsAlignment: MainAxisAlignment.center,
+        actions: [
+          SizedBox(
+            width: double.infinity,
+            height: 46.h,
+            child: ElevatedButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: danger,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(26.r)),
+              ),
+              child: Text('Delete my account',
+                  style:
+                      TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700)),
+            ),
+          ),
+          SizedBox(
+            width: double.infinity,
+            child: TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: Text('Keep my account',
+                  style: TextStyle(
+                      fontSize: 13.sp,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey.shade700)),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+
+    final navigator = Navigator.of(context);
+    try {
+      await context.read<AuthProvider>().deleteAccount();
+    } catch (e) {
+      // A session that had already ended is signed out by ApiClient; anything
+      // else left the account in place, so say so and stay here.
+      if (context.mounted) {
+        showAppSnackBar(context, e.toString().replaceFirst('Exception: ', ''),
+            kind: AppMessage.failure);
+      }
+      return;
+    }
+    // AuthGate swaps the root to the login screen; just get out of its way.
+    navigator.popUntil((route) => route.isFirst);
   }
 
   static TimeOfDay _timeOf(int minutes) =>
@@ -157,6 +233,19 @@ class SettingsScreen extends StatelessWidget {
                             fontSize: 14.sp, color: Colors.grey.shade700)),
                   ),
                 ]),
+
+                // A visitor on sample content has no account to delete.
+                if (!DemoMode.active) ...[
+                  SizedBox(height: 18.h),
+                  const _SectionLabel('Account'),
+                  _Card(children: [
+                    _LinkRow(
+                      title: 'Delete account',
+                      color: const Color(0xFFD65745),
+                      onTap: () => _confirmDelete(context),
+                    ),
+                  ]),
+                ],
 
                 SizedBox(height: 20.h),
                 // Stated, not offered: screen protection is not the student's
@@ -293,7 +382,13 @@ class _LinkRow extends StatelessWidget {
 
   final VoidCallback onTap;
 
-  const _LinkRow({required this.title, required this.onTap, this.trailing});
+  final Color color;
+
+  const _LinkRow(
+      {required this.title,
+      required this.onTap,
+      this.trailing,
+      this.color = Colors.black87});
 
   @override
   Widget build(BuildContext context) {
@@ -308,7 +403,7 @@ class _LinkRow extends StatelessWidget {
                   style: TextStyle(
                       fontSize: 14.sp,
                       fontWeight: FontWeight.w600,
-                      color: Colors.black87)),
+                      color: color)),
             ),
             if (trailing != null) ...[
               Text(trailing!,
