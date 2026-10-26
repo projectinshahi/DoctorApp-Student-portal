@@ -824,11 +824,17 @@ class _StudentLessonDetailScreenState extends State<StudentLessonDetailScreen> {
     return Padding(
       padding: EdgeInsets.fromLTRB(20.w, 6.h, 20.w, 0),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Flexible, so a long description wraps onto as many lines as it
+          // needs instead of running off the right edge.
           if (_lesson.description != null && _lesson.description!.isNotEmpty)
-            Text(
-              _lesson.description!,
-              style: TextStyle(fontSize: 13.sp, color: Colors.grey.shade600),
+            Flexible(
+              child: Text(
+                _lesson.description!,
+                style: TextStyle(
+                    fontSize: 13.sp, height: 1.45, color: Colors.grey.shade600),
+              ),
             ),
           if (durationText != null) ...[
             if (_lesson.description != null && _lesson.description!.isNotEmpty) ...[
