@@ -19,6 +19,15 @@ import '../../../widget/lesson_watch_indicator.dart';
 const Color _kPrimary = Color(0xFF87986B);
 
 class AiVideoTab extends StatefulWidget {
+  /// The lessons this tab is about: videos and notes, never quizzes.
+  ///
+  /// Both the chapter cards and the list below them count through here, so
+  /// the number on a card is the number of rows a tap on it produces. The
+  /// cards used to show the server's lesson total, which counts the quizzes
+  /// too — "0/4 Lessons" above a list of two videos.
+  static List<StudentLessonModel> videosIn(StudentChapterModel chapter) =>
+      chapter.lessons.where((l) => l.isWatchable).toList();
+
   const AiVideoTab({super.key});
 
   @override
@@ -145,7 +154,11 @@ class _AiVideoTabState extends State<AiVideoTab> with RefreshOnVisible<AiVideoTa
           }
 
           final content = provider.content;
-          final chapters = content?.chapters ?? const <StudentChapterModel>[];
+          // Chapters with nothing to watch are not chapters of this tab. They
+          // showed as "0/0 Lessons" cards that did nothing when tapped.
+          final chapters = (content?.chapters ?? const <StudentChapterModel>[])
+              .where((c) => AiVideoTab.videosIn(c).isNotEmpty)
+              .toList();
 
           if (chapters.isEmpty) {
             return Center(
@@ -286,9 +299,18 @@ class _AiVideoTabState extends State<AiVideoTab> with RefreshOnVisible<AiVideoTa
                                         // already here. A separate "2 of 2"
                                         // line underneath overflowed this
                                         // card, and repeated the same number.
-                                        chapter.progress != null
-                                            ? "${chapter.progress!.completedLessons}/${chapter.progress!.totalLessons} Lessons"
-                                            : "${chapter.lessons.length} Lessons",
+                                        // Counted from the videos this tab
+                                        // will actually list, not from the
+                                        // chapter's lessons — those include
+                                        // the quizzes, which live in QBank.
+                                        () {
+                                          final videos =
+                                              AiVideoTab.videosIn(chapter);
+                                          final done = videos
+                                              .where((l) => l.completed)
+                                              .length;
+                                          return "$done/${videos.length} Lessons";
+                                        }(),
                                         style: TextStyle(
                                           fontSize: 9.5.sp,
                                           fontWeight: FontWeight.w600,

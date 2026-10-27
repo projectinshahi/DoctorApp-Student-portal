@@ -272,7 +272,7 @@ class _HomescreenState extends State<Homescreen> with RefreshOnVisible<Homescree
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
                                         Text(
-                                          "Heyyy",
+                                          "Hey",
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
                                           style: TextStyle(

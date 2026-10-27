@@ -10,6 +10,7 @@ import 'package:provider/provider.dart';
 
 import '../../View_model/Course_get_model.dart';
 import '../../repository/course_get_provider.dart';
+import '../../repository/profile_provider.dart';
 import '../../repository/selection_provider.dart';
 import '../../repository/selection_content_provider.dart';
 import '../../widget/app_loading.dart';
@@ -44,9 +45,38 @@ class _ExamSelectionScreenState extends State<ExamSelectionScreen> {
   int? selectedParentCourseId;
   String? selectedParentCourseTitle;
 
+  /// The course the student already has, from their profile. Null on the
+  /// first-run picker, where there is nothing to change from.
+  int? _currentCourseId;
+  int? _currentCourseTypeId;
+  String? _currentTitle;
+
+  bool get _hasCurrent => _currentCourseId != null;
+
   @override
   void initState() {
     super.initState();
+
+    // Opened to change course: start on the one they have, marked Current,
+    // so they can see what they are moving away from.
+    final profile = context.read<ProfileProvider>().profile;
+    final course = profile?.selectedCourse;
+    if (course != null) {
+      final type = profile!.selectedCourseType;
+      _currentCourseId = course.id;
+      _currentCourseTypeId = type?.id;
+      _currentTitle = type == null ? course.title : '${course.title} — ${type.title}';
+      if (type == null) {
+        selectedCourseId = course.id;
+        selectedCourseTitle = course.title;
+      } else {
+        selectedCourseTypeId = type.id;
+        selectedCourseTypeTitle = type.title;
+        selectedParentCourseId = course.id;
+        selectedParentCourseTitle = course.title;
+      }
+    }
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<CourseListGetProvider>().fetchCourses();
     });
@@ -98,6 +128,88 @@ class _ExamSelectionScreenState extends State<ExamSelectionScreen> {
   bool get _hasSelection =>
       selectedCourseId != null || selectedCourseTypeId != null;
 
+  /// The selection is still the course they already have.
+  bool get _isUnchanged =>
+      _hasCurrent &&
+      (selectedCourseTypeId != null
+          ? selectedCourseTypeId == _currentCourseTypeId
+          : selectedCourseId == _currentCourseId && _currentCourseTypeId == null);
+
+  String get _selectedTitle => selectedCourseTypeId != null
+      ? '$selectedParentCourseTitle — $selectedCourseTypeTitle'
+      : selectedCourseTitle ?? '';
+
+  /// Switching course swaps everything the student sees, so it is asked,
+  /// not assumed from one tap.
+  Future<bool> _confirmChange() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: AppColor.Screenbackground,
+        surfaceTintColor: Colors.transparent,
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.r)),
+        icon: Icon(Icons.swap_horiz_rounded,
+            size: 30.sp, color: AppColor.buttoncolor),
+        title: Text('Change your course?',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 17.sp, fontWeight: FontWeight.w800)),
+        content: Text.rich(
+          TextSpan(
+            style: TextStyle(
+                fontSize: 13.sp, height: 1.5, color: Colors.grey.shade700),
+            children: [
+              const TextSpan(text: 'From '),
+              TextSpan(
+                  text: _currentTitle,
+                  style: const TextStyle(fontWeight: FontWeight.w700)),
+              const TextSpan(text: ' to '),
+              TextSpan(
+                  text: _selectedTitle,
+                  style: const TextStyle(fontWeight: FontWeight.w700)),
+              const TextSpan(
+                  text: '.\n\nHome, QBank, AI Videos and Rapid Recall will '
+                      'show the new course.'),
+            ],
+          ),
+          textAlign: TextAlign.center,
+        ),
+        actionsAlignment: MainAxisAlignment.center,
+        actions: [
+          SizedBox(
+            width: double.infinity,
+            height: 46.h,
+            child: ElevatedButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColor.buttoncolor,
+                foregroundColor: AppColor.Buttontextcolor,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(26.r)),
+              ),
+              child: Text('Change course',
+                  style:
+                      TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700)),
+            ),
+          ),
+          SizedBox(
+            width: double.infinity,
+            child: TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: Text('Keep current course',
+                  style: TextStyle(
+                      fontSize: 13.sp,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey.shade700)),
+            ),
+          ),
+        ],
+      ),
+    );
+    return confirmed == true;
+  }
+
   Future<void> _handleDone() async {
     if (!_hasSelection) return;
 
@@ -107,6 +219,15 @@ class _ExamSelectionScreenState extends State<ExamSelectionScreen> {
     // taps before the first rebuild — which is how the same selection was
     // being POSTed twice.
     if (selectionProvider.isSaving) return;
+
+    // Done on the course they already have: nothing to save.
+    if (_isUnchanged) {
+      final navigator = Navigator.of(context);
+      if (navigator.canPop()) navigator.pop();
+      return;
+    }
+    if (_hasCurrent && !await _confirmChange()) return;
+    if (!mounted) return;
 
     bool success;
     if (selectedCourseId != null) {
@@ -210,7 +331,11 @@ class _ExamSelectionScreenState extends State<ExamSelectionScreen> {
                       foregroundColor: _hasSelection
                           ? AppColor.Buttontextcolor
                           : Colors.grey.shade500,
-                      disabledBackgroundColor: Colors.white,
+                      // Disabled while saving too: the button stays green
+                      // then, and only the spinner on it is white.
+                      disabledBackgroundColor: selectionProvider.isSaving
+                          ? AppColor.buttoncolor
+                          : Colors.white,
                       disabledForegroundColor: Colors.grey.shade400,
                       elevation: 0,
                       shape: RoundedRectangleBorder(
@@ -356,6 +481,12 @@ class _ExamSelectionScreenState extends State<ExamSelectionScreen> {
                   ),
                 ),
               ),
+              if (!hasCourseTypes &&
+                  _currentCourseTypeId == null &&
+                  _currentCourseId == course.id) ...[
+                const _CurrentBadge(),
+                SizedBox(width: 8.w),
+              ],
               if (!hasCourseTypes)
                 GestureDetector(
                   onTap: () => _selectStandaloneCourse(course),
@@ -435,6 +566,10 @@ class _ExamSelectionScreenState extends State<ExamSelectionScreen> {
                           ),
                         ),
                       ),
+                      if (_currentCourseTypeId == courseType.id) ...[
+                        const _CurrentBadge(),
+                        SizedBox(width: 8.w),
+                      ],
                       _SelectionCircle(isSelected: isSelected),
                     ],
                   ),
@@ -446,6 +581,28 @@ class _ExamSelectionScreenState extends State<ExamSelectionScreen> {
       ),
     );
   }
+}
+
+/// Marks the course the student already has.
+class _CurrentBadge extends StatelessWidget {
+  const _CurrentBadge();
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 3.h),
+        decoration: BoxDecoration(
+          color: AppColor.buttoncolor.withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(8.r),
+        ),
+        child: Text(
+          'Current',
+          style: TextStyle(
+            fontSize: 11.sp,
+            fontWeight: FontWeight.w700,
+            color: AppColor.buttoncolor,
+          ),
+        ),
+      );
 }
 
 class _SelectionCircle extends StatelessWidget {

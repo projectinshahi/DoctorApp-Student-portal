@@ -394,7 +394,7 @@ class _ProfileScreenState extends State<ProfileScreen> with RefreshOnVisible<Pro
                         ),
                         SizedBox(width: 8.w),
                         Text(
-                          "profile",
+                          "Profile",
                           style: TextStyle(
                             fontSize: 25.sp,
                             fontWeight: FontWeight.w600,
