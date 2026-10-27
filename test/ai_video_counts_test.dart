@@ -61,7 +61,13 @@ void main() {
   });
 
   test('a chapter with only quizzes has nothing for this tab', () {
-    // Those showed as "0/0 Lessons" cards that did nothing when tapped.
+    // Its card still shows — a published subject that disappears reads as a
+    // missing subject rather than an empty one — but the pill says "No
+    // lessons" instead of counting the quizzes it cannot open.
     expect(AiVideoTab.videosIn(_chapter([_quiz(1), _quiz(2)])), isEmpty);
+  });
+
+  test('a chapter with no lessons at all is still a subject', () {
+    expect(AiVideoTab.videosIn(_chapter(const [])), isEmpty);
   });
 }

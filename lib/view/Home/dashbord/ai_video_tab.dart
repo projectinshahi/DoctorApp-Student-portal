@@ -154,11 +154,10 @@ class _AiVideoTabState extends State<AiVideoTab> with RefreshOnVisible<AiVideoTa
           }
 
           final content = provider.content;
-          // Chapters with nothing to watch are not chapters of this tab. They
-          // showed as "0/0 Lessons" cards that did nothing when tapped.
-          final chapters = (content?.chapters ?? const <StudentChapterModel>[])
-              .where((c) => AiVideoTab.videosIn(c).isNotEmpty)
-              .toList();
+          // Every published chapter gets a card, including one with nothing
+          // in it yet — a subject that disappears reads as a missing subject
+          // rather than an empty one. Its pill says so instead of "0/0".
+          final chapters = content?.chapters ?? const <StudentChapterModel>[];
 
           if (chapters.isEmpty) {
             return Center(
@@ -306,6 +305,9 @@ class _AiVideoTabState extends State<AiVideoTab> with RefreshOnVisible<AiVideoTa
                                         () {
                                           final videos =
                                               AiVideoTab.videosIn(chapter);
+                                          if (videos.isEmpty) {
+                                            return "No lessons";
+                                          }
                                           final done = videos
                                               .where((l) => l.completed)
                                               .length;
@@ -392,7 +394,9 @@ class _AiVideoTabState extends State<AiVideoTab> with RefreshOnVisible<AiVideoTa
                       child: Text(
                         _searchQuery.isNotEmpty
                             ? "No lessons match \"$_searchQuery\"."
-                            : "No lessons available yet.",
+                            : _selectedChapterIndex != null
+                                ? "No lessons in this subject yet."
+                                : "No lessons available yet.",
                         style: TextStyle(fontSize: 13.sp, color: Colors.grey.shade600),
                       ),
                     )
