@@ -22,6 +22,82 @@ class SignupScreen extends StatefulWidget {
 class _SignupScreenState extends State<SignupScreen> {
   bool _isSigningIn = false;
 
+  /// Shared by the Google and Apple buttons: the server's reply, and so
+  /// everything after it, is the same for both.
+  Future<void> _signIn(
+    GoogleSignInIntergration viewModel,
+    Future<bool> Function() signIn,
+  ) async {
+    setState(() => _isSigningIn = true);
+
+    final success = await signIn();
+
+    // The server turned it away for a stated reason —
+    // in use elsewhere, blocked, a bound device. Each
+    // needs different words, and the code is what
+    // decides. Staying put is the point: there is no
+    // force-sign-in to offer.
+    final refused = viewModel.refusal;
+    if (refused != null && mounted) {
+      setState(() => _isSigningIn = false);
+      await showLoginRefusedDialog(context, refused);
+      return;
+    }
+
+    if (!mounted) return;
+
+    // Deliberately still signing in: adoptSession has
+    // a /selection/content call to make, and clearing
+    // this here put the form back on screen for the
+    // length of it.
+    final result = viewModel.authResult;
+
+    if (success && result != null) {
+      // No "Welcome back" toast. The home screen
+      // already greets them by name, and a snack bar
+      // riding in over the transition just competes
+      // with the notice shown when another device was
+      // signed out.
+
+      // Hand the session to AuthProvider, which is
+      // what AuthGate watches. Without this the
+      // tokens were stored but the gate went on
+      // showing the login screen until some later
+      // rebuild — the flicker between signing in and
+      // landing on home.
+      await context
+          .read<AuthProvider>()
+          .adoptSession(result);
+
+      if (!mounted) return;
+      // Left spinning until now on purpose:
+      // adoptSession still had a /selection/content
+      // call to make after the 200 landed.
+      setState(() => _isSigningIn = false);
+
+      // No navigation of our own. AuthGate swaps its
+      // root — to the course picker for a new
+      // account, to home otherwise.
+      //
+      // pushReplacement removed AuthGate from the
+      // tree, taking the session watcher with it, and
+      // it pushed ExamSelectionScreen with three empty
+      // strings for the tokens it needs.
+      Navigator.of(context).popUntil((r) => r.isFirst);
+    } else {
+      // Back to the form, or the button stays disabled
+      // and they cannot try again.
+      setState(() => _isSigningIn = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            viewModel.errorMessage ?? 'Sign-in failed',
+          ),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
 
@@ -179,76 +255,7 @@ class _SignupScreenState extends State<SignupScreen> {
                             return GestureDetector(
                               onTap: (viewModel.isLoading || _isSigningIn)
                                   ? null
-                                  : () async {
-                                setState(() => _isSigningIn = true);
-
-                                final success = await viewModel.signInWithGoogle();
-
-                                // The server turned it away for a stated reason —
-                                // in use elsewhere, blocked, a bound device. Each
-                                // needs different words, and the code is what
-                                // decides. Staying put is the point: there is no
-                                // force-sign-in to offer.
-                                final refused = viewModel.refusal;
-                                if (refused != null && context.mounted) {
-                                  setState(() => _isSigningIn = false);
-                                  await showLoginRefusedDialog(context, refused);
-                                  return;
-                                }
-
-                                if (!context.mounted) return;
-
-                                // Deliberately still signing in: adoptSession has
-                                // a /selection/content call to make, and clearing
-                                // this here put the form back on screen for the
-                                // length of it.
-                                final result = viewModel.authResult;
-
-                                if (success && result != null) {
-                                  // No "Welcome back" toast. The home screen
-                                  // already greets them by name, and a snack bar
-                                  // riding in over the transition just competes
-                                  // with the notice shown when another device was
-                                  // signed out.
-
-                                  // Hand the session to AuthProvider, which is
-                                  // what AuthGate watches. Without this the
-                                  // tokens were stored but the gate went on
-                                  // showing the login screen until some later
-                                  // rebuild — the flicker between signing in and
-                                  // landing on home.
-                                  await context
-                                      .read<AuthProvider>()
-                                      .adoptSession(result);
-
-                                  if (!context.mounted) return;
-                                  // Left spinning until now on purpose:
-                                  // adoptSession still had a /selection/content
-                                  // call to make after the 200 landed.
-                                  setState(() => _isSigningIn = false);
-
-                                  // No navigation of our own. AuthGate swaps its
-                                  // root — to the course picker for a new
-                                  // account, to home otherwise.
-                                  //
-                                  // pushReplacement removed AuthGate from the
-                                  // tree, taking the session watcher with it, and
-                                  // it pushed ExamSelectionScreen with three empty
-                                  // strings for the tokens it needs.
-                                  Navigator.of(context).popUntil((r) => r.isFirst);
-                                } else {
-                                  // Back to the form, or the button stays disabled
-                                  // and they cannot try again.
-                                  setState(() => _isSigningIn = false);
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                        viewModel.errorMessage ?? 'Sign-in failed',
-                                      ),
-                                    ),
-                                  );
-                                }
-                              },
+                                  : () => _signIn(viewModel, viewModel.signInWithGoogle),
                               child: Container(
                                 width: 192.w,
                                 height: 60.h,
@@ -286,20 +293,30 @@ class _SignupScreenState extends State<SignupScreen> {
 
                         const Spacer(),
 
-                        Container(
-                          width: 192.w,
-                          height: 60.h,
-                          decoration: BoxDecoration(
-                            color: AppColor.buttoncolor,
-                            borderRadius: BorderRadius.circular(12.r),
-                          ),
-                          child: Center(
-                            child: Image.asset(
-                              "asset/icons/Appleicon.png",
-                              height: 34.h,
-                              width: 88.w,
-                            ),
-                          ),
+                        // ---- APPLE SIGN-IN BUTTON ----
+                        Consumer<GoogleSignInIntergration>(
+                          builder: (context, viewModel, child) {
+                            return GestureDetector(
+                              onTap: (viewModel.isLoading || _isSigningIn)
+                                  ? null
+                                  : () => _signIn(viewModel, viewModel.signInWithApple),
+                              child: Container(
+                                width: 192.w,
+                                height: 60.h,
+                                decoration: BoxDecoration(
+                                  color: AppColor.buttoncolor,
+                                  borderRadius: BorderRadius.circular(12.r),
+                                ),
+                                child: Center(
+                                  child: Image.asset(
+                                    "asset/icons/Appleicon.png",
+                                    height: 34.h,
+                                    width: 88.w,
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
                         ),
                       ],
                     ),

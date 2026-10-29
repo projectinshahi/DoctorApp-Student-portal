@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 import '../../../../core/constant/api_constant.dart';
 import '../../../../core/utils/device_id_helper.dart';
@@ -83,71 +84,126 @@ class AuthService {
         throw Exception("Google ID Token is null");
       }
 
-      final String deviceId = await DeviceIdHelper.getDeviceId();
-
-      final response = await http.post(
-        Uri.parse(ApiConstant.googleSignIn),
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: jsonEncode({
-          "idToken": idToken,
-          "deviceId": deviceId,
-        }),
-      );
-
-      // Never the body: it carries the access and refresh tokens, and
-      // print() reaches logcat in release builds too, where any app with log
-      // access could read them. The status alone is enough to debug with.
-      if (kDebugMode) debugPrint('AUTH  POST [${response.statusCode}]  google');
-
-      if (response.statusCode == 200) {
-        final AuthResultModel authResult =
-        AuthResultModel.fromJson(jsonDecode(response.body));
-
-        // Save Tokens
-        await LocalStorage.saveAccessToken(authResult.accessToken);
-        await LocalStorage.saveRefreshToken(authResult.refreshToken);
-
-
-
-        return authResult;
-      }
-
-      // The server refuses a login for reasons the student can act on, and
-      // each needs its own words. A raw Exception here surfaced as
-      // "Exception: ..." on the login screen.
-      Map<String, dynamic> error = const {};
-      try {
-        final decoded = jsonDecode(response.body);
-        if (decoded is Map && decoded["error"] is Map) {
-          error = Map<String, dynamic>.from(decoded["error"] as Map);
-        }
-      } catch (_) {
-        // A gateway page is not JSON. The generic message below covers it.
-      }
-
-      // retryAfterMinutes sits beside `error`, not inside it.
-      Map<String, dynamic> body = const {};
-      try {
-        final decoded = jsonDecode(response.body);
-        if (decoded is Map) body = Map<String, dynamic>.from(decoded);
-      } catch (_) {}
-
-      final retry = body["retryAfterMinutes"];
-
-      throw LoginRefusedException(
-        code: error["code"]?.toString(),
-        message: error["message"]?.toString() ??
-            "Could not sign in. Please try again.",
-        retryAfterMinutes: retry is int
-            ? retry
-            : int.tryParse('${retry ?? ''}'),
-      );
+      return await _signInToBackend(ApiConstant.googleSignIn, {"idToken": idToken});
     } catch (e) {
       if (kDebugMode) debugPrint('Google sign-in failed: $e');
       rethrow;
     }
+  }
+
+  /// The Services ID from the Apple portal. Android has no native Apple
+  /// sign-in, so it signs in on Apple's web page as this "service", and Apple
+  /// posts the result to the backend, which hands it back to the app.
+  static const String _appleServiceId = 'com.keerthana.drApp.signin';
+
+  /// Native sheet on iPhone; Apple's web page on Android.
+  Future<AuthResultModel> signInWithApple() async {
+    try {
+      final credential = await SignInWithApple.getAppleIDCredential(
+        scopes: [
+          AppleIDAuthorizationScopes.email,
+          AppleIDAuthorizationScopes.fullName,
+        ],
+        webAuthenticationOptions: Platform.isAndroid
+            ? WebAuthenticationOptions(
+                clientId: _appleServiceId,
+                redirectUri: Uri.parse(ApiConstant.appleCallback),
+              )
+            : null,
+      );
+
+      final idToken = credential.identityToken;
+      if (idToken == null || idToken.isEmpty) {
+        throw Exception("Apple ID Token is null");
+      }
+
+      // Apple hands over the name on the very first sign-in only, and never
+      // puts it in the token, so it travels beside it.
+      final name = [credential.givenName, credential.familyName]
+          .whereType<String>()
+          .join(' ')
+          .trim();
+
+      return await _signInToBackend(ApiConstant.appleSignIn, {
+        "idToken": idToken,
+        if (name.isNotEmpty) "name": name,
+      });
+    } on SignInWithAppleAuthorizationException catch (e) {
+      if (e.code == AuthorizationErrorCode.canceled) {
+        throw Exception("User cancelled Apple Sign-In");
+      }
+      if (kDebugMode) debugPrint('Apple sign-in failed: $e');
+      rethrow;
+    } catch (e) {
+      if (kDebugMode) debugPrint('Apple sign-in failed: $e');
+      rethrow;
+    }
+  }
+
+  /// Posts a provider's id token to the backend. The reply is the same for
+  /// Google and Apple: tokens on 200, a typed refusal otherwise.
+  Future<AuthResultModel> _signInToBackend(
+    String url,
+    Map<String, dynamic> payload,
+  ) async {
+    final String deviceId = await DeviceIdHelper.getDeviceId();
+
+    final response = await http.post(
+      Uri.parse(url),
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: jsonEncode({...payload, "deviceId": deviceId}),
+    );
+
+    // Never the body: it carries the access and refresh tokens, and
+    // print() reaches logcat in release builds too, where any app with log
+    // access could read them. The status alone is enough to debug with.
+    if (kDebugMode) debugPrint('AUTH  POST [${response.statusCode}]  $url');
+
+    if (response.statusCode == 200) {
+      final AuthResultModel authResult =
+      AuthResultModel.fromJson(jsonDecode(response.body));
+
+      // Save Tokens
+      await LocalStorage.saveAccessToken(authResult.accessToken);
+      await LocalStorage.saveRefreshToken(authResult.refreshToken);
+
+
+
+      return authResult;
+    }
+
+    // The server refuses a login for reasons the student can act on, and
+    // each needs its own words. A raw Exception here surfaced as
+    // "Exception: ..." on the login screen.
+    Map<String, dynamic> error = const {};
+    try {
+      final decoded = jsonDecode(response.body);
+      if (decoded is Map && decoded["error"] is Map) {
+        error = Map<String, dynamic>.from(decoded["error"] as Map);
+      }
+    } catch (_) {
+      // A gateway page is not JSON. The generic message below covers it.
+    }
+
+    // retryAfterMinutes sits beside `error`, not inside it.
+    Map<String, dynamic> body = const {};
+    try {
+      final decoded = jsonDecode(response.body);
+      if (decoded is Map) body = Map<String, dynamic>.from(decoded);
+    } catch (_) {}
+
+    final retry = body["retryAfterMinutes"];
+
+    throw LoginRefusedException(
+      code: error["code"]?.toString(),
+      message: error["message"]?.toString() ??
+          "Could not sign in. Please try again.",
+      retryAfterMinutes: retry is int
+          ? retry
+          : int.tryParse('${retry ?? ''}'),
+    );
   }
 
   Future<void> signOut() async {

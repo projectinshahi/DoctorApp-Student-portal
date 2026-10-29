@@ -18,14 +18,18 @@ class GoogleSignInIntergration extends ChangeNotifier {
   /// the student as "Exception: ...".
   LoginRefusedException? refusal;
 
-  Future<bool> signInWithGoogle() async {
+  Future<bool> signInWithGoogle() => _signIn(_authService.signInWithGoogle);
+
+  Future<bool> signInWithApple() => _signIn(_authService.signInWithApple);
+
+  Future<bool> _signIn(Future<AuthResultModel> Function() signIn) async {
     isLoading = true;
     errorMessage = null;
     refusal = null;
     notifyListeners();
 
     try {
-      authResult = await _authService.signInWithGoogle();
+      authResult = await signIn();
       isLoading = false;
       notifyListeners();
       return true;

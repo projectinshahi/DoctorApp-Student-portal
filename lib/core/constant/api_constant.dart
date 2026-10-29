@@ -7,6 +7,8 @@ class ApiConstant {
   static const String baseUrl = '$host/api';
 
   static const String googleSignIn = '$baseUrl/auth/google';
+  static const String appleSignIn = '$baseUrl/auth/apple';
+  static const String appleCallback = '$baseUrl/auth/apple/callback';
   static const String refresh = '$baseUrl/auth/refresh';
   static const String logout = '$baseUrl/auth/logout';
 }
