@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import '../View_model/profile_model.dart';
 import '../core/constant/local_storage.dart';
 import '../core/constant/api_constant.dart';
+import 'refresh_api_services.dart';
 
 class ProfileService {
   static const String _profileUrl = '${ApiConstant.baseUrl}/users/me';
@@ -17,13 +18,7 @@ class ProfileService {
       throw Exception('Not logged in. Please log in again.');
     }
 
-    final response = await http.get(
-      Uri.parse(_profileUrl),
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
-    );
+    final response = await ApiClient.get(_profileUrl);
 
     final data = jsonDecode(response.body);
 
@@ -53,14 +48,7 @@ class ProfileService {
     if (phone != null) body['phone'] = phone;
     if (avatarUrl != null) body['avatarUrl'] = avatarUrl;
 
-    final response = await http.put(
-      Uri.parse(_profileUrl),
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
-      body: jsonEncode(body),
-    );
+    final response = await ApiClient.put(_profileUrl, body: body);
 
     final data = jsonDecode(response.body);
 
@@ -80,10 +68,7 @@ class ProfileService {
     }
 
     // Step 1: get a signed signature from our backend
-    final sigResponse = await http.post(
-      Uri.parse(_signatureUrl),
-      headers: {'Authorization': 'Bearer $token'},
-    );
+    final sigResponse = await ApiClient.post(_signatureUrl);
 
     if (sigResponse.statusCode != 200) {
       throw Exception('Failed to get upload signature');
