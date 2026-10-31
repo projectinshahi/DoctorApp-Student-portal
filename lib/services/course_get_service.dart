@@ -2,9 +2,9 @@ import 'dart:convert';
 
 import 'package:dr_app/core/constant/local_storage.dart';
 import 'package:dr_app/core/constant/api_constant.dart';
-import 'package:http/http.dart' as http;
 
 import '../View_model/Course_get_model.dart';
+import 'refresh_api_services.dart';
 
 class CourseListGetService {
   Future<List<CourseListGetModel>> fetchCourses({
@@ -40,13 +40,7 @@ class CourseListGetService {
     final uri = Uri.parse('${ApiConstant.baseUrl}/courses')
         .replace(queryParameters: queryParams);
 
-    final response = await http.get(
-      uri,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
-    );
+    final response = await ApiClient.get(uri.toString());
 
     final data = jsonDecode(response.body);
 

@@ -1,9 +1,9 @@
 import 'dart:convert';
 import 'package:dr_app/core/constant/local_storage.dart';
 import 'package:dr_app/core/constant/api_constant.dart';
-import 'package:http/http.dart' as http;
 
 import '../View_model/selection_model.dart';
+import 'refresh_api_services.dart';
 
 class SelectionService {
   static const String _baseUrl = '${ApiConstant.baseUrl}/users/me/selection';
@@ -22,14 +22,7 @@ class SelectionService {
     if (courseId != null) body['courseId'] = courseId;
     if (courseTypeId != null) body['courseTypeId'] = courseTypeId;
 
-    final response = await http.put(
-      Uri.parse(_baseUrl),
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
-      body: jsonEncode(body),
-    );
+    final response = await ApiClient.put(_baseUrl, body: body);
 
     final data = jsonDecode(response.body);
 
