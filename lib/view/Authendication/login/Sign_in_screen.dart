@@ -12,6 +12,7 @@ import 'package:provider/provider.dart';
 import '../../../core/theam /app_color.dart';
 import '../../../core/constant/app_size.dart';
 import '../../../repository/google_sign_in_provider.dart';
+import 'otp_screen.dart';
 
 class SignInScreen extends StatefulWidget {
   const SignInScreen({super.key});
@@ -31,6 +32,28 @@ class _SignInScreenState extends State<SignInScreen> {
 
   bool _obscurePassword = true;
 
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  void _loginWithEmail(GoogleSignInIntergration viewModel) {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+    if (email.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter your email and password.')),
+      );
+      return;
+    }
+    _signIn(viewModel, () => viewModel.loginWithEmail(email, password));
+  }
+
   /// Shared by the Google and Apple buttons: the server's reply, and so
   /// everything after it, is the same for both.
   Future<void> _signIn(
@@ -46,6 +69,19 @@ class _SignInScreenState extends State<SignInScreen> {
     // itself, rather than falling through to the
     // generic failure snack bar below.
     final refused = viewModel.refusal;
+    if (refused != null && refused.isEmailNotVerified) {
+      // Signed up but never entered the code. A fresh one beats explaining
+      // that the old one has probably expired.
+      setState(() => _finishing = false);
+      final email = _emailController.text.trim();
+      await viewModel.resendOtp(email);
+      if (!mounted) return;
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => OtpScreen(email: email)),
+      );
+      return;
+    }
     if (refused != null) {
       setState(() => _finishing = false);
       await showLoginRefusedDialog(context, refused);
@@ -130,7 +166,7 @@ class _SignInScreenState extends State<SignInScreen> {
                   child: IntrinsicHeight(
                     child: Column(
                 children: [
-                  SizedBox(height: 380.h),
+                  SizedBox(height: 300.h),
 
                   SizedBox(
                     width: double.infinity,
@@ -149,7 +185,45 @@ class _SignInScreenState extends State<SignInScreen> {
                           ),
                           child: Padding(
                             padding: EdgeInsets.symmetric(vertical: 15.h, horizontal: 20.w),
+                            child: TextField(
+                              controller: _emailController,
+                              keyboardType: TextInputType.emailAddress,
+                              autocorrect: false,
+                              textAlign: TextAlign.left,
+                              style: TextStyle(
+                                fontWeight: FontWeight.w300,
+                                fontSize: 16.sp,
+                                letterSpacing: 0,
+                              ),
+                              decoration: InputDecoration(
+                                hintText: "Enter your Email",
+                                hintStyle: TextStyle(
+                                  fontWeight: FontWeight.w300,
+                                  fontSize: 16.sp,
+                                  letterSpacing: 0,
+                                ),
+                                border: InputBorder.none,
+                                isCollapsed: true,
+                              ),
+                            ),
+                          ),
+                        ),
+                        SizedBox(height: AppSize.gap.h),
+                        Container(
+                          width: double.infinity,
+                          height: 60.h,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(12.r),
+                            color: AppColor.Screenbackground,
+                            border: Border.all(
+                              color: Colors.grey,
+                              width: 1,
+                            ),
+                          ),
+                          child: Padding(
+                            padding: EdgeInsets.symmetric(vertical: 15.h, horizontal: 20.w),
                             child:  TextField(
+                              controller: _passwordController,
                               obscureText: _obscurePassword,
                               textAlign: TextAlign.left,
                               style: TextStyle(
@@ -183,23 +257,27 @@ class _SignInScreenState extends State<SignInScreen> {
                           ),
                         ),
                         SizedBox(height: AppSize.gap.h),
-                        Container(
-                          width: double.infinity,
-                          height: 60.h,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(12.r),
-                            color: AppColor.buttoncolor,
-                          ),
-                          child: Center(
-                            child: SizedBox(
-                              //height: 20.h,
-                              child: Text(
-                                "Login",
-                                style: TextStyle(
-                                  color: AppColor.Buttontextcolor,
-                                  fontWeight: FontWeight.w500,
-                                  fontSize: 20.sp,
-                                  letterSpacing: 0,
+                        Consumer<GoogleSignInIntergration>(
+                          builder: (context, viewModel, child) => GestureDetector(
+                            onTap: (viewModel.isLoading || _finishing)
+                                ? null
+                                : () => _loginWithEmail(viewModel),
+                            child: Container(
+                              width: double.infinity,
+                              height: 60.h,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(12.r),
+                                color: AppColor.buttoncolor,
+                              ),
+                              child: Center(
+                                child: Text(
+                                  "Login",
+                                  style: TextStyle(
+                                    color: AppColor.Buttontextcolor,
+                                    fontWeight: FontWeight.w500,
+                                    fontSize: 20.sp,
+                                    letterSpacing: 0,
+                                  ),
                                 ),
                               ),
                             ),

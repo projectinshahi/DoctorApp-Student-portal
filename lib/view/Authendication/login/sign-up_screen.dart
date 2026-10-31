@@ -11,6 +11,7 @@ import 'package:provider/provider.dart';
 import 'package:dr_app/core/constant/app_size.dart';
 import '../../../core/theam /app_color.dart';
 import '../../../repository/google_sign_in_provider.dart';
+import 'otp_screen.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -21,6 +22,50 @@ class SignupScreen extends StatefulWidget {
 
 class _SignupScreenState extends State<SignupScreen> {
   bool _isSigningIn = false;
+
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  bool _obscurePassword = true;
+  bool _registering = false;
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  void _say(String message) => ScaffoldMessenger.of(context)
+      .showSnackBar(SnackBar(content: Text(message)));
+
+  /// Creates the account, then asks for the code the server just emailed.
+  Future<void> _register() async {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+
+    // The server checks these too; asking here saves a round trip.
+    if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email)) {
+      return _say('Enter a valid email address.');
+    }
+    if (password.length < 8) {
+      return _say('Password must be at least 8 characters.');
+    }
+
+    setState(() => _registering = true);
+    final refused = await context
+        .read<GoogleSignInIntergration>()
+        .registerWithEmail(email, password);
+    if (!mounted) return;
+    setState(() => _registering = false);
+
+    // "Already registered — log in" and friends: the server's words fit.
+    if (refused != null) return _say(refused.message);
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => OtpScreen(email: email)),
+    );
+  }
 
   /// Shared by the Google and Apple buttons: the server's reply, and so
   /// everything after it, is the same for both.
@@ -165,6 +210,9 @@ class _SignupScreenState extends State<SignupScreen> {
                           child: Padding(
                             padding: EdgeInsets.symmetric(vertical: 15.h, horizontal: 20.w),
                             child: TextField(
+                              controller: _emailController,
+                              keyboardType: TextInputType.emailAddress,
+                              autocorrect: false,
                               textAlign: TextAlign.left,
                               style: TextStyle(
                                 fontWeight: FontWeight.w300,
@@ -190,20 +238,67 @@ class _SignupScreenState extends State<SignupScreen> {
                           height: 60.h,
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(12.r),
-                            color: AppColor.buttoncolor,
+                            color: AppColor.Screenbackground,
+                            border: Border.all(
+                              color: Colors.grey.shade300,
+                              width: 1,
+                            ),
                           ),
-                          child: Center(
-                            child: SizedBox(
-                              height: 20.h,
-                              child: Text(
-                                "Next",
-                                style: TextStyle(
-                                  color: AppColor.Buttontextcolor,
+                          child: Padding(
+                            padding: EdgeInsets.symmetric(vertical: 15.h, horizontal: 20.w),
+                            child: TextField(
+                              controller: _passwordController,
+                              obscureText: _obscurePassword,
+                              textAlign: TextAlign.left,
+                              style: TextStyle(
+                                fontWeight: FontWeight.w300,
+                                fontSize: 16.sp,
+                                letterSpacing: 0,
+                              ),
+                              decoration: InputDecoration(
+                                hintText: "Create a password (8+ characters)",
+                                hintStyle: TextStyle(
                                   fontWeight: FontWeight.w500,
                                   fontSize: 16.sp,
                                   letterSpacing: 0,
                                 ),
+                                border: InputBorder.none,
+                                isCollapsed: true,
+                                suffixIcon: IconButton(
+                                  icon: Icon(
+                                    _obscurePassword
+                                        ? Icons.visibility_off
+                                        : Icons.visibility,
+                                  ),
+                                  onPressed: () => setState(
+                                      () => _obscurePassword = !_obscurePassword),
+                                ),
                               ),
+                            ),
+                          ),
+                        ),
+                        SizedBox(height: AppSize.gap.h),
+                        GestureDetector(
+                          onTap: _registering ? null : _register,
+                          child: Container(
+                            width: double.infinity,
+                            height: 60.h,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(12.r),
+                              color: AppColor.buttoncolor,
+                            ),
+                            child: Center(
+                              child: _registering
+                                  ? const CircularProgressIndicator()
+                                  : Text(
+                                      "Next",
+                                      style: TextStyle(
+                                        color: AppColor.Buttontextcolor,
+                                        fontWeight: FontWeight.w500,
+                                        fontSize: 16.sp,
+                                        letterSpacing: 0,
+                                      ),
+                                    ),
                             ),
                           ),
                         ),
