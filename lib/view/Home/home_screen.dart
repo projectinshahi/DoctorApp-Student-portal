@@ -57,14 +57,9 @@ class _HomescreenState extends State<Homescreen> with RefreshOnVisible<Homescree
   // ── Handles nav bar taps: some tabs just update the selected visual
   // state, others (like AI Videos) actually navigate to a real screen. ──
   void _handleNavTap(int index) {
-    // The preview carries a course and sample decks, so Home, QBank, AI
-    // Videos and Rapid Recall have something to show. Grand Tests are the
-    // student's own papers, and there is nothing to sample.
-    if (DemoMode.active && index == 2) {
-      showSignInRequired(context, what: 'sit a grand test');
-      return;
-    }
-
+    // Every tab opens, signed in or not. A visitor gets the preview's sample
+    // in each; what a student can open inside is decided per item by their
+    // plan — free opens, premium asks for an account, then a plan.
     // Every tab opens. Access is decided per item inside them — a premium
     // lesson shows its paywall, a premium question is never in the set — so
     // a locked door at the tab would also shut out the free content behind

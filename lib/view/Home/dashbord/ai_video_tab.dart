@@ -480,7 +480,8 @@ class _AiVideoTabState extends State<AiVideoTab> with RefreshOnVisible<AiVideoTa
                                           ),
                                         ),
                                       ),
-                                    if (!lesson.isOpen)
+                                    if (!lesson.isOpen &&
+                                        !lesson.hasFreePreviewParts)
                                       Positioned(
                                         top: 4,
                                         left: 4,
@@ -525,8 +526,15 @@ class _AiVideoTabState extends State<AiVideoTab> with RefreshOnVisible<AiVideoTa
                                       _LessonProgressLine(lesson: lesson),
                                       Align(
                                         alignment: Alignment.centerLeft,
-                                        child: AccessChip(
-                                            accessType: lesson.accessType),
+                                        // A lesson whose first part is free
+                                        // and whose rest are paid is neither
+                                        // Free nor Premium — it is a sample,
+                                        // and a padlock on it would hide the
+                                        // one thing that sells the rest.
+                                        child: lesson.hasFreePreviewParts
+                                            ? _FreePreviewChip(lesson: lesson)
+                                            : AccessChip(
+                                                accessType: lesson.accessType),
                                       ),
                                     ],
                                   ),
@@ -619,4 +627,31 @@ class _LessonProgressLine extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => LessonWatchIndicator(lesson: lesson);
+}
+
+/// "1 free · 4 premium" — a lesson that is partly open.
+class _FreePreviewChip extends StatelessWidget {
+  final StudentLessonModel lesson;
+
+  const _FreePreviewChip({required this.lesson});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 7.w, vertical: 2.h),
+      decoration: BoxDecoration(
+        color: const Color(0xFF3F7D34).withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(6.r),
+      ),
+      child: Text(
+        '${lesson.openPartCount} free · ${lesson.lockedPartCount} premium',
+        style: TextStyle(
+          fontSize: 9.5.sp,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.3,
+          color: const Color(0xFF3F7D34),
+        ),
+      ),
+    );
+  }
 }

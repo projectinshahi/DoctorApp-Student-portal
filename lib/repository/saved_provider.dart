@@ -4,6 +4,7 @@ import '../core/utils/load_timer.dart';
 import 'package:flutter/foundation.dart';
 
 import '../core/constant/local_storage.dart';
+import '../core/demo/demo_content.dart';
 import '../models/quiz_model.dart' show QuizException;
 import '../models/saved_model.dart';
 import '../services/saved_service.dart';
@@ -120,6 +121,16 @@ class SavedProvider extends ChangeNotifier {
       _inFlight ??= _fetchAll().whenComplete(() => _inFlight = null);
 
   Future<void> _fetchAll() async {
+    // A visitor has no bookmarks, and asking without a session only fails —
+    // once per screen that refreshes them.
+    if (DemoMode.active) {
+      isLoadingQuestions = false;
+      isLoadingLessons = false;
+      errorMessage = null;
+      notifyListeners();
+      return;
+    }
+
     // The lists stay up while the refetch runs. This screen is opened and
     // closed constantly, and a spinner between every visit is the flicker.
     isLoadingQuestions = !_fetched || _staleLists;

@@ -29,6 +29,7 @@ import '../../repository/daily_quiz_provider.dart';
 import '../../repository/refresh_api_provider.dart';
 import '../../repository/quiz_prefetch.dart';
 import '../../repository/rapid_recall_provider.dart';
+import '../../services/demo_test_service.dart';
 import '../../repository/notification_feed_provider.dart';
 import '../../repository/plan_access_provider.dart';
 import '../../repository/saved_provider.dart';
@@ -290,6 +291,8 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
     context.read<QuizPrefetch>().clear();
     // Decks and their bookmarks belong to that account's course too.
     context.read<RapidRecallProvider>().clear();
+    // The sample paper's answers belong to the visitor before this one.
+    DemoTestService.reset();
     // Course alerts and the study reminder are for a signed-in student.
     unawaited(context.read<SettingsProvider>().clearForSignOut());
     // The list belongs to the account that just left.
