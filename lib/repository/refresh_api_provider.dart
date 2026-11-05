@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 
 import '../View_model/auth_result_model.dart';
+import '../core/constant/api_constant.dart';
 import '../core/constant/local_storage.dart';
 import '../services/Auth_services.dart';
 import '../services/refresh_api_services.dart';
@@ -220,6 +221,24 @@ class AuthProvider extends ChangeNotifier {
     await LocalStorage.setHasSelectedExam(true);
     _hasSelectedExam = true;
     notifyListeners();
+  }
+
+  /// Deletes the account on the server, then forgets it here.
+  ///
+  /// No logout call afterwards: the session dies with the account, so
+  /// /auth/logout would only answer 401. A non-200 throws with the server's
+  /// message and nothing is cleared — the account is still there.
+  Future<void> deleteAccount() async {
+    final response =
+        await ApiClient.delete('${ApiConstant.baseUrl}/users/me');
+    if (response.statusCode != 200) {
+      String? message;
+      try {
+        message = jsonDecode(response.body)['error']?['message']?.toString();
+      } catch (_) {}
+      throw Exception(message ?? 'Could not delete the account. Try again.');
+    }
+    await signOut();
   }
 
   Future<void> signOut() async {

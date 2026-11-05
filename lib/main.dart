@@ -47,6 +47,13 @@ void main() async {
   // value, so there is a single orientation the app returns to.
   await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
 
+  // And the same for the system bars, for the same reason. Fullscreen video
+  // goes immersive and restores edge-to-edge on the way out — a mode the app
+  // had never asked for, so the first video of a session quietly changed how
+  // much room the system navigation takes and shifted the tab bar down by
+  // its height. Set here, before and after a video are the same.
+  await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+
   // Notification channels, the time zone the study reminder is scheduled
   // in, and course alerts. Before runApp, so a notification that launched
   // the app is caught rather than lost.

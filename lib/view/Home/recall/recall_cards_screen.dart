@@ -392,7 +392,22 @@ class _FullScreenImage extends StatelessWidget {
 class _NoteBlock extends StatelessWidget {
   final String text;
 
-  const _NoteBlock({required this.text});
+  _NoteBlock({required String text}) : text = _withHeading(text);
+
+  /// The admin panel stores a note's title and description in one field:
+  /// title, blank line, description. That title becomes a `## ` heading.
+  /// Only a short single line counts, so a description that merely has
+  /// paragraphs does not get its first one bolded.
+  static String _withHeading(String raw) {
+    final note = raw.replaceAll('\r\n', '\n').trim();
+    final gap = note.indexOf('\n\n');
+    if (gap <= 0) return note;
+    final title = note.substring(0, gap).trim();
+    if (title.contains('\n') || title.length > 80 || title.startsWith('## ')) {
+      return note;
+    }
+    return '## $title\n${note.substring(gap + 2).trim()}';
+  }
 
   @override
   Widget build(BuildContext context) => Container(
@@ -401,11 +416,55 @@ class _NoteBlock extends StatelessWidget {
           color: Colors.white,
           borderRadius: BorderRadius.circular(22.r),
         ),
-        child: Text(
-          text,
-          style: TextStyle(
-              fontSize: 13.5.sp, height: 1.6, color: Colors.grey.shade800),
-        ),
+        child: _structured ? _lines() : Text(text, style: _body),
+      );
+
+  TextStyle get _body =>
+      TextStyle(fontSize: 13.5.sp, height: 1.6, color: Colors.grey.shade800);
+
+  /// A note written with `## ` headings or `• ` points gets laid out as
+  /// such. Anything else is shown exactly as typed.
+  bool get _structured => text
+      .split('\n')
+      .any((l) => l.startsWith('## ') || l.startsWith('• '));
+
+  Widget _lines() => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (final line in text.split('\n'))
+            if (line.startsWith('## '))
+              Padding(
+                padding: EdgeInsets.only(bottom: 8.h),
+                child: Text(line.substring(3),
+                    style: TextStyle(
+                        fontSize: 16.sp,
+                        height: 1.3,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.black87)),
+              )
+            else if (line.startsWith('• '))
+              Padding(
+                padding: EdgeInsets.only(top: 6.h),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 6.w,
+                      height: 6.w,
+                      margin: EdgeInsets.only(top: 8.h, right: 10.w),
+                      decoration: const BoxDecoration(
+                          color: kRecallPrimary, shape: BoxShape.circle),
+                    ),
+                    Expanded(child: Text(line.substring(2), style: _body)),
+                  ],
+                ),
+              )
+            else if (line.trim().isNotEmpty)
+              Text(line, style: _body)
+            else
+              // A blank line between paragraphs keeps its gap.
+              SizedBox(height: 8.h),
+        ],
       );
 }
 

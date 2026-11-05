@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
 
+import '../../../services/Auth_services.dart' show LoginRefusedException;
 import '../../../widget/app_loading_screen.dart';
+import 'Sign_in_screen.dart';
 
 import '../../../repository/refresh_api_provider.dart';
 
@@ -11,6 +13,7 @@ import 'package:provider/provider.dart';
 import 'package:dr_app/core/constant/app_size.dart';
 import '../../../core/theam /app_color.dart';
 import '../../../repository/google_sign_in_provider.dart';
+import 'otp_screen.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -21,6 +24,160 @@ class SignupScreen extends StatefulWidget {
 
 class _SignupScreenState extends State<SignupScreen> {
   bool _isSigningIn = false;
+
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  bool _obscurePassword = true;
+  bool _registering = false;
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  void _say(String message) => ScaffoldMessenger.of(context)
+      .showSnackBar(SnackBar(content: Text(message)));
+
+  /// Creates the account, then asks for the code the server just emailed.
+  Future<void> _register() async {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+
+    // The server checks these too; asking here saves a round trip.
+    if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email)) {
+      return _say('Enter a valid email address.');
+    }
+    if (password.length < 8) {
+      return _say('Password must be at least 8 characters.');
+    }
+
+    setState(() => _registering = true);
+    final refused = await context
+        .read<GoogleSignInIntergration>()
+        .registerWithEmail(email, password);
+    if (!mounted) return;
+    setState(() => _registering = false);
+
+    if (refused != null) {
+      // The server's words first — they are specific, and ours would only
+      // paraphrase them.
+      _say(refused.message);
+
+      // An account that exists but was never verified finishes the same way
+      // it started: the code it was sent.
+      if (refused.needsVerification) {
+        await context.read<GoogleSignInIntergration>().resendOtp(email);
+        if (!mounted) return;
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => OtpScreen(email: email)),
+        );
+        return;
+      }
+
+      // An account that exists and is verified has nothing to sign up for.
+      // Sending them to the form they need, with the address they just
+      // typed, beats leaving them on a sign-up page that will refuse them
+      // every time they press Next.
+      if (refused.alreadyRegistered) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => SignInScreen(
+              initialEmail: email,
+              notice: 'This email already has an account. Log in here.',
+            ),
+          ),
+        );
+      }
+      return;
+    }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => OtpScreen(email: email)),
+    );
+  }
+
+
+
+  /// Shared by the Google and Apple buttons: the server's reply, and so
+  /// everything after it, is the same for both.
+  Future<void> _signIn(
+    GoogleSignInIntergration viewModel,
+    Future<bool> Function() signIn,
+  ) async {
+    setState(() => _isSigningIn = true);
+
+    final success = await signIn();
+
+    // The server turned it away for a stated reason —
+    // in use elsewhere, blocked, a bound device. Each
+    // needs different words, and the code is what
+    // decides. Staying put is the point: there is no
+    // force-sign-in to offer.
+    final refused = viewModel.refusal;
+    if (refused != null && mounted) {
+      setState(() => _isSigningIn = false);
+      await showLoginRefusedDialog(context, refused);
+      return;
+    }
+
+    if (!mounted) return;
+
+    // Deliberately still signing in: adoptSession has
+    // a /selection/content call to make, and clearing
+    // this here put the form back on screen for the
+    // length of it.
+    final result = viewModel.authResult;
+
+    if (success && result != null) {
+      // No "Welcome back" toast. The home screen
+      // already greets them by name, and a snack bar
+      // riding in over the transition just competes
+      // with the notice shown when another device was
+      // signed out.
+
+      // Hand the session to AuthProvider, which is
+      // what AuthGate watches. Without this the
+      // tokens were stored but the gate went on
+      // showing the login screen until some later
+      // rebuild — the flicker between signing in and
+      // landing on home.
+      await context
+          .read<AuthProvider>()
+          .adoptSession(result);
+
+      if (!mounted) return;
+      // Left spinning until now on purpose:
+      // adoptSession still had a /selection/content
+      // call to make after the 200 landed.
+      setState(() => _isSigningIn = false);
+
+      // No navigation of our own. AuthGate swaps its
+      // root — to the course picker for a new
+      // account, to home otherwise.
+      //
+      // pushReplacement removed AuthGate from the
+      // tree, taking the session watcher with it, and
+      // it pushed ExamSelectionScreen with three empty
+      // strings for the tokens it needs.
+      Navigator.of(context).popUntil((r) => r.isFirst);
+    } else {
+      // Back to the form, or the button stays disabled
+      // and they cannot try again.
+      setState(() => _isSigningIn = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            viewModel.errorMessage ?? 'Sign-in failed',
+          ),
+        ),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -89,6 +246,9 @@ class _SignupScreenState extends State<SignupScreen> {
                           child: Padding(
                             padding: EdgeInsets.symmetric(vertical: 15.h, horizontal: 20.w),
                             child: TextField(
+                              controller: _emailController,
+                              keyboardType: TextInputType.emailAddress,
+                              autocorrect: false,
                               textAlign: TextAlign.left,
                               style: TextStyle(
                                 fontWeight: FontWeight.w300,
@@ -114,20 +274,76 @@ class _SignupScreenState extends State<SignupScreen> {
                           height: 60.h,
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(12.r),
-                            color: AppColor.buttoncolor,
+                            color: AppColor.Screenbackground,
+                            border: Border.all(
+                              color: Colors.grey.shade300,
+                              width: 1,
+                            ),
                           ),
-                          child: Center(
-                            child: SizedBox(
-                              height: 20.h,
-                              child: Text(
-                                "Next",
-                                style: TextStyle(
-                                  color: AppColor.Buttontextcolor,
+                          child: Padding(
+                            padding: EdgeInsets.symmetric(vertical: 15.h, horizontal: 20.w),
+                            child: TextField(
+                              controller: _passwordController,
+                              obscureText: _obscurePassword,
+                              textAlign: TextAlign.left,
+                              style: TextStyle(
+                                fontWeight: FontWeight.w300,
+                                fontSize: 16.sp,
+                                letterSpacing: 0,
+                              ),
+                              decoration: InputDecoration(
+                                hintText: "Create a password (8+ characters)",
+                                hintStyle: TextStyle(
                                   fontWeight: FontWeight.w500,
                                   fontSize: 16.sp,
                                   letterSpacing: 0,
                                 ),
+                                border: InputBorder.none,
+                                isCollapsed: true,
+                                suffixIcon: IconButton(
+                                  icon: Icon(
+                                    _obscurePassword
+                                        ? Icons.visibility_off
+                                        : Icons.visibility,
+                                  ),
+                                  onPressed: () => setState(
+                                      () => _obscurePassword = !_obscurePassword),
+                                ),
                               ),
+                            ),
+                          ),
+                        ),
+                        SizedBox(height: AppSize.gap.h),
+                        GestureDetector(
+                          onTap: _registering ? null : _register,
+                          child: Container(
+                            width: double.infinity,
+                            height: 60.h,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(12.r),
+                              color: AppColor.buttoncolor,
+                            ),
+                            child: Center(
+                              child: _registering
+                                  ? SizedBox(
+                                      width: 22.w,
+                                      height: 22.w,
+                                      child: const CircularProgressIndicator(
+                                        strokeWidth: 2.4,
+                                        valueColor:
+                                            AlwaysStoppedAnimation<Color>(
+                                                Colors.white),
+                                      ),
+                                    )
+                                  : Text(
+                                      "Next",
+                                      style: TextStyle(
+                                        color: AppColor.Buttontextcolor,
+                                        fontWeight: FontWeight.w500,
+                                        fontSize: 16.sp,
+                                        letterSpacing: 0,
+                                      ),
+                                    ),
                             ),
                           ),
                         ),
@@ -179,76 +395,7 @@ class _SignupScreenState extends State<SignupScreen> {
                             return GestureDetector(
                               onTap: (viewModel.isLoading || _isSigningIn)
                                   ? null
-                                  : () async {
-                                setState(() => _isSigningIn = true);
-
-                                final success = await viewModel.signInWithGoogle();
-
-                                // The server turned it away for a stated reason —
-                                // in use elsewhere, blocked, a bound device. Each
-                                // needs different words, and the code is what
-                                // decides. Staying put is the point: there is no
-                                // force-sign-in to offer.
-                                final refused = viewModel.refusal;
-                                if (refused != null && context.mounted) {
-                                  setState(() => _isSigningIn = false);
-                                  await showLoginRefusedDialog(context, refused);
-                                  return;
-                                }
-
-                                if (!context.mounted) return;
-
-                                // Deliberately still signing in: adoptSession has
-                                // a /selection/content call to make, and clearing
-                                // this here put the form back on screen for the
-                                // length of it.
-                                final result = viewModel.authResult;
-
-                                if (success && result != null) {
-                                  // No "Welcome back" toast. The home screen
-                                  // already greets them by name, and a snack bar
-                                  // riding in over the transition just competes
-                                  // with the notice shown when another device was
-                                  // signed out.
-
-                                  // Hand the session to AuthProvider, which is
-                                  // what AuthGate watches. Without this the
-                                  // tokens were stored but the gate went on
-                                  // showing the login screen until some later
-                                  // rebuild — the flicker between signing in and
-                                  // landing on home.
-                                  await context
-                                      .read<AuthProvider>()
-                                      .adoptSession(result);
-
-                                  if (!context.mounted) return;
-                                  // Left spinning until now on purpose:
-                                  // adoptSession still had a /selection/content
-                                  // call to make after the 200 landed.
-                                  setState(() => _isSigningIn = false);
-
-                                  // No navigation of our own. AuthGate swaps its
-                                  // root — to the course picker for a new
-                                  // account, to home otherwise.
-                                  //
-                                  // pushReplacement removed AuthGate from the
-                                  // tree, taking the session watcher with it, and
-                                  // it pushed ExamSelectionScreen with three empty
-                                  // strings for the tokens it needs.
-                                  Navigator.of(context).popUntil((r) => r.isFirst);
-                                } else {
-                                  // Back to the form, or the button stays disabled
-                                  // and they cannot try again.
-                                  setState(() => _isSigningIn = false);
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                        viewModel.errorMessage ?? 'Sign-in failed',
-                                      ),
-                                    ),
-                                  );
-                                }
-                              },
+                                  : () => _signIn(viewModel, viewModel.signInWithGoogle),
                               child: Container(
                                 width: 192.w,
                                 height: 60.h,
@@ -286,20 +433,30 @@ class _SignupScreenState extends State<SignupScreen> {
 
                         const Spacer(),
 
-                        Container(
-                          width: 192.w,
-                          height: 60.h,
-                          decoration: BoxDecoration(
-                            color: AppColor.buttoncolor,
-                            borderRadius: BorderRadius.circular(12.r),
-                          ),
-                          child: Center(
-                            child: Image.asset(
-                              "asset/icons/Appleicon.png",
-                              height: 34.h,
-                              width: 88.w,
-                            ),
-                          ),
+                        // ---- APPLE SIGN-IN BUTTON ----
+                        Consumer<GoogleSignInIntergration>(
+                          builder: (context, viewModel, child) {
+                            return GestureDetector(
+                              onTap: (viewModel.isLoading || _isSigningIn)
+                                  ? null
+                                  : () => _signIn(viewModel, viewModel.signInWithApple),
+                              child: Container(
+                                width: 192.w,
+                                height: 60.h,
+                                decoration: BoxDecoration(
+                                  color: AppColor.buttoncolor,
+                                  borderRadius: BorderRadius.circular(12.r),
+                                ),
+                                child: Center(
+                                  child: Image.asset(
+                                    "asset/icons/Appleicon.png",
+                                    height: 34.h,
+                                    width: 88.w,
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
                         ),
                       ],
                     ),

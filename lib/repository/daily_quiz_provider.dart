@@ -3,6 +3,7 @@ import 'dart:convert';
 import '../core/utils/load_timer.dart';
 import 'package:flutter/foundation.dart';
 
+import '../core/demo/demo_content.dart';
 import '../models/daily_quiz_model.dart';
 import '../core/constant/local_storage.dart';
 import '../models/home_summary_model.dart';
@@ -53,6 +54,13 @@ class HomeSummaryProvider extends ChangeNotifier {
   /// Reads `/users/me/home`. Verified to leave the attempts table empty —
   /// nothing starts until the student opens the quiz itself.
   Future<void> load() async {
+    if (DemoMode.active) {
+      home = HomeSummary.fromJson(DemoContent.homeSummary);
+      isLoading = false;
+      notifyListeners();
+      return;
+    }
+
     isLoading = home == null;
     notifyListeners();
 
@@ -65,6 +73,13 @@ class HomeSummaryProvider extends ChangeNotifier {
       home = null;
     }
 
+    isLoading = false;
+    notifyListeners();
+  }
+
+  /// Sign-out: the streak and the half-watched videos are that student's.
+  void clear() {
+    home = null;
     isLoading = false;
     notifyListeners();
   }
@@ -159,6 +174,16 @@ class DailyQuizProvider extends ChangeNotifier {
   /// The fetch still runs underneath: it is what confirms the date has not
   /// rolled over, and picks up an answer committed elsewhere.
   Future<bool> restoreCached() async {
+    // The preview has its own question. What is on disk belongs to whoever
+    // was signed in last, and reading it is a wait for something that must
+    // not be shown anyway.
+    if (DemoMode.active) {
+      set = DailyQuizSet.fromJson(DemoContent.dailyQuiz);
+      isLoading = false;
+      notifyListeners();
+      return true;
+    }
+
     if (set != null) return true;
     try {
       final stored = await LocalStorage.getCached(LocalStorage.dailyQuizKey);
@@ -187,6 +212,14 @@ class DailyQuizProvider extends ChangeNotifier {
   }
 
   Future<void> load() async {
+    if (DemoMode.active) {
+      set = DailyQuizSet.fromJson(DemoContent.dailyQuiz);
+      isLoading = false;
+      failure = null;
+      notifyListeners();
+      return;
+    }
+
     isLoading = set == null;
     failure = null;
     notifyListeners();
@@ -250,6 +283,26 @@ class DailyQuizProvider extends ChangeNotifier {
     }
     notifyListeners();
 
+    // The preview scores its own question. There is no attempt to record it
+    // against and no server to ask, and the sample ships with its key and its
+    // explanation precisely so a visitor can answer one before signing in.
+    if (DemoMode.active) {
+      if (local != null) {
+        answers[questionId] = DailyQuizAnswer(
+          questionId: local.questionId,
+          selectedOptionId: local.selectedOptionId,
+          correctOptionId: local.correctOptionId,
+          isCorrect: local.isCorrect,
+          marksAwarded: local.marksAwarded,
+          explanation: _demoExplanation(questionId),
+        );
+      }
+      pendingOptionId = null;
+      isSubmitting = false;
+      notifyListeners();
+      return local != null;
+    }
+
     var ok = false;
     try {
       final response = await _service.answer(courseId,
@@ -279,6 +332,16 @@ class DailyQuizProvider extends ChangeNotifier {
 
   /// The verdict from the question itself, when the server sent the key with
   /// it. Null when it did not, which is the case the POST exists for.
+  /// The sample's own explanation, which the local verdict leaves out
+  /// because a real set's explanation only arrives with the POST.
+  String? _demoExplanation(int questionId) {
+    for (final raw in (DemoContent.dailyQuiz['questions'] as List)) {
+      final q = Map<String, dynamic>.from(raw as Map);
+      if (q['id'] == questionId) return q['explanation'] as String?;
+    }
+    return null;
+  }
+
   DailyQuizAnswer? _localVerdict(int questionId, int optionId) {
     final question =
         questions.where((q) => q.id == questionId).firstOrNull;

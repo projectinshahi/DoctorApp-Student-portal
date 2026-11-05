@@ -21,6 +21,7 @@ import '../../../core/utils/refresh_on_visible.dart';
 import '../../../models/quiz_model.dart' show QuizException;
 import '../../../models/test_model.dart';
 import '../../../repository/selection_content_provider.dart';
+import '../../../services/demo_test_service.dart';
 import '../../../services/test_service.dart';
 import '../../../widget/loading_wave.dart';
 import 'test_attempt_screen.dart';
@@ -57,7 +58,8 @@ class TestsTab extends StatefulWidget {
 }
 
 class _TestsTabState extends State<TestsTab> with RefreshOnVisible<TestsTab> {
-  final TestService _service = TestService();
+  /// Asked each time: the sample while signed out, the server after.
+  TestService get _service => testServiceForSession();
 
   List<TestSummary> _tests = const [];
   bool _loading = true;
@@ -299,19 +301,24 @@ class _Header extends StatelessWidget {
                   size: 28.sp, color: Colors.white),
             ),
             SizedBox(width: 8.w),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text('Tests',
-                    style: TextStyle(
-                        fontSize: 20.sp,
-                        fontWeight: FontWeight.w800,
-                        color: Colors.white)),
-                SizedBox(height: 2.h),
-                Text('One attempt each — make it count',
-                    style: TextStyle(fontSize: 11.5.sp, color: Colors.white70)),
-              ],
+            // Expanded, so the subtitle wraps under large text sizes instead
+            // of running off the right edge.
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('Tests',
+                      style: TextStyle(
+                          fontSize: 20.sp,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white)),
+                  SizedBox(height: 2.h),
+                  Text('One attempt each — make it count',
+                      style:
+                          TextStyle(fontSize: 11.5.sp, color: Colors.white70)),
+                ],
+              ),
             ),
           ],
         ),

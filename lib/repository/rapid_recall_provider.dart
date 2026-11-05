@@ -5,6 +5,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 
 import '../core/constant/local_storage.dart';
+import '../core/demo/demo_content.dart';
 import '../core/utils/load_timer.dart';
 import '../models/quiz_model.dart' show QuizException, QuizErrorKind;
 import '../models/rapid_recall_model.dart';
@@ -44,6 +45,9 @@ class RapidRecallProvider extends ChangeNotifier {
   /// A fetch has come back. Distinct from a started one: the spinner waits on
   /// the answer, and an account with no decks at all has to stop spinning too.
   bool _fetched = false;
+
+  /// [decks] holds the signed-out sample rather than an account's list.
+  bool _showingDemo = false;
 
   Future<void>? _inFlight;
 
@@ -114,6 +118,21 @@ class RapidRecallProvider extends ChangeNotifier {
       _inFlight ??= _fetch().whenComplete(() => _inFlight = null);
 
   Future<void> _fetch() async {
+    // Signed out: the sample decks, no request. Signed in after a preview:
+    // the sample must not stay on screen while the real list loads.
+    if (DemoMode.active) {
+      final list = RapidRecallService.parseList(DemoContent.rapidRecalls);
+      decks = list.decks;
+      reason = null;
+      featureLocked = false;
+      _fetched = true;
+      _showingDemo = true;
+      notifyListeners();
+      return;
+    }
+    if (_showingDemo) clear();
+    _showingDemo = false;
+
     // The list stays up while the refetch runs. The spinner is for a cold
     // load only — anything else is the flicker the client complained about.
     isLoading = !_fetched;
@@ -269,6 +288,25 @@ class RapidRecallProvider extends ChangeNotifier {
     // cold load if the two overlapped.
     if (_deckErrors.remove(id) != null) notifyListeners();
 
+    if (DemoMode.active) {
+      final json = DemoContent.rapidRecallDeck(id);
+      final deck = json == null
+          ? null
+          : RapidRecallDeck.fromJson(json['rapidRecall']);
+      if (deck == null) {
+        _deckErrors[id] = QuizException(
+            QuizErrorKind.lessonNotFound, 'This deck could not be opened.');
+      } else if (deck.locked) {
+        // What the server answers a locked deck with: a 403, not its cards.
+        _deckErrors[id] = QuizException(
+            QuizErrorKind.locked, 'Sign in to open the premium decks.');
+      } else {
+        _detail[id] = deck;
+      }
+      notifyListeners();
+      return;
+    }
+
     try {
       _detail[id] = await timedLoad(
         'recall deck',
@@ -300,6 +338,8 @@ class RapidRecallProvider extends ChangeNotifier {
   Future<void> warmDecks(Iterable<int> ids) async {
     for (final id in ids.toList()) {
       if (_detail.containsKey(id)) continue;
+      // Refused with a 403 for certain; its cover came with the list.
+      if (deck(id)?.locked == true) continue;
       await loadDeck(id);
     }
   }

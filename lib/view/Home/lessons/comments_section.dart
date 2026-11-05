@@ -2,6 +2,9 @@
 //
 // The comment thread under a lesson.
 import 'package:flutter/material.dart';
+
+import '../../../core/demo/demo_content.dart';
+import '../../../widget/sign_in_required.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 
@@ -22,9 +25,71 @@ class CommentsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // The preview shows the section rather than hiding it, so the lesson
+    // screen a visitor sees is the one they will get. The thread itself
+    // needs an account to load, and posting needs one to sign the comment.
+    if (DemoMode.active) return const _CommentsLocked();
+
     return ChangeNotifierProvider<CommentProvider>(
       create: (_) => CommentProvider()..load(lessonId),
       child: _CommentsView(lessonId: lessonId),
+    );
+  }
+}
+
+/// The comments block for somebody with no account: the same heading in the
+/// same place, and one line saying what signing in adds.
+class _CommentsLocked extends StatelessWidget {
+  const _CommentsLocked();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(16.w, 18.h, 16.w, 24.h),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.chat_bubble_outline_rounded,
+                  size: 18.sp, color: Colors.black87),
+              SizedBox(width: 8.w),
+              Text('Comments',
+                  style: TextStyle(
+                      fontSize: 15.sp,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.black87)),
+            ],
+          ),
+          SizedBox(height: 12.h),
+          GestureDetector(
+            onTap: () => showSignInRequired(context,
+                what: 'read and post comments'),
+            child: Container(
+              width: double.infinity,
+              padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 14.h),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(14.r),
+                border: Border.all(color: Colors.grey.shade300),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Sign in to read and post comments',
+                      style: TextStyle(
+                          fontSize: 13.sp, color: Colors.grey.shade600),
+                    ),
+                  ),
+                  Icon(Icons.chevron_right_rounded,
+                      size: 20.sp, color: Colors.grey.shade500),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

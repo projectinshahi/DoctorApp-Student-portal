@@ -111,6 +111,7 @@ class SelectedCourseInfo {
 
   bool get isPremium => accessType == 'premium';
 
+
 }
 
 class SelectedCourseTypeInfo {
@@ -178,6 +179,114 @@ class StudentChapterModel {
   }
 }
 
+/// One video inside a lesson.
+///
+/// A lesson used to be a video. It is now a container of them, and the tier
+/// is set per part: Part 1 free inside a paid lesson is the whole point — the
+/// sample that sells the rest.
+///
+/// A locked part still arrives, with its title and length and `videoUrl`
+/// null. It is listed on purpose: the free part is the advert, and the
+/// padlocked ones beside it are what it advertises.
+class LessonVideo {
+  final int id;
+  final String title;
+  final String? description;
+  final String? videoUrl;
+  final String? thumbnailUrl;
+  final int durationSeconds;
+
+  /// `free` or `premium`, as the admin set it.
+  final String accessType;
+
+  /// Whether this student may watch it. The server's answer, never worked
+  /// out here from accessType.
+  final bool locked;
+
+  /// How many times it has been played, across everyone.
+  final int viewCount;
+
+  /// Bookmarked by this student. Per video, not per lesson — a student saves
+  /// the part they want to come back to, not the hour it sits in.
+  final bool isSaved;
+
+  const LessonVideo({
+    required this.id,
+    required this.title,
+    this.description,
+    this.videoUrl,
+    this.thumbnailUrl,
+    this.durationSeconds = 0,
+    this.accessType = 'free',
+    this.locked = false,
+    this.viewCount = 0,
+    this.isSaved = false,
+  });
+
+  bool get isPremium => accessType.toLowerCase() == 'premium';
+
+  bool get hasVideo => videoUrl != null && videoUrl!.isNotEmpty;
+
+  /// Whether to let the student into it. Locked is the server's word; a part
+  /// that came back unlocked with no url has nothing to play, and an empty
+  /// player is a worse answer than a padlock.
+  bool get isOpen => !locked && hasVideo;
+
+  /// "18.4k views", or null at zero — a row saying "0 views" is worse than
+  /// a row saying nothing.
+  String? get viewsLabel {
+    if (viewCount <= 0) return null;
+    if (viewCount == 1) return '1 view';
+    if (viewCount < 1000) return '$viewCount views';
+    if (viewCount < 1000000) {
+      return '${(viewCount / 1000).toStringAsFixed(1)}k views';
+    }
+    return '${(viewCount / 1000000).toStringAsFixed(1)}M views';
+  }
+
+  /// A copy with the fields a play or a bookmark changes.
+  LessonVideo copyWith({int? viewCount, bool? isSaved}) => LessonVideo(
+        id: id,
+        title: title,
+        description: description,
+        videoUrl: videoUrl,
+        thumbnailUrl: thumbnailUrl,
+        durationSeconds: durationSeconds,
+        accessType: accessType,
+        locked: locked,
+        viewCount: viewCount ?? this.viewCount,
+        isSaved: isSaved ?? this.isSaved,
+      );
+
+  /// "10:10", or null when the server did not send a length.
+  String? get lengthLabel {
+    if (durationSeconds <= 0) return null;
+    final minutes = durationSeconds ~/ 60;
+    final seconds = (durationSeconds % 60).toString().padLeft(2, '0');
+    return '$minutes:$seconds';
+  }
+
+  factory LessonVideo.fromJson(Map<String, dynamic> json) => LessonVideo(
+        id: _toInt(json['id']),
+        title: (json['title'] ?? '').toString(),
+        description: _text(json['description']),
+        videoUrl: _text(json['videoUrl'] ?? json['video_url']),
+        thumbnailUrl: _text(json['thumbnailUrl'] ?? json['thumbnail_url']),
+        durationSeconds:
+            _toInt(json['durationSeconds'] ?? json['duration_seconds']),
+        accessType: (json['accessType'] ?? json['access_type'] ?? 'free')
+            .toString(),
+        locked: json['locked'] == true,
+        viewCount: _toInt(json['viewCount'] ?? json['view_count']),
+        isSaved: json['isSaved'] == true,
+      );
+}
+
+String? _text(dynamic value) {
+  final text = value?.toString().trim() ?? '';
+  return text.isEmpty ? null : text;
+}
+
 class StudentLessonModel {
   final int id;
   final String title;
@@ -192,6 +301,16 @@ class StudentLessonModel {
   final bool isFreePreview;
   final String accessType;
   final bool locked;
+
+  /// The lesson's parts, in order. Empty from a server that has not shipped
+  /// per-video access yet, and then [videoParts] stands one in for the
+  /// lesson's own url — which is exactly how this screen behaved before.
+  final List<LessonVideo> videos;
+
+  /// The quiz, the notes and the text are locked. Separate from [locked],
+  /// which now means nothing inside opens at all: a lesson can play its free
+  /// part while its quiz is premium.
+  final bool contentLocked;
 
   /// Present on quiz lessons. `quiz` carries the questionCount when the
   /// server sends the nested object; `quizQuestionCount` is null when it
@@ -253,6 +372,8 @@ class StudentLessonModel {
     this.description,
     required this.type,
     this.content,
+    this.videos = const [],
+    this.contentLocked = false,
     this.videoUrl,
     this.thumbnailUrl,
     this.noteUrl,
@@ -290,6 +411,8 @@ class StudentLessonModel {
         description: description,
         type: type,
         content: content,
+        videos: videos,
+        contentLocked: contentLocked,
         videoUrl: videoUrl,
         thumbnailUrl: thumbnailUrl,
         noteUrl: noteUrl,
@@ -355,6 +478,16 @@ class StudentLessonModel {
       noteUrl: noteUrlValue,
       noteFileType: json['noteFileType'] ?? json['note_file_type'],
       displayOrder: json['displayOrder'] ?? json['display_order'] ?? 0,
+      videos: json['videos'] is List
+          ? (json['videos'] as List)
+              .whereType<Map>()
+              .map((v) => LessonVideo.fromJson(Map<String, dynamic>.from(v)))
+              .toList()
+          : const [],
+      // Falls back to the lesson's own lock, which is what a server without
+      // per-video access is saying about its content.
+      contentLocked:
+          json['contentLocked'] ?? json['content_locked'] ?? lockedValue,
       isFreePreview: freePreviewValue,
       accessType: accessTypeValue,
       locked: lockedValue,
@@ -399,6 +532,45 @@ class StudentLessonModel {
   bool get isVideo => type == 'video' || hasVideo;
 
   bool get isPremium => accessType == 'premium';
+  /// The lesson's parts, always as a list.
+  ///
+  /// A server that has not shipped per-video access sends none, and then the
+  /// lesson's own url and lock are the single part — which is exactly how
+  /// this screen behaved before, with no branch anywhere else.
+  List<LessonVideo> get videoParts {
+    if (videos.isNotEmpty) return videos;
+    if (!isVideo) return const [];
+
+    return [
+      LessonVideo(
+        id: id,
+        title: title,
+        description: description,
+        videoUrl: videoUrl,
+        thumbnailUrl: thumbnailUrl,
+        durationSeconds: durationSeconds ?? 0,
+        accessType: accessType,
+        locked: locked,
+      ),
+    ];
+  }
+
+  /// The first part this student can watch, or null when none opens.
+  LessonVideo? get firstOpenPart {
+    for (final part in videoParts) {
+      if (part.isOpen) return part;
+    }
+    return null;
+  }
+
+  /// Some parts play and some do not — the sample that sells the rest.
+  bool get hasFreePreviewParts =>
+      videoParts.length > 1 &&
+      videoParts.any((v) => v.isOpen) &&
+      videoParts.any((v) => v.locked);
+
+  int get openPartCount => videoParts.where((v) => v.isOpen).length;
+  int get lockedPartCount => videoParts.where((v) => v.locked).length;
   /// Whether to let the student in.
   ///
   /// The server decides. A lesson it will not serve is shut here too, so a
@@ -416,6 +588,10 @@ class StudentLessonModel {
   /// a padlock.
   bool get isOpen {
     if (locked) return false;
+    // A video lesson is open when any of its parts is. With per-video access
+    // the lesson's own url is only part one's, and a lesson whose sample is
+    // part two would otherwise read as having nothing to play.
+    if (isVideo) return firstOpenPart != null || hasMedia;
     return isQuiz || hasMedia;
   }
 }

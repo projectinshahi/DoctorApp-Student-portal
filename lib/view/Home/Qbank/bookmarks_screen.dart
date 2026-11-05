@@ -149,6 +149,27 @@ class _BookmarksScreenState extends State<BookmarksScreen>
       );
     }
 
+    // Videos are saved one at a time now, not by the lesson they sit in, so
+    // this chip shows the videos themselves.
+    if (filter.type == 'video') {
+      final videos = provider.videos;
+      if (videos.isEmpty) {
+        return AppRefresh.fill(
+            onRefresh: onRefresh, child: _empty('No saved videos yet.'));
+      }
+      return AppRefresh(
+        onRefresh: onRefresh,
+        child: ListView.separated(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: EdgeInsets.fromLTRB(16.w, 4.h, 16.w, 24.h),
+          itemCount: videos.length,
+          separatorBuilder: (_, __) => SizedBox(height: 12.h),
+          itemBuilder: (context, index) =>
+              _SavedVideoCard(video: videos[index]),
+        ),
+      );
+    }
+
     final lessons = provider.lessons
         .where((saved) => saved.type == filter.type)
         .toList();
@@ -513,6 +534,124 @@ class _OptionRow extends StatelessWidget {
             Icon(Icons.check_circle_rounded, size: 18.sp, color: _kPrimary),
             SizedBox(width: 6.w),
           ],
+        ],
+      ),
+    );
+  }
+}
+
+/// One saved video: the still, what it is, and which lesson it came from —
+/// "Part 2" says nothing without the lesson around it.
+class _SavedVideoCard extends StatelessWidget {
+  final SavedVideo video;
+
+  const _SavedVideoCard({required this.video});
+
+  String? get _length {
+    if (video.durationSeconds <= 0) return null;
+    final minutes = video.durationSeconds ~/ 60;
+    final seconds = (video.durationSeconds % 60).toString().padLeft(2, '0');
+    return '$minutes:$seconds';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.all(10.w),
+      decoration: BoxDecoration(
+        color: _kCard,
+        borderRadius: BorderRadius.circular(16.r),
+      ),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 104.w,
+            height: 64.h,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12.r),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  if (video.thumbnailUrl != null)
+                    Image.network(video.thumbnailUrl!,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) =>
+                            Container(color: Colors.grey.shade300))
+                  else
+                    Container(color: Colors.grey.shade300),
+                  Center(
+                    child: Container(
+                      padding: EdgeInsets.all(5.w),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.45),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                          video.locked
+                              ? Icons.lock_rounded
+                              : Icons.play_arrow_rounded,
+                          size: 14.sp,
+                          color: Colors.white),
+                    ),
+                  ),
+                  if (_length != null)
+                    Positioned(
+                      right: 4.w,
+                      bottom: 4.h,
+                      child: Container(
+                        padding: EdgeInsets.symmetric(
+                            horizontal: 5.w, vertical: 1.h),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.65),
+                          borderRadius: BorderRadius.circular(4.r),
+                        ),
+                        child: Text(_length!,
+                            style: TextStyle(
+                                fontSize: 9.sp, color: Colors.white)),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          SizedBox(width: 12.w),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(video.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                        fontSize: 13.5.sp,
+                        height: 1.3,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.black87)),
+                SizedBox(height: 3.h),
+                Text(
+                  video.chapterTitle == null
+                      ? video.lessonTitle
+                      : '${video.chapterTitle} · ${video.lessonTitle}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style:
+                      TextStyle(fontSize: 11.5.sp, color: Colors.grey.shade700),
+                ),
+              ],
+            ),
+          ),
+          GestureDetector(
+            onTap: () => _toggleAndRefresh(
+              context,
+              () => context.read<SavedProvider>().toggleVideo(video.videoId),
+            ),
+            behavior: HitTestBehavior.opaque,
+            child: Padding(
+              padding: EdgeInsets.all(6.w),
+              child: Icon(Icons.bookmark_rounded,
+                  size: 19.sp, color: const Color(0xFF87986B)),
+            ),
+          ),
         ],
       ),
     );

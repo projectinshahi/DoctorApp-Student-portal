@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 
 import '../models/quiz_model.dart' show QuizException, QuizErrorKind;
 import '../models/test_model.dart';
+import '../services/demo_test_service.dart';
 import '../services/test_service.dart';
 
 /// How a question looks in the navigator grid.
@@ -18,7 +19,8 @@ enum QuestionState { answered, marked, unanswered }
 class TestProvider extends ChangeNotifier {
   final TestService _service;
 
-  TestProvider({TestService? service}) : _service = service ?? TestService();
+  TestProvider({TestService? service})
+      : _service = service ?? testServiceForSession();
 
   bool isLoading = true;
   QuizException? failure;

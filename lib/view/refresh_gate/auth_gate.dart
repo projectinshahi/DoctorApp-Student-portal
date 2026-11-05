@@ -15,6 +15,8 @@ import 'dart:async';
 //    removed is usually the one on top, so the reset goes through the app's
 //    navigator key rather than this widget's context.
 import 'package:dr_app/view/Home/home_screen.dart';
+import '../../core/demo/demo_content.dart';
+import '../../repository/profile_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
@@ -27,6 +29,7 @@ import '../../repository/daily_quiz_provider.dart';
 import '../../repository/refresh_api_provider.dart';
 import '../../repository/quiz_prefetch.dart';
 import '../../repository/rapid_recall_provider.dart';
+import '../../services/demo_test_service.dart';
 import '../../repository/notification_feed_provider.dart';
 import '../../repository/plan_access_provider.dart';
 import '../../repository/saved_provider.dart';
@@ -253,7 +256,16 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
     final wasSignedIn = previous == AuthStatus.authenticated;
     _lastStatus = status;
 
-    if (isFreshSignIn(previous, status)) _startWelcome();
+    if (isFreshSignIn(previous, status)) {
+      _startWelcome();
+      // The preview's sample is still in these providers, and the first
+      // thing a new student sees is the course picker — which read the
+      // sample as their current course and asked them to confirm changing
+      // away from "Sample exam".
+      context.read<ProfileProvider>().clear();
+      context.read<HomeSummaryProvider>().clear();
+      context.read<SelectionContentProvider>().invalidate();
+    }
 
     // A sign-in that displaced another device. Shown from here rather than
     // from the login screen, because that screen is being replaced by this
@@ -288,12 +300,19 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
     context.read<QuizPrefetch>().clear();
     // Decks and their bookmarks belong to that account's course too.
     context.read<RapidRecallProvider>().clear();
+    // The sample paper's answers belong to the visitor before this one.
+    DemoTestService.reset();
     // Course alerts and the study reminder are for a signed-in student.
     unawaited(context.read<SettingsProvider>().clearForSignOut());
     // The list belongs to the account that just left.
     context.read<NotificationFeedProvider>().clear();
     // The plan belongs to that account too.
     context.read<PlanAccessProvider>().clear();
+    // And the name, photo, streak and half-watched videos. What follows a
+    // sign-out is the preview, which must look like the app does before
+    // anyone has signed in — not like the student who just left.
+    context.read<ProfileProvider>().clear();
+    context.read<HomeSummaryProvider>().clear();
 
     // The session can die while a quiz, a test paper or the player is on
     // top. Swapping this root does not remove those, and without the reset
@@ -402,8 +421,16 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
 
     final auth = context.watch<AuthProvider>();
 
+    // Everything below reads this: the providers to show sample content
+    // instead of calling, the screens to ask for an account on any tap that
+    // would need one.
+    DemoMode.active = auth.status == AuthStatus.unauthenticated;
+
     return switch (auth.status) {
-      AuthStatus.unauthenticated => const LoginScreen(),
+      // The app itself, on sample content, rather than a login form. A
+      // visitor sees what it does and signs in when they want their own
+      // course — the exam picker stays after sign-in, where it belongs.
+      AuthStatus.unauthenticated => const Homescreen(),
       // Reading the stored token. Brief, but it is the very first frame and
       // an empty screen there reads as a crash.
       AuthStatus.unknown => const AnimatedSplash(),

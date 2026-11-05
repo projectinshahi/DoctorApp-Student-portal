@@ -25,7 +25,7 @@ import '../../../widget/app_bottom_nav.dart';
 import '../../../widget/app_loading.dart';
 import '../Qbank/qbank_subjects_screen.dart' show QbankRowTile;
 import '../Qbank/qbank_tab.dart';
-import '../dashbord/ai_video_tab.dart';
+import '../dashbord/videos_subjects_screen.dart';
 import '../tests/tests_tab.dart';
 import 'recall_decks_screen.dart';
 
@@ -321,7 +321,7 @@ void openTabFromRecall(BuildContext context, int index) {
   final Widget? tab = switch (index) {
     1 => const QbankTab(),
     2 => const TestsTab(),
-    3 => const AiVideoTab(),
+    3 => const VideosSubjectsScreen(),
     4 => const RecallTopicsScreen(),
     _ => null, // Home: popping back to it was the whole job.
   };
@@ -363,8 +363,6 @@ IconData recallIconFor(String title) {
 /// Checked in order, so the more specific words come first — "neonat" before
 /// anything a paediatrics title might also contain.
 const Map<String, IconData> _lessonIcons = {
-  'cardio': Icons.favorite_border_rounded,
-  'heart': Icons.favorite_border_rounded,
   'pulmo': Icons.air_rounded,
   'respir': Icons.air_rounded,
   'lung': Icons.air_rounded,

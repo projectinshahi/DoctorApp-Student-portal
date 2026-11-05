@@ -1,6 +1,9 @@
 // lib/view/Home/Qbank/quiz_screen.dart
 import 'package:flutter/material.dart';
 
+import '../../../core/demo/demo_content.dart';
+import '../../../widget/sign_in_required.dart';
+
 import '../../../models/selection_content_model.dart' show LessonAttemptInfo;
 import '../../../repository/quiz_prefetch.dart';
 import '../../../widget/quiz_loading.dart';
@@ -13,7 +16,7 @@ import '../../../repository/quiz_provider.dart';
 import '../../../repository/saved_provider.dart';
 import '../../../services/quiz_sounds.dart';
 import '../../subjectSelection/select_exam_screen.dart';
-import '../../../widget/pro_plan_dialog.dart';
+import '../../../widget/learning_plan_dialog.dart';
 
 const Color _kPrimary = Color(0xFF87986B);
 const Color _kBg = Color(0xFFEFF4E2);
@@ -297,7 +300,20 @@ class _QuestionView extends StatelessWidget {
       ),
     );
 
-    if (confirmed == true) await provider.finish();
+    if (confirmed != true) return;
+
+    // Nothing to submit in the preview: the questions were answered on the
+    // device, against no attempt. Scoring one needs an account, which is the
+    // honest place to ask for it — after they have seen what the quiz is
+    // like, not before.
+    if (DemoMode.active) {
+      if (context.mounted) {
+        await showSignInRequired(context, what: 'save your score');
+      }
+      return;
+    }
+
+    await provider.finish();
   }
 
   @override
@@ -1255,13 +1271,9 @@ class _FailureView extends StatelessWidget {
   Widget build(BuildContext context) {
     switch (failure.kind) {
       case QuizErrorKind.locked:
-        // Same paywall the video player shows — PRO badge, View Plan, Go back.
-        // Subscribing reloads the lesson so the questions appear straight away.
-        return ProPlanPaywall(
-          message: 'This quiz is available for pro users of this course. '
-              'Want to check Pro plans?',
-          onSubscribed: onRetry,
-        );
+        // The plan lapsed after the list was drawn: the same notice a
+        // padlocked row gives, in place of the questions.
+        return const PlanRequiredNotice(feature: 'This quiz');
 
       case QuizErrorKind.noCourseSelected:
         return _EmptyState(

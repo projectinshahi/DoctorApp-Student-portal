@@ -18,14 +18,48 @@ class GoogleSignInIntergration extends ChangeNotifier {
   /// the student as "Exception: ...".
   LoginRefusedException? refusal;
 
-  Future<bool> signInWithGoogle() async {
+  Future<bool> signInWithGoogle() => _signIn(_authService.signInWithGoogle);
+
+  Future<bool> signInWithApple() => _signIn(_authService.signInWithApple);
+
+  Future<bool> loginWithEmail(String email, String password) =>
+      _signIn(() => _authService.loginWithEmail(email, password));
+
+  Future<bool> verifyOtp(String email, String code) =>
+      _signIn(() => _authService.verifyOtp(email, code));
+
+  Future<void> resendOtp(String email) => _authService.resendOtp(email);
+
+  Future<String?> forgotPassword(String email) => _authService.forgotPassword(email);
+
+  Future<bool> resetPassword(String email, String code, String password) =>
+      _signIn(() => _authService.resetPassword(email, code, password));
+
+  /// Registration signs no one in, so all it reports is why it was refused,
+  /// or null when the code is on its way.
+  Future<LoginRefusedException?> registerWithEmail(
+      String email, String password) async {
+    try {
+      await _authService.registerWithEmail(email, password);
+      return null;
+    } on LoginRefusedException catch (e) {
+      return e;
+    } catch (_) {
+      return const LoginRefusedException(
+        code: null,
+        message: 'Could not reach the server. Check your connection and try again.',
+      );
+    }
+  }
+
+  Future<bool> _signIn(Future<AuthResultModel> Function() signIn) async {
     isLoading = true;
     errorMessage = null;
     refusal = null;
     notifyListeners();
 
     try {
-      authResult = await _authService.signInWithGoogle();
+      authResult = await signIn();
       isLoading = false;
       notifyListeners();
       return true;

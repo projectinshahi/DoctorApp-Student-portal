@@ -16,9 +16,13 @@ import '../../../models/selection_content_model.dart';
 import '../../../repository/saved_provider.dart';
 import '../../../repository/daily_quiz_provider.dart';
 import '../../../repository/selection_content_provider.dart';
+import '../../../core/demo/demo_content.dart';
 import '../../../services/lesson_progress_service.dart';
+import '../../../services/saved_service.dart';
+import '../../../core/demo/demo_content.dart';
+import '../../../widget/access_chip.dart';
 import '../../../widget/app_loading.dart';
-import '../../../widget/pro_plan_dialog.dart';
+import '../../../widget/learning_plan_dialog.dart';
 import '../Qbank/quiz_screen.dart';    // adjust path to wherever you place this file
 import '../lessons/comments_section.dart';
 import '../../../core/utils/capture_watch.dart';
@@ -27,10 +31,16 @@ class StudentLessonDetailScreen extends StatefulWidget {
   final StudentLessonModel lesson;
   final List<StudentLessonModel> relatedLessons;
 
+  /// Which part to open on. Null starts at the first one that plays, which
+  /// is what every other way in wants; the videos list passes the row that
+  /// was tapped.
+  final int? initialPartId;
+
   const StudentLessonDetailScreen({
     super.key,
     required this.lesson,
     this.relatedLessons = const [],
+    this.initialPartId,
   });
 
   @override
@@ -108,7 +118,9 @@ class _StudentLessonDetailScreenState extends State<StudentLessonDetailScreen> {
     });
 
     if (_lesson.locked) return;
-    if (_lesson.hasVideo && _lesson.videoUrl != null && _lesson.videoUrl!.isNotEmpty) {
+    // No progress to write in the preview: there is no student whose place
+    // this would be kept, and every write would be a 401.
+    if (!DemoMode.active && _lesson.firstOpenPart != null) {
       _progress = LessonProgressWriter(
         lessonId: _lesson.id,
         // The server answers every write with its own verdict, so the tick
@@ -138,28 +150,62 @@ class _StudentLessonDetailScreenState extends State<StudentLessonDetailScreen> {
     }
   }
 
-  /// Called after a successful subscribe. The plans screen already awaits a
-  /// full SelectionContentProvider reload before it pops, so the unlocked
-  /// lesson — videoUrl and all — is already in the tree; the copy this screen
-  /// holds is the stale, stripped one. Swap it in instead of re-fetching.
-  void _reloadUnlockedLesson() {
-    if (!mounted) return;
-    final lessons = context.read<SelectionContentProvider>().content?.allLessons ??
-        const <StudentLessonModel>[];
-    final index = lessons.indexWhere((l) => l.id == _lesson.id);
+  /// The part on the player. A lesson is a list of them now; a server that
+  /// has not shipped per-video access sends one, which is the lesson itself.
+  LessonVideo? _part;
 
-    // Still locked (or gone) means the plan they bought doesn't cover this
-    // lesson. Leave, so the list behind re-renders with the access that is
-    // now real rather than stranding them on a paywall they just paid past.
-    if (index == -1 || lessons[index].locked) {
-      Navigator.pop(context, true);
-      return;
-    }
-    _switchToLesson(lessons[index]);
+  /// Videos whose play has already been counted on this screen. One view per
+  /// open, not one per resume — a student who pauses to take a note has not
+  /// watched it twice.
+  final Set<int> _viewed = {};
+
+  /// Counts a play, once, out of the player's way.
+  ///
+  /// Never awaited and never allowed to fail loudly: a view that goes
+  /// unrecorded costs a number, a play blocked on recording it costs the
+  /// lesson.
+  void _countView() {
+    final part = _part;
+    if (part == null || !part.isOpen) return;
+    // Nothing to count against in the preview, and a locked video is not
+    // playing in the first place.
+    if (DemoMode.active || !_viewed.add(part.id)) return;
+
+    unawaited(() async {
+      try {
+        final count = await SavedService().recordView(part.id);
+        if (!mounted || count < 0) return;
+        setState(() => _part = part.copyWith(viewCount: count));
+      } catch (_) {
+        // The next play will try again.
+      }
+    }());
   }
 
+  /// The part the caller asked for, if it is one this student can open.
+  LessonVideo? get _requestedPart {
+    final wanted = widget.initialPartId;
+    if (wanted == null) return null;
+    for (final part in _lesson.videoParts) {
+      if (part.id == wanted && part.isOpen) return part;
+    }
+    return null;
+  }
+
+  /// Progress is one position per lesson, saved against the first part. The
+  /// others start at zero and report nothing — a backend decision that has
+  /// not been taken yet, and overwriting the lesson's position with part
+  /// four's would be worse than not saving it.
+  bool get _partCarriesProgress =>
+      _part != null && _lesson.videoParts.isNotEmpty &&
+      _part!.id == _lesson.videoParts.first.id;
+
   void _setupVideo() {
-    final url = _lesson.videoUrl;
+    // The part that was tapped, where a list sent them to one; otherwise the
+    // first that plays — in a lesson whose sample is part two, part one has
+    // no url at all.
+    _part ??= _requestedPart ?? _lesson.firstOpenPart;
+    final url = _part?.videoUrl;
     if (url == null || url.isEmpty) return;
 
     if (YoutubeUtils.isYoutubeUrl(url)) {
@@ -201,7 +247,8 @@ class _StudentLessonDetailScreenState extends State<StudentLessonDetailScreen> {
     if (!isRetry) _videoRetryCount = 0;
 
     try {
-      final controller = VideoPlayerController.networkUrl(Uri.parse(_lesson.videoUrl!));
+      final controller =
+          VideoPlayerController.networkUrl(Uri.parse(_part!.videoUrl!));
       await controller.initialize();
       // Resume before the first frame is shown, so the student never sees it
       // start from zero and jump.
@@ -253,6 +300,46 @@ class _StudentLessonDetailScreenState extends State<StudentLessonDetailScreen> {
   }
 
   /// Applies a new playback speed to the currently-running controller.
+  /// Plays another part of this lesson.
+  ///
+  /// The player is rebuilt rather than re-pointed: the two players are
+  /// different packages, and a YouTube part following an mp4 one needs the
+  /// other one entirely.
+  Future<void> _playPart(LessonVideo part) async {
+    if (part.id == _part?.id || !part.isOpen) return;
+
+    await _controller?.pause();
+    _progress?.flush();
+    _ytController?.pause();
+
+    setState(() {
+      _part = part;
+      _error = null;
+      _started = false;
+      _resumed = false;
+    });
+
+    _controller?.dispose();
+    _controller = null;
+    _ytController?.removeListener(_onYoutubeTick);
+    _ytController?.dispose();
+    _ytController = null;
+
+    _setupVideo();
+  }
+
+  /// The next part that plays, skipping the padlocked ones.
+  LessonVideo? get _nextOpenPart {
+    final parts = _lesson.videoParts;
+    final at = parts.indexWhere((v) => v.id == _part?.id);
+    if (at == -1) return null;
+
+    for (final part in parts.skip(at + 1)) {
+      if (part.isOpen) return part;
+    }
+    return null;
+  }
+
   /// Position reporting for the direct-file player.
   ///
   /// Fires several times a second; everything expensive is behind the
@@ -262,6 +349,7 @@ class _StudentLessonDetailScreenState extends State<StudentLessonDetailScreen> {
   void _onVideoTick(VideoPlayerController controller) {
     final value = controller.value;
     if (!value.isInitialized || !_resumed) return;
+    if (value.isPlaying) _countView();
 
     // Handed over once the player knows it. Without a length the server
     // cannot judge a percentage at all, and every video uploaded before
@@ -269,12 +357,14 @@ class _StudentLessonDetailScreenState extends State<StudentLessonDetailScreen> {
     _progress?.durationSeconds = value.duration.inSeconds;
 
     final seconds = value.position.inSeconds;
-    _progress?.record(seconds);
+    if (_partCarriesProgress) _progress?.record(seconds);
 
     // Watched to the end. `completed` is the server's flag, but it only
     // learns about a finished video if the player says so.
     if (value.duration > Duration.zero && value.position >= value.duration) {
-      _progress?.flush(completed: true);
+      if (_partCarriesProgress) _progress?.flush(completed: true);
+      final next = _nextOpenPart;
+      if (next != null) _playPart(next);
       return;
     }
 
@@ -302,6 +392,8 @@ class _StudentLessonDetailScreenState extends State<StudentLessonDetailScreen> {
     _progress?.durationSeconds = controller.metadata.duration.inSeconds;
 
     _progress?.record(position.inSeconds);
+
+    if (controller.value.isPlaying) _countView();
 
     final duration = controller.metadata.duration;
     if (duration > Duration.zero && position >= duration) {
@@ -770,10 +862,7 @@ class _StudentLessonDetailScreenState extends State<StudentLessonDetailScreen> {
   }
 
   Widget _buildVideoPlayer() {
-    final hasValidVideoUrl = _lesson.videoUrl != null && _lesson.videoUrl!.isNotEmpty;
-    if (!_lesson.hasVideo || !hasValidVideoUrl) {
-      return const SizedBox.shrink();
-    }
+    if (_part == null || !_part!.isOpen) return const SizedBox.shrink();
 
     return Stack(
       children: [
@@ -818,11 +907,17 @@ class _StudentLessonDetailScreenState extends State<StudentLessonDetailScreen> {
     return Padding(
       padding: EdgeInsets.fromLTRB(20.w, 6.h, 20.w, 0),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Flexible, so a long description wraps onto as many lines as it
+          // needs instead of running off the right edge.
           if (_lesson.description != null && _lesson.description!.isNotEmpty)
-            Text(
-              _lesson.description!,
-              style: TextStyle(fontSize: 13.sp, color: Colors.grey.shade600),
+            Flexible(
+              child: Text(
+                _lesson.description!,
+                style: TextStyle(
+                    fontSize: 13.sp, height: 1.45, color: Colors.grey.shade600),
+              ),
             ),
           if (durationText != null) ...[
             if (_lesson.description != null && _lesson.description!.isNotEmpty) ...[
@@ -839,6 +934,7 @@ class _StudentLessonDetailScreenState extends State<StudentLessonDetailScreen> {
 
   // ── "View Notes" full-width button, matching the screenshot ──
   Widget _buildViewNotesButton() {
+    if (_lesson.contentLocked) return const SizedBox.shrink();
     final hasValidNoteUrl = _lesson.noteUrl != null && _lesson.noteUrl!.isNotEmpty;
     if (!_lesson.hasNote || !hasValidNoteUrl) return const SizedBox.shrink();
 
@@ -863,7 +959,64 @@ class _StudentLessonDetailScreenState extends State<StudentLessonDetailScreen> {
   }
 
   // ── Quiz lesson: same full-width card slot the video/notes use ──
+  /// What a padlocked part offers instead of playing: the same notice as
+  /// every other premium item.
+  Future<void> _openPaywallSheet(String title) =>
+      showPlanRequiredDialog(context, lessonTitle: title);
+
+  /// The lesson's parts, in order.
+  ///
+  /// Padlocked ones are listed with the rest: the open part is the sample,
+  /// and these are what it is a sample of. Nothing here is drawn for a lesson
+  /// the server sent as a single video.
+  Widget _buildPartsList() {
+    final parts = _lesson.videoParts;
+    if (parts.length < 2) return const SizedBox.shrink();
+
+    final open = _lesson.openPartCount;
+    final locked = _lesson.lockedPartCount;
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(16.w, 18.h, 16.w, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text('VIDEOS · ${parts.length}',
+                  style: TextStyle(
+                      fontSize: 11.sp,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.6,
+                      color: Colors.grey.shade600)),
+              const Spacer(),
+              if (locked > 0)
+                Text('$open free · $locked premium',
+                    style: TextStyle(
+                        fontSize: 11.sp, color: Colors.grey.shade600)),
+            ],
+          ),
+          SizedBox(height: 10.h),
+          for (final part in parts) ...[
+            _PartRow(
+              part: part,
+              isPlaying: part.id == _part?.id,
+              onTap: () => part.isOpen
+                  ? _playPart(part)
+                  // No url to play, so this is the only honest answer.
+                  : _openPaywallSheet(part.title),
+            ),
+            SizedBox(height: 8.h),
+          ],
+        ],
+      ),
+    );
+  }
+
   Widget _buildQuizCard() {
+    // The quiz is the lesson's content, and the lesson's tier now covers only
+    // that: a lesson can play its free part while its quiz needs the plan.
+    if (_lesson.contentLocked) return _lockedContentCard('Quiz');
     if (!_lesson.isQuiz) return const SizedBox.shrink();
 
     final count = _lesson.quizQuestionCount;
@@ -938,6 +1091,42 @@ class _StudentLessonDetailScreenState extends State<StudentLessonDetailScreen> {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  /// The quiz or the notes, behind the plan while the videos play.
+  Widget _lockedContentCard(String what) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(16.w, 16.h, 16.w, 0),
+      child: GestureDetector(
+        onTap: () => _openPaywallSheet(_lesson.title),
+        child: Container(
+          padding: EdgeInsets.all(14.w),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14.r),
+            border: Border.all(color: Colors.grey.shade200),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.lock_outline_rounded,
+                  size: 19.sp, color: Colors.grey.shade500),
+              SizedBox(width: 11.w),
+              Expanded(
+                child: Text(
+                  "$what is part of this lesson's plan",
+                  style: TextStyle(
+                      fontSize: 13.sp,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey.shade700),
+                ),
+              ),
+              Icon(Icons.chevron_right_rounded,
+                  size: 20.sp, color: Colors.grey.shade500),
+            ],
+          ),
         ),
       ),
     );
@@ -1024,10 +1213,9 @@ class _StudentLessonDetailScreenState extends State<StudentLessonDetailScreen> {
   }
 
   /// The locked state, built the same way the quiz screen builds its own:
-  /// a plain app bar over a full-screen [ProPlanPaywall], not a dialog thrown
-  /// on top of a player that was never allowed to load. Subscribing reloads
-  /// the lesson in place, so the video starts here rather than sending them
-  /// back to the list to find it again.
+  /// a plain app bar over a full-screen [PlanRequiredNotice], not a dialog
+  /// thrown on top of a player that was never allowed to load. Reached when
+  /// the plan lapsed after the list was drawn.
   Widget _buildPaywallScreen() {
     return Scaffold(
       backgroundColor: kBg,
@@ -1048,11 +1236,7 @@ class _StudentLessonDetailScreenState extends State<StudentLessonDetailScreen> {
         ),
       ),
       body: SafeArea(
-        child: ProPlanPaywall(
-          message: 'This video is available for pro users of this course. '
-              'Want to check Pro plans?',
-          onSubscribed: _reloadUnlockedLesson,
-        ),
+        child: PlanRequiredNotice(feature: _lesson.title),
       ),
     );
   }
@@ -1080,8 +1264,7 @@ class _StudentLessonDetailScreenState extends State<StudentLessonDetailScreen> {
       );
     }
 
-    final hasValidVideoUrl = _lesson.videoUrl != null && _lesson.videoUrl!.isNotEmpty;
-    final isVideoAvailable = _lesson.hasVideo && hasValidVideoUrl;
+    final isVideoAvailable = _lesson.firstOpenPart != null;
 
     return Scaffold(
       backgroundColor: kBg,
@@ -1144,6 +1327,7 @@ class _StudentLessonDetailScreenState extends State<StudentLessonDetailScreen> {
               ),
 
               _buildMetaRow(),
+              _buildPartsList(),
               _buildQuizCard(),
               _buildViewNotesButton(),
 
@@ -1168,6 +1352,102 @@ class _StudentLessonDetailScreenState extends State<StudentLessonDetailScreen> {
               SizedBox(height: 30.h),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// One part in the list under the player.
+class _PartRow extends StatelessWidget {
+  static const Color _kPrimary = Color(0xFF87986B);
+
+  final LessonVideo part;
+  final bool isPlaying;
+  final VoidCallback onTap;
+
+  const _PartRow({
+    required this.part,
+    required this.isPlaying,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final open = part.isOpen;
+
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        padding: EdgeInsets.fromLTRB(12.w, 11.h, 12.w, 11.h),
+        decoration: BoxDecoration(
+          color: isPlaying ? _kPrimary.withValues(alpha: 0.10) : Colors.white,
+          borderRadius: BorderRadius.circular(14.r),
+          border: Border.all(
+            color: isPlaying
+                ? _kPrimary.withValues(alpha: 0.45)
+                : Colors.grey.shade200,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 30.w,
+              height: 30.w,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: open
+                    ? _kPrimary.withValues(alpha: 0.12)
+                    : Colors.grey.shade200,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                open
+                    ? (isPlaying
+                        ? Icons.graphic_eq_rounded
+                        : Icons.play_arrow_rounded)
+                    : Icons.lock_outline_rounded,
+                size: 16.sp,
+                color: open ? _kPrimary : Colors.grey.shade500,
+              ),
+            ),
+            SizedBox(width: 11.w),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    part.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                        fontSize: 13.5.sp,
+                        fontWeight: FontWeight.w700,
+                        color: open ? Colors.black87 : Colors.grey.shade600),
+                  ),
+                  if (part.description != null) ...[
+                    SizedBox(height: 2.h),
+                    Text(
+                      part.description!,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                          fontSize: 11.5.sp, color: Colors.grey.shade600),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            if (part.lengthLabel != null) ...[
+              SizedBox(width: 8.w),
+              Text(part.lengthLabel!,
+                  style: TextStyle(
+                      fontSize: 11.5.sp, color: Colors.grey.shade600)),
+            ],
+            SizedBox(width: 8.w),
+            AccessChip(accessType: part.accessType),
+          ],
         ),
       ),
     );

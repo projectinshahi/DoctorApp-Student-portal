@@ -4,6 +4,7 @@ import 'dart:convert';
 import '../core/utils/load_timer.dart';
 import 'package:flutter/foundation.dart';
 import '../core/constant/local_storage.dart';
+import '../core/demo/demo_content.dart';
 import '../models/selection_content_model.dart';
 import '../services/lesson_progress_service.dart' show LessonProgress;
 import '../services/selection_content_service.dart';
@@ -90,8 +91,20 @@ class SelectionContentProvider extends ChangeNotifier {
   /// were the same request eight times over.
   ///
   /// A second caller now awaits the first instead of starting another.
-  Future<void> loadContent() => _inFlight ??=
-      _fetch().whenComplete(() => _inFlight = null);
+  Future<void> loadContent() {
+    // No session, no request. The preview is shown from sample content, and
+    // a call here would only 401 and put an error over a screen that is
+    // doing exactly what it should.
+    if (DemoMode.active) {
+      content = SelectionContentModel.fromJson(DemoContent.courseTree);
+      _loadedOnce = true;
+      isLoading = false;
+      notifyListeners();
+      return Future.value();
+    }
+
+    return _inFlight ??= _fetch().whenComplete(() => _inFlight = null);
+  }
 
   Future<void> _fetch() async {
     isLoading = !_loadedOnce;

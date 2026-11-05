@@ -16,7 +16,7 @@ import '../../repository/settings_provider.dart';
 import 'Qbank/bookmarks_screen.dart';
 import 'Qbank/qbank_tab.dart';
 import 'tests/tests_tab.dart';
-import 'dashbord/ai_video_tab.dart';
+import 'dashbord/videos_subjects_screen.dart';
 import 'continue_learning_row.dart';
 import 'notifications/notifications_screen.dart';
 import 'recall/recall_lists_screen.dart';
@@ -28,6 +28,8 @@ import '../../widget/learning_plan_dialog.dart';
 import '../../widget/app_bottom_nav.dart';
 import '../../core/utils/refresh_on_visible.dart';
 import '../../core/utils/website.dart';
+import '../../core/demo/demo_content.dart';
+import '../../widget/sign_in_required.dart';
 
 
 class Homescreen extends StatefulWidget {
@@ -55,6 +57,9 @@ class _HomescreenState extends State<Homescreen> with RefreshOnVisible<Homescree
   // ── Handles nav bar taps: some tabs just update the selected visual
   // state, others (like AI Videos) actually navigate to a real screen. ──
   void _handleNavTap(int index) {
+    // Every tab opens, signed in or not. A visitor gets the preview's sample
+    // in each; what a student can open inside is decided per item by their
+    // plan — free opens, premium asks for an account, then a plan.
     // Every tab opens. Access is decided per item inside them — a premium
     // lesson shows its paywall, a premium question is never in the set — so
     // a locked door at the tab would also shut out the free content behind
@@ -71,7 +76,7 @@ class _HomescreenState extends State<Homescreen> with RefreshOnVisible<Homescree
         break;
 
       case 3: // AI Videos
-        _pushScreen(const AiVideoTab());
+        _pushScreen(const VideosSubjectsScreen());
         break;
 
       case 4: // Rapid Recall
@@ -183,6 +188,10 @@ class _HomescreenState extends State<Homescreen> with RefreshOnVisible<Homescree
       children: [
         Scaffold(
       extendBody: true,
+      // The search field is on this screen, and without this the tab bar
+      // rode up on the keyboard and dropped back down again. A tab bar that
+      // moves is a tab bar people miss.
+      resizeToAvoidBottomInset: false,
       backgroundColor: kBg,
       body: Column(
         children: [
@@ -258,7 +267,7 @@ class _HomescreenState extends State<Homescreen> with RefreshOnVisible<Homescree
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
                                         Text(
-                                          "Heyyy",
+                                          "Hey",
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
                                           style: TextStyle(
@@ -294,6 +303,30 @@ class _HomescreenState extends State<Homescreen> with RefreshOnVisible<Homescree
                               ),
 
                               SizedBox(width: 10.w),
+                              // The way in, in the header rather than a
+                              // banner down the page: a visitor should never
+                              // have to hunt for it, and the drawer is three
+                              // taps away.
+                              if (DemoMode.active)
+                                GestureDetector(
+                                  onTap: () => showSignInRequired(context),
+                                  child: Container(
+                                    padding: EdgeInsets.symmetric(
+                                        horizontal: 16.w, vertical: 9.h),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(22.r),
+                                    ),
+                                    child: Text(
+                                      'Sign in',
+                                      style: TextStyle(
+                                          fontSize: 13.sp,
+                                          fontWeight: FontWeight.w800,
+                                          color: const Color(0xFF3D4A2C)),
+                                    ),
+                                  ),
+                                )
+                              else ...[
                               _HeaderIconButton(
                                 icon: Icons.bookmark_border_rounded,
                                 onTap: () => Navigator.push(
@@ -307,9 +340,9 @@ class _HomescreenState extends State<Homescreen> with RefreshOnVisible<Homescree
                                 // What is waiting, unread. Watched, so a push arriving while
                                 // home is open moves it.
                                 badge: context.watch<NotificationFeedProvider>().unreadCount,
-                                onTap: () =>
-                                    NotificationsScreen.open(context),
+                                onTap: () => NotificationsScreen.open(context),
                               ),
+                              ],
                             ],
                           ),
                           SizedBox(height: 32.h),
@@ -452,6 +485,14 @@ class _HomescreenState extends State<Homescreen> with RefreshOnVisible<Homescree
                           // not the same as deciding against a plan, and
                           // without this there is nothing left on home that
                           // sells one.
+                          // Above the day's question, where the eye already
+                          // is. The header pill stays — this is the one that
+                          // says what signing in is for.
+                          if (DemoMode.active) ...[
+                            const _SignInBanner(),
+                            SizedBox(height: 22.h),
+                          ],
+
                           if (planInactive && _gateDismissed) ...[
                             const _NoPlanBanner(),
                             SizedBox(height: 22.h),
@@ -523,6 +564,12 @@ class _HomescreenState extends State<Homescreen> with RefreshOnVisible<Homescree
                                   ContinueLearningRow(
                                     items: items,
                                     onOpen: (lesson) async {
+                                      if (DemoMode.active) {
+                                        await showSignInRequired(context,
+                                            what: 'watch this lesson');
+                                        return;
+                                      }
+
                                       // Same answer as every other list: a
                                       // padlocked lesson says why here rather
                                       // than opening a screen with nothing in
@@ -576,6 +623,80 @@ class _HomescreenState extends State<Homescreen> with RefreshOnVisible<Homescree
         if (planInactive && !_gateDismissed)
           LearningPlanGate(onClose: () => setState(() => _gateDismissed = true)),
       ],
+    );
+  }
+}
+
+/// The way in, above the day's question, before anyone has signed in.
+class _SignInBanner extends StatelessWidget {
+  const _SignInBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => showSignInRequired(context),
+      child: Container(
+        padding: EdgeInsets.fromLTRB(18.w, 18.h, 18.w, 18.h),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF6E8052), Color(0xFF87986B)],
+          ),
+          borderRadius: BorderRadius.circular(20.r),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 40.w,
+              height: 40.w,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.18),
+                borderRadius: BorderRadius.circular(13.r),
+              ),
+              child: Icon(Icons.person_outline_rounded,
+                  size: 21.sp, color: Colors.white),
+            ),
+            SizedBox(width: 13.w),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Sign in to start learning',
+                    style: TextStyle(
+                        fontSize: 14.5.sp,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white),
+                  ),
+                  SizedBox(height: 4.h),
+                  Text(
+                    'Open your course, answer the day and keep your streak.',
+                    style: TextStyle(
+                        fontSize: 11.5.sp,
+                        height: 1.4,
+                        color: Colors.white.withValues(alpha: 0.9)),
+                  ),
+                ],
+              ),
+            ),
+            SizedBox(width: 10.w),
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 8.h),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20.r),
+              ),
+              child: Text('Sign in',
+                  style: TextStyle(
+                      fontSize: 12.sp,
+                      fontWeight: FontWeight.w800,
+                      color: const Color(0xFF3D4A2C))),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

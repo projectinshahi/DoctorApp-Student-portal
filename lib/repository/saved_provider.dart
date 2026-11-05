@@ -4,6 +4,7 @@ import '../core/utils/load_timer.dart';
 import 'package:flutter/foundation.dart';
 
 import '../core/constant/local_storage.dart';
+import '../core/demo/demo_content.dart';
 import '../models/quiz_model.dart' show QuizException;
 import '../models/saved_model.dart';
 import '../services/saved_service.dart';
@@ -31,6 +32,7 @@ class SavedProvider extends ChangeNotifier {
       counts = bundle.counts;
       questions = bundle.questions;
       lessons = bundle.lessons;
+      videos = bundle.videos;
       questionCount = bundle.counts['question'] ?? bundle.questions.length;
       lessonCount = bundle.counts['lesson'] ?? bundle.lessons.length;
       _savedQuestionIds
@@ -39,6 +41,9 @@ class SavedProvider extends ChangeNotifier {
       _savedLessonIds
         ..clear()
         ..addAll(bundle.lessons.map((l) => l.lessonId));
+      _savedVideoIds
+        ..clear()
+        ..addAll(bundle.videos.map((v) => v.videoId));
 
       // Not _fetched: that means the server answered, and this did not. The
       // next loadAll still shows nothing stale as authoritative.
@@ -55,6 +60,7 @@ class SavedProvider extends ChangeNotifier {
 
   List<SavedQuestion> questions = const [];
   List<SavedLesson> lessons = const [];
+  List<SavedVideo> videos = const [];
 
   bool isLoadingQuestions = false;
   bool isLoadingLessons = false;
@@ -65,9 +71,15 @@ class SavedProvider extends ChangeNotifier {
   final Set<int> _savedQuestionIds = {};
   final Set<int> _savedLessonIds = {};
 
+  /// Saved videos, by video id. Separate from lessons: a student saves the
+  /// part they want to come back to, not the hour it sits in, and the two
+  /// icons sit on different rows.
+  final Set<int> _savedVideoIds = {};
+
   /// Toggles already in flight, so a double tap can't fire two writes.
   final Set<int> _busyQuestions = {};
   final Set<int> _busyLessons = {};
+  final Set<int> _busyVideos = {};
 
   bool _loadedOnce = false;
 
@@ -120,6 +132,16 @@ class SavedProvider extends ChangeNotifier {
       _inFlight ??= _fetchAll().whenComplete(() => _inFlight = null);
 
   Future<void> _fetchAll() async {
+    // A visitor has no bookmarks, and asking without a session only fails —
+    // once per screen that refreshes them.
+    if (DemoMode.active) {
+      isLoadingQuestions = false;
+      isLoadingLessons = false;
+      errorMessage = null;
+      notifyListeners();
+      return;
+    }
+
     // The lists stay up while the refetch runs. This screen is opened and
     // closed constantly, and a spinner between every visit is the flicker.
     isLoadingQuestions = !_fetched || _staleLists;
@@ -135,6 +157,7 @@ class SavedProvider extends ChangeNotifier {
       counts = bundle.counts;
       questions = bundle.questions;
       lessons = bundle.lessons;
+      videos = bundle.videos;
       questionCount = bundle.counts['question'] ?? bundle.questions.length;
       lessonCount = bundle.counts['lesson'] ?? bundle.lessons.length;
 
@@ -144,6 +167,9 @@ class SavedProvider extends ChangeNotifier {
       _savedLessonIds
         ..clear()
         ..addAll(bundle.lessons.map((l) => l.lessonId));
+      _savedVideoIds
+        ..clear()
+        ..addAll(bundle.videos.map((v) => v.videoId));
       _fetched = true;
       _staleLists = false;
     } on QuizException catch (e) {
@@ -173,6 +199,42 @@ class SavedProvider extends ChangeNotifier {
 
   bool isQuestionSaved(int questionId) => _savedQuestionIds.contains(questionId);
   bool isLessonSaved(int lessonId) => _savedLessonIds.contains(lessonId);
+
+  bool isVideoSaved(int videoId) => _savedVideoIds.contains(videoId);
+
+  /// Takes what the course tree already said about each video, so a row is
+  /// drawn with its bookmark filled before /saved has answered.
+  void seedVideos(Iterable<int> savedVideoIds) {
+    final incoming = savedVideoIds.toSet();
+    if (incoming.isEmpty || _savedVideoIds.containsAll(incoming)) return;
+
+    _savedVideoIds.addAll(incoming);
+    notifyListeners();
+  }
+
+  Future<void> toggleVideo(int videoId) async {
+    if (_busyVideos.contains(videoId)) return;
+
+    final saving = !isVideoSaved(videoId);
+    _busyVideos.add(videoId);
+    // Flipped first: a bookmark that waits for the network reads as a tap
+    // that missed.
+    saving ? _savedVideoIds.add(videoId) : _savedVideoIds.remove(videoId);
+    notifyListeners();
+
+    try {
+      saving
+          ? await _service.saveVideo(videoId)
+          : await _service.unsaveVideo(videoId);
+      _staleLists = true;
+    } on QuizException catch (e) {
+      saving ? _savedVideoIds.remove(videoId) : _savedVideoIds.add(videoId);
+      errorMessage = e.message;
+    }
+
+    _busyVideos.remove(videoId);
+    notifyListeners();
+  }
 
   // ── Questions ────────────────────────────────────────────────
 
@@ -254,7 +316,9 @@ class SavedProvider extends ChangeNotifier {
     lessonCount = 0;
     questions = const [];
     lessons = const [];
+    videos = const [];
     _savedQuestionIds.clear();
+    _savedVideoIds.clear();
     _savedLessonIds.clear();
     notifyListeners();
   }

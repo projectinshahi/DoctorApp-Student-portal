@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 import '../../../../core/constant/api_constant.dart';
 import '../../../../core/utils/device_id_helper.dart';
@@ -83,71 +84,183 @@ class AuthService {
         throw Exception("Google ID Token is null");
       }
 
-      final String deviceId = await DeviceIdHelper.getDeviceId();
-
-      final response = await http.post(
-        Uri.parse(ApiConstant.googleSignIn),
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: jsonEncode({
-          "idToken": idToken,
-          "deviceId": deviceId,
-        }),
-      );
-
-      // Never the body: it carries the access and refresh tokens, and
-      // print() reaches logcat in release builds too, where any app with log
-      // access could read them. The status alone is enough to debug with.
-      if (kDebugMode) debugPrint('AUTH  POST [${response.statusCode}]  google');
-
-      if (response.statusCode == 200) {
-        final AuthResultModel authResult =
-        AuthResultModel.fromJson(jsonDecode(response.body));
-
-        // Save Tokens
-        await LocalStorage.saveAccessToken(authResult.accessToken);
-        await LocalStorage.saveRefreshToken(authResult.refreshToken);
-
-
-
-        return authResult;
-      }
-
-      // The server refuses a login for reasons the student can act on, and
-      // each needs its own words. A raw Exception here surfaced as
-      // "Exception: ..." on the login screen.
-      Map<String, dynamic> error = const {};
-      try {
-        final decoded = jsonDecode(response.body);
-        if (decoded is Map && decoded["error"] is Map) {
-          error = Map<String, dynamic>.from(decoded["error"] as Map);
-        }
-      } catch (_) {
-        // A gateway page is not JSON. The generic message below covers it.
-      }
-
-      // retryAfterMinutes sits beside `error`, not inside it.
-      Map<String, dynamic> body = const {};
-      try {
-        final decoded = jsonDecode(response.body);
-        if (decoded is Map) body = Map<String, dynamic>.from(decoded);
-      } catch (_) {}
-
-      final retry = body["retryAfterMinutes"];
-
-      throw LoginRefusedException(
-        code: error["code"]?.toString(),
-        message: error["message"]?.toString() ??
-            "Could not sign in. Please try again.",
-        retryAfterMinutes: retry is int
-            ? retry
-            : int.tryParse('${retry ?? ''}'),
-      );
+      return await _signInToBackend(ApiConstant.googleSignIn, {"idToken": idToken});
     } catch (e) {
       if (kDebugMode) debugPrint('Google sign-in failed: $e');
       rethrow;
     }
+  }
+
+  /// The Services ID from the Apple portal. Android has no native Apple
+  /// sign-in, so it signs in on Apple's web page as this "service", and Apple
+  /// posts the result to the backend, which hands it back to the app.
+  static const String _appleServiceId = 'com.keerthana.drApp.signin';
+
+  /// Native sheet on iPhone; Apple's web page on Android.
+  Future<AuthResultModel> signInWithApple() async {
+    try {
+      final credential = await SignInWithApple.getAppleIDCredential(
+        scopes: [
+          AppleIDAuthorizationScopes.email,
+          AppleIDAuthorizationScopes.fullName,
+        ],
+        webAuthenticationOptions: Platform.isAndroid
+            ? WebAuthenticationOptions(
+                clientId: _appleServiceId,
+                redirectUri: Uri.parse(ApiConstant.appleCallback),
+              )
+            : null,
+      );
+
+      final idToken = credential.identityToken;
+      if (idToken == null || idToken.isEmpty) {
+        throw Exception("Apple ID Token is null");
+      }
+
+      // Apple hands over the name on the very first sign-in only, and never
+      // puts it in the token, so it travels beside it.
+      final name = [credential.givenName, credential.familyName]
+          .whereType<String>()
+          .join(' ')
+          .trim();
+
+      return await _signInToBackend(ApiConstant.appleSignIn, {
+        "idToken": idToken,
+        if (name.isNotEmpty) "name": name,
+      });
+    } on SignInWithAppleAuthorizationException catch (e) {
+      if (e.code == AuthorizationErrorCode.canceled) {
+        throw Exception("User cancelled Apple Sign-In");
+      }
+      if (kDebugMode) debugPrint('Apple sign-in failed: $e');
+      rethrow;
+    } catch (e) {
+      if (kDebugMode) debugPrint('Apple sign-in failed: $e');
+      rethrow;
+    }
+  }
+
+  /// Posts a provider's id token to the backend. The reply is the same for
+  /// Google and Apple: tokens on 200, a typed refusal otherwise.
+  Future<AuthResultModel> _signInToBackend(
+    String url,
+    Map<String, dynamic> payload,
+  ) async {
+    final String deviceId = await DeviceIdHelper.getDeviceId();
+
+    final response = await http.post(
+      Uri.parse(url),
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: jsonEncode({...payload, "deviceId": deviceId}),
+    );
+
+    // Never the body: it carries the access and refresh tokens, and
+    // print() reaches logcat in release builds too, where any app with log
+    // access could read them. The status alone is enough to debug with.
+    if (kDebugMode) debugPrint('AUTH  POST [${response.statusCode}]  $url');
+
+    if (response.statusCode == 200) {
+      final AuthResultModel authResult =
+      AuthResultModel.fromJson(jsonDecode(response.body));
+
+      // Save Tokens
+      await LocalStorage.saveAccessToken(authResult.accessToken);
+      await LocalStorage.saveRefreshToken(authResult.refreshToken);
+
+
+
+      return authResult;
+    }
+
+    throw _refusalFrom(response, "Could not sign in. Please try again.");
+  }
+
+  /// Creates an unverified account. The server emails a 6-digit code, which
+  /// [verifyOtp] then exchanges for a session.
+  Future<void> registerWithEmail(String email, String password) async {
+    final response = await http.post(
+      Uri.parse(ApiConstant.register),
+      headers: {"Content-Type": "application/json"},
+      body: jsonEncode({"email": email, "password": password}),
+    );
+    if (kDebugMode) debugPrint('AUTH  POST [${response.statusCode}]  register');
+    if (response.statusCode != 201) {
+      throw _refusalFrom(response, "Could not create the account. Please try again.");
+    }
+  }
+
+  Future<AuthResultModel> loginWithEmail(String email, String password) =>
+      _signInToBackend(ApiConstant.login, {"email": email, "password": password});
+
+  /// The right code verifies the account and signs in, like a login.
+  Future<AuthResultModel> verifyOtp(String email, String code) =>
+      _signInToBackend(ApiConstant.verifyOtp, {"email": email, "code": code});
+
+  /// Emails a code for [resetPassword]. A Google account has no password,
+  /// so this is also how it adds one.
+  ///
+  /// Returns why it cannot, or null. The endpoint answers 404 until the
+  /// backend's forgot-password branch is merged.
+  Future<String?> forgotPassword(String email) async {
+    final status = await _postQuietly(ApiConstant.forgotPassword, email);
+    return status == 404
+        ? 'Password reset is not available yet. Please try again later.'
+        : null;
+  }
+
+  /// The right code sets the new password and signs in, like a login.
+  Future<AuthResultModel> resetPassword(String email, String code, String password) =>
+      _signInToBackend(ApiConstant.resetPassword,
+          {"email": email, "code": code, "password": password});
+
+  /// The server answers the same whether or not it sent one, and ignores a
+  /// second request inside a minute, so there is nothing to report back.
+  Future<void> resendOtp(String email) => _postQuietly(ApiConstant.resendOtp, email);
+
+  Future<int?> _postQuietly(String url, String email) async {
+    try {
+      final response = await http.post(
+        Uri.parse(url),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({"email": email}),
+      );
+      return response.statusCode;
+    } catch (e) {
+      if (kDebugMode) debugPrint('POST $url failed: $e');
+      return null;
+    }
+  }
+
+  /// The server refuses for reasons the student can act on, and each needs
+  /// its own words. A raw Exception here surfaced as "Exception: ..." on the
+  /// login screen.
+  LoginRefusedException _refusalFrom(http.Response response, String fallback) {
+    Map<String, dynamic> body = const {};
+    try {
+      final decoded = jsonDecode(response.body);
+      if (decoded is Map) body = Map<String, dynamic>.from(decoded);
+    } catch (_) {
+      // A gateway page is not JSON. The fallback message covers it.
+    }
+    final error = body["error"] is Map
+        ? Map<String, dynamic>.from(body["error"] as Map)
+        : const <String, dynamic>{};
+
+    // retryAfterMinutes and attemptsLeft sit beside `error`, not inside it.
+    final retry = body["retryAfterMinutes"];
+    final attemptsLeft = body["attemptsLeft"];
+    var message = error["message"]?.toString() ?? fallback;
+    if (attemptsLeft is int) {
+      message = '$message $attemptsLeft ${attemptsLeft == 1 ? 'try' : 'tries'} left.';
+    }
+
+    return LoginRefusedException(
+      code: error["code"]?.toString(),
+      message: message,
+      retryAfterMinutes: retry is int ? retry : int.tryParse('${retry ?? ''}'),
+    );
   }
 
   Future<void> signOut() async {
@@ -190,8 +303,48 @@ class LoginRefusedException implements Exception {
   /// needs support to release the device.
   bool get isDeviceBound => code == 'DEVICE_BOUND';
 
-  bool get isAccountBlocked => code == 'ACCOUNT_BLOCKED';
+  bool get isAccountBlocked =>
+      code == 'ACCOUNT_BLOCKED' || code == 'ACCOUNT_DEACTIVATED';
+
+  /// Email signup not finished: the app should ask for the code.
+  /// The exact code, for anything that needs certainty.
+  bool get isEmailNotVerified => code == 'EMAIL_NOT_VERIFIED';
+
+  /// The account exists but has never been verified, however the server
+  /// chose to say so. Read from the code where it sends one and from its
+  /// words otherwise — sign-up and sign-in both end here and must agree.
+  bool get needsVerification => accountNeedsVerification(code, message);
+
+  /// The account exists and is ready to be logged into.
+  bool get alreadyRegistered => accountAlreadyRegistered(code, message);
 
   @override
   String toString() => message;
+}
+
+/// The account exists but has never been verified.
+///
+/// The two endings are very different — a code to type, or a password to
+/// remember — so the verdict is read from what the server said, never
+/// guessed.
+bool accountNeedsVerification(String? code, String message) {
+  final upper = (code ?? '').toUpperCase();
+  final lower = message.toLowerCase();
+  return upper.contains('VERIF') ||
+      upper.contains('PENDING') ||
+      upper.contains('OTP') ||
+      lower.contains('not verified') ||
+      lower.contains('verify');
+}
+
+/// The account exists and is ready to be logged into.
+bool accountAlreadyRegistered(String? code, String message) {
+  if (accountNeedsVerification(code, message)) return false;
+
+  final upper = (code ?? '').toUpperCase();
+  final lower = message.toLowerCase();
+  return upper.contains('EXIST') ||
+      upper.contains('DUPLICATE') ||
+      upper.contains('CONFLICT') ||
+      lower.contains('already');
 }
