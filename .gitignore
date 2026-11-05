@@ -47,3 +47,6 @@ app.*.map.json
 # Gradle output, and the DevTools settings file Flutter drops in on first run.
 android/build/
 devtools_options.yaml
+
+# Firebase iOS config, copy in by hand
+ios/Runner/GoogleService-Info.plist

@@ -200,7 +200,15 @@ class AuthService {
 
   /// Emails a code for [resetPassword]. A Google account has no password,
   /// so this is also how it adds one.
-  Future<void> forgotPassword(String email) => _postQuietly(ApiConstant.forgotPassword, email);
+  ///
+  /// Returns why it cannot, or null. The endpoint answers 404 until the
+  /// backend's forgot-password branch is merged.
+  Future<String?> forgotPassword(String email) async {
+    final status = await _postQuietly(ApiConstant.forgotPassword, email);
+    return status == 404
+        ? 'Password reset is not available yet. Please try again later.'
+        : null;
+  }
 
   /// The right code sets the new password and signs in, like a login.
   Future<AuthResultModel> resetPassword(String email, String code, String password) =>
@@ -211,15 +219,17 @@ class AuthService {
   /// second request inside a minute, so there is nothing to report back.
   Future<void> resendOtp(String email) => _postQuietly(ApiConstant.resendOtp, email);
 
-  Future<void> _postQuietly(String url, String email) async {
+  Future<int?> _postQuietly(String url, String email) async {
     try {
-      await http.post(
+      final response = await http.post(
         Uri.parse(url),
         headers: {"Content-Type": "application/json"},
         body: jsonEncode({"email": email}),
       );
+      return response.statusCode;
     } catch (e) {
       if (kDebugMode) debugPrint('POST $url failed: $e');
+      return null;
     }
   }
 

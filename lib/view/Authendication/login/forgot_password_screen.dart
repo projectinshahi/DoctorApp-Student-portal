@@ -68,8 +68,16 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       _busy = true;
       _error = null;
     });
-    await context.read<GoogleSignInIntergration>().forgotPassword(email);
+    final unavailable =
+        await context.read<GoogleSignInIntergration>().forgotPassword(email);
     if (!mounted) return;
+    if (unavailable != null) {
+      setState(() {
+        _busy = false;
+        _error = unavailable;
+      });
+      return;
+    }
     _codeController.clear();
     setState(() {
       _busy = false;

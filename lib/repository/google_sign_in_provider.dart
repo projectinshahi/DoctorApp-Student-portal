@@ -30,7 +30,7 @@ class GoogleSignInIntergration extends ChangeNotifier {
 
   Future<void> resendOtp(String email) => _authService.resendOtp(email);
 
-  Future<void> forgotPassword(String email) => _authService.forgotPassword(email);
+  Future<String?> forgotPassword(String email) => _authService.forgotPassword(email);
 
   Future<bool> resetPassword(String email, String code, String password) =>
       _signIn(() => _authService.resetPassword(email, code, password));
