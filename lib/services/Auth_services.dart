@@ -174,35 +174,71 @@ class AuthService {
       return authResult;
     }
 
-    // The server refuses a login for reasons the student can act on, and
-    // each needs its own words. A raw Exception here surfaced as
-    // "Exception: ..." on the login screen.
-    Map<String, dynamic> error = const {};
-    try {
-      final decoded = jsonDecode(response.body);
-      if (decoded is Map && decoded["error"] is Map) {
-        error = Map<String, dynamic>.from(decoded["error"] as Map);
-      }
-    } catch (_) {
-      // A gateway page is not JSON. The generic message below covers it.
-    }
+    throw _refusalFrom(response, "Could not sign in. Please try again.");
+  }
 
-    // retryAfterMinutes sits beside `error`, not inside it.
+  /// Creates an unverified account. The server emails a 6-digit code, which
+  /// [verifyOtp] then exchanges for a session.
+  Future<void> registerWithEmail(String email, String password) async {
+    final response = await http.post(
+      Uri.parse(ApiConstant.register),
+      headers: {"Content-Type": "application/json"},
+      body: jsonEncode({"email": email, "password": password}),
+    );
+    if (kDebugMode) debugPrint('AUTH  POST [${response.statusCode}]  register');
+    if (response.statusCode != 201) {
+      throw _refusalFrom(response, "Could not create the account. Please try again.");
+    }
+  }
+
+  Future<AuthResultModel> loginWithEmail(String email, String password) =>
+      _signInToBackend(ApiConstant.login, {"email": email, "password": password});
+
+  /// The right code verifies the account and signs in, like a login.
+  Future<AuthResultModel> verifyOtp(String email, String code) =>
+      _signInToBackend(ApiConstant.verifyOtp, {"email": email, "code": code});
+
+  /// The server answers the same whether or not it sent one, and ignores a
+  /// second request inside a minute, so there is nothing to report back.
+  Future<void> resendOtp(String email) async {
+    try {
+      await http.post(
+        Uri.parse(ApiConstant.resendOtp),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({"email": email}),
+      );
+    } catch (e) {
+      if (kDebugMode) debugPrint('Resend OTP failed: $e');
+    }
+  }
+
+  /// The server refuses for reasons the student can act on, and each needs
+  /// its own words. A raw Exception here surfaced as "Exception: ..." on the
+  /// login screen.
+  LoginRefusedException _refusalFrom(http.Response response, String fallback) {
     Map<String, dynamic> body = const {};
     try {
       final decoded = jsonDecode(response.body);
       if (decoded is Map) body = Map<String, dynamic>.from(decoded);
-    } catch (_) {}
+    } catch (_) {
+      // A gateway page is not JSON. The fallback message covers it.
+    }
+    final error = body["error"] is Map
+        ? Map<String, dynamic>.from(body["error"] as Map)
+        : const <String, dynamic>{};
 
+    // retryAfterMinutes and attemptsLeft sit beside `error`, not inside it.
     final retry = body["retryAfterMinutes"];
+    final attemptsLeft = body["attemptsLeft"];
+    var message = error["message"]?.toString() ?? fallback;
+    if (attemptsLeft is int) {
+      message = '$message $attemptsLeft ${attemptsLeft == 1 ? 'try' : 'tries'} left.';
+    }
 
-    throw LoginRefusedException(
+    return LoginRefusedException(
       code: error["code"]?.toString(),
-      message: error["message"]?.toString() ??
-          "Could not sign in. Please try again.",
-      retryAfterMinutes: retry is int
-          ? retry
-          : int.tryParse('${retry ?? ''}'),
+      message: message,
+      retryAfterMinutes: retry is int ? retry : int.tryParse('${retry ?? ''}'),
     );
   }
 
@@ -246,7 +282,11 @@ class LoginRefusedException implements Exception {
   /// needs support to release the device.
   bool get isDeviceBound => code == 'DEVICE_BOUND';
 
-  bool get isAccountBlocked => code == 'ACCOUNT_BLOCKED';
+  bool get isAccountBlocked =>
+      code == 'ACCOUNT_BLOCKED' || code == 'ACCOUNT_DEACTIVATED';
+
+  /// Email signup not finished: the app should ask for the code.
+  bool get isEmailNotVerified => code == 'EMAIL_NOT_VERIFIED';
 
   @override
   String toString() => message;
