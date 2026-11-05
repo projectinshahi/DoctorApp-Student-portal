@@ -256,7 +256,16 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
     final wasSignedIn = previous == AuthStatus.authenticated;
     _lastStatus = status;
 
-    if (isFreshSignIn(previous, status)) _startWelcome();
+    if (isFreshSignIn(previous, status)) {
+      _startWelcome();
+      // The preview's sample is still in these providers, and the first
+      // thing a new student sees is the course picker — which read the
+      // sample as their current course and asked them to confirm changing
+      // away from "Sample exam".
+      context.read<ProfileProvider>().clear();
+      context.read<HomeSummaryProvider>().clear();
+      context.read<SelectionContentProvider>().invalidate();
+    }
 
     // A sign-in that displaced another device. Shown from here rather than
     // from the login screen, because that screen is being replaced by this

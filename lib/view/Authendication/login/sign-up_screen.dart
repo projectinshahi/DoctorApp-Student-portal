@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
 
+import '../../../services/Auth_services.dart' show LoginRefusedException;
 import '../../../widget/app_loading_screen.dart';
+import 'Sign_in_screen.dart';
 
 import '../../../repository/refresh_api_provider.dart';
 
@@ -58,14 +60,48 @@ class _SignupScreenState extends State<SignupScreen> {
     if (!mounted) return;
     setState(() => _registering = false);
 
-    // "Already registered — log in" and friends: the server's words fit.
-    if (refused != null) return _say(refused.message);
+    if (refused != null) {
+      // The server's words first — they are specific, and ours would only
+      // paraphrase them.
+      _say(refused.message);
+
+      // An account that exists but was never verified finishes the same way
+      // it started: the code it was sent.
+      if (needsVerification(refused.code, refused.message)) {
+        await context.read<GoogleSignInIntergration>().resendOtp(email);
+        if (!mounted) return;
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => OtpScreen(email: email)),
+        );
+        return;
+      }
+
+      // An account that exists and is verified has nothing to sign up for.
+      // Sending them to the form they need, with the address they just
+      // typed, beats leaving them on a sign-up page that will refuse them
+      // every time they press Next.
+      if (alreadyRegistered(refused.code, refused.message)) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => SignInScreen(
+              initialEmail: email,
+              notice: 'This email already has an account. Log in here.',
+            ),
+          ),
+        );
+      }
+      return;
+    }
 
     Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => OtpScreen(email: email)),
     );
   }
+
+
 
   /// Shared by the Google and Apple buttons: the server's reply, and so
   /// everything after it, is the same for both.
@@ -289,7 +325,16 @@ class _SignupScreenState extends State<SignupScreen> {
                             ),
                             child: Center(
                               child: _registering
-                                  ? const CircularProgressIndicator()
+                                  ? SizedBox(
+                                      width: 22.w,
+                                      height: 22.w,
+                                      child: const CircularProgressIndicator(
+                                        strokeWidth: 2.4,
+                                        valueColor:
+                                            AlwaysStoppedAnimation<Color>(
+                                                Colors.white),
+                                      ),
+                                    )
                                   : Text(
                                       "Next",
                                       style: TextStyle(
@@ -432,4 +477,31 @@ class _SignupScreenState extends State<SignupScreen> {
       ],
     );
   }
+}
+
+/// The account exists but has never been verified.
+///
+/// Read from the server's code where it sends one, and from its words
+/// otherwise — the app must not invent a verdict either way, and the two
+/// endings are very different: a code to type, or a password to remember.
+bool needsVerification(String? code, String message) {
+  final upper = (code ?? '').toUpperCase();
+  final lower = message.toLowerCase();
+  return upper.contains('VERIF') ||
+      upper.contains('PENDING') ||
+      upper.contains('OTP') ||
+      lower.contains('not verified') ||
+      lower.contains('verify');
+}
+
+/// The account exists and is ready to be logged into.
+bool alreadyRegistered(String? code, String message) {
+  if (needsVerification(code, message)) return false;
+
+  final upper = (code ?? '').toUpperCase();
+  final lower = message.toLowerCase();
+  return upper.contains('EXIST') ||
+      upper.contains('DUPLICATE') ||
+      upper.contains('CONFLICT') ||
+      lower.contains('already');
 }

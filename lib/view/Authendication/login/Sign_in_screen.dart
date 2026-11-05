@@ -15,7 +15,14 @@ import '../../../repository/google_sign_in_provider.dart';
 import 'otp_screen.dart';
 
 class SignInScreen extends StatefulWidget {
-  const SignInScreen({super.key});
+  /// Filled in when a sign-up was turned away because the account exists, so
+  /// the student is not asked to type an address they just typed.
+  final String? initialEmail;
+
+  /// Why they were sent here, shown above the form.
+  final String? notice;
+
+  const SignInScreen({super.key, this.initialEmail, this.notice});
 
   @override
   State<SignInScreen> createState() => _SignInScreenState();
@@ -32,7 +39,8 @@ class _SignInScreenState extends State<SignInScreen> {
 
   bool _obscurePassword = true;
 
-  final _emailController = TextEditingController();
+  late final _emailController =
+      TextEditingController(text: widget.initialEmail ?? '');
   final _passwordController = TextEditingController();
 
   @override
@@ -167,6 +175,39 @@ class _SignInScreenState extends State<SignInScreen> {
                     child: Column(
                 children: [
                   SizedBox(height: 300.h),
+
+                  // Why they were sent here — a sign-up that found the
+                  // account already exists lands on this screen, and
+                  // arriving at a login form with no explanation reads as
+                  // the app having lost their place.
+                  if (widget.notice != null) ...[
+                    Container(
+                      width: double.infinity,
+                      padding:
+                          EdgeInsets.symmetric(horizontal: 14.w, vertical: 12.h),
+                      decoration: BoxDecoration(
+                        color: AppColor.buttoncolor.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(12.r),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.info_outline_rounded,
+                              size: 17.sp, color: const Color(0xFF3D4A2C)),
+                          SizedBox(width: 9.w),
+                          Expanded(
+                            child: Text(
+                              widget.notice!,
+                              style: TextStyle(
+                                  fontSize: 12.5.sp,
+                                  height: 1.45,
+                                  color: const Color(0xFF3D4A2C)),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    SizedBox(height: 16.h),
+                  ],
 
                   SizedBox(
                     width: double.infinity,
