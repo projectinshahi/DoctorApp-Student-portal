@@ -18,6 +18,7 @@ import '../../../repository/daily_quiz_provider.dart';
 import '../../../repository/selection_content_provider.dart';
 import '../../../core/demo/demo_content.dart';
 import '../../../services/lesson_progress_service.dart';
+import '../../../services/saved_service.dart';
 import '../../../core/demo/demo_content.dart';
 import '../../../widget/access_chip.dart';
 import '../../../widget/sign_in_required.dart';
@@ -173,6 +174,34 @@ class _StudentLessonDetailScreenState extends State<StudentLessonDetailScreen> {
   /// The part on the player. A lesson is a list of them now; a server that
   /// has not shipped per-video access sends one, which is the lesson itself.
   LessonVideo? _part;
+
+  /// Videos whose play has already been counted on this screen. One view per
+  /// open, not one per resume — a student who pauses to take a note has not
+  /// watched it twice.
+  final Set<int> _viewed = {};
+
+  /// Counts a play, once, out of the player's way.
+  ///
+  /// Never awaited and never allowed to fail loudly: a view that goes
+  /// unrecorded costs a number, a play blocked on recording it costs the
+  /// lesson.
+  void _countView() {
+    final part = _part;
+    if (part == null || !part.isOpen) return;
+    // Nothing to count against in the preview, and a locked video is not
+    // playing in the first place.
+    if (DemoMode.active || !_viewed.add(part.id)) return;
+
+    unawaited(() async {
+      try {
+        final count = await SavedService().recordView(part.id);
+        if (!mounted || count < 0) return;
+        setState(() => _part = part.copyWith(viewCount: count));
+      } catch (_) {
+        // The next play will try again.
+      }
+    }());
+  }
 
   /// The part the caller asked for, if it is one this student can open.
   LessonVideo? get _requestedPart {
@@ -341,6 +370,7 @@ class _StudentLessonDetailScreenState extends State<StudentLessonDetailScreen> {
   void _onVideoTick(VideoPlayerController controller) {
     final value = controller.value;
     if (!value.isInitialized || !_resumed) return;
+    if (value.isPlaying) _countView();
 
     // Handed over once the player knows it. Without a length the server
     // cannot judge a percentage at all, and every video uploaded before
@@ -383,6 +413,8 @@ class _StudentLessonDetailScreenState extends State<StudentLessonDetailScreen> {
     _progress?.durationSeconds = controller.metadata.duration.inSeconds;
 
     _progress?.record(position.inSeconds);
+
+    if (controller.value.isPlaying) _countView();
 
     final duration = controller.metadata.duration;
     if (duration > Duration.zero && position >= duration) {

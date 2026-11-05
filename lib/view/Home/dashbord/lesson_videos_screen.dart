@@ -34,6 +34,11 @@ class LessonVideosScreen extends StatefulWidget {
 class _LessonVideosScreenState extends State<LessonVideosScreen> {
   String _query = '';
 
+  /// The design shows four, then offers the rest. A subject with eight
+  /// videos should not open as a wall of them.
+  static const int _preview = 4;
+  bool _showAll = false;
+
   /// The live copy of this lesson, so a part unlocked by a purchase appears
   /// without coming back to this screen twice.
   StudentLessonModel get _lesson {
@@ -51,6 +56,11 @@ class _LessonVideosScreenState extends State<LessonVideosScreen> {
         .where((v) => v.title.toLowerCase().contains(_query))
         .toList();
   }
+
+  List<LessonVideo> _shown(List<LessonVideo> parts) =>
+      _showAll || _query.isNotEmpty || parts.length <= _preview
+          ? parts
+          : parts.take(_preview).toList();
 
   Future<void> _open(StudentLessonModel lesson, LessonVideo part) async {
     if (!part.isOpen) {
@@ -79,6 +89,16 @@ class _LessonVideosScreenState extends State<LessonVideosScreen> {
   Widget build(BuildContext context) {
     final lesson = _lesson;
     final parts = _visible(lesson);
+
+    // The tree already says which videos this student saved, so the rows are
+    // drawn with their bookmarks filled rather than empty until /saved
+    // answers. Seeding is a no-op when it has nothing new.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      context.read<SavedProvider>().seedVideos(
+            lesson.videoParts.where((v) => v.isSaved).map((v) => v.id),
+          );
+    });
 
     return Scaffold(
       backgroundColor: _kBg,
@@ -135,19 +155,39 @@ class _LessonVideosScreenState extends State<LessonVideosScreen> {
                       TextStyle(fontSize: 13.sp, color: Colors.grey.shade600),
                 ),
               )
-            else
-              for (final part in parts) ...[
+            else ...[
+              for (final part in _shown(parts)) ...[
                 _VideoRow(
                   part: part,
-                  saved: context
-                      .watch<SavedProvider>()
-                      .isLessonSaved(lesson.id),
+                  showsFreeChip: lesson.hasFreePreviewParts,
+                  // Per video: bookmarking the second row used to fill every
+                  // row, because it saved the lesson they all sit in.
+                  saved: context.watch<SavedProvider>().isVideoSaved(part.id),
                   onBookmark: () =>
-                      context.read<SavedProvider>().toggleLesson(lesson.id),
+                      context.read<SavedProvider>().toggleVideo(part.id),
                   onTap: () => _open(lesson, part),
                 ),
                 SizedBox(height: 12.h),
               ],
+              // Hidden while searching: a result list is already the short
+              // answer to a question.
+              if (!_showAll && _query.isEmpty && parts.length > _preview)
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: () => setState(() => _showAll = true),
+                    child: Text(
+                      'View all',
+                      style: TextStyle(
+                        fontSize: 13.sp,
+                        fontWeight: FontWeight.w600,
+                        decoration: TextDecoration.underline,
+                        color: Colors.black87,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
           ],
         ),
       ),
@@ -199,12 +239,16 @@ class _SearchField extends StatelessWidget {
 class _VideoRow extends StatelessWidget {
   final LessonVideo part;
   final bool saved;
+
+  /// Whether this subject mixes free and paid videos.
+  final bool showsFreeChip;
   final VoidCallback onBookmark;
   final VoidCallback onTap;
 
   const _VideoRow({
     required this.part,
     required this.saved,
+    this.showsFreeChip = false,
     required this.onBookmark,
     required this.onTap,
   });
@@ -250,8 +294,22 @@ class _VideoRow extends StatelessWidget {
                           fontSize: 11.5.sp, color: Colors.grey.shade600),
                     ),
                   ],
-                  SizedBox(height: 6.h),
-                  AccessChip(accessType: part.accessType),
+                  SizedBox(height: 5.h),
+                  Row(
+                    children: [
+                      if (part.viewsLabel != null)
+                        Text(part.viewsLabel!,
+                            style: TextStyle(
+                                fontSize: 11.sp, color: Colors.grey.shade600)),
+                      // Only on a free row, and only where being free is
+                      // news: in a subject where everything is free it says
+                      // nothing worth the space.
+                      if (!part.isPremium && showsFreeChip) ...[
+                        if (part.viewsLabel != null) SizedBox(width: 8.w),
+                        const AccessChip(accessType: 'free'),
+                      ],
+                    ],
+                  ),
                 ],
               ),
             ),

@@ -203,6 +203,13 @@ class LessonVideo {
   /// out here from accessType.
   final bool locked;
 
+  /// How many times it has been played, across everyone.
+  final int viewCount;
+
+  /// Bookmarked by this student. Per video, not per lesson — a student saves
+  /// the part they want to come back to, not the hour it sits in.
+  final bool isSaved;
+
   const LessonVideo({
     required this.id,
     required this.title,
@@ -212,6 +219,8 @@ class LessonVideo {
     this.durationSeconds = 0,
     this.accessType = 'free',
     this.locked = false,
+    this.viewCount = 0,
+    this.isSaved = false,
   });
 
   bool get isPremium => accessType.toLowerCase() == 'premium';
@@ -222,6 +231,32 @@ class LessonVideo {
   /// that came back unlocked with no url has nothing to play, and an empty
   /// player is a worse answer than a padlock.
   bool get isOpen => !locked && hasVideo;
+
+  /// "18.4k views", or null at zero — a row saying "0 views" is worse than
+  /// a row saying nothing.
+  String? get viewsLabel {
+    if (viewCount <= 0) return null;
+    if (viewCount == 1) return '1 view';
+    if (viewCount < 1000) return '$viewCount views';
+    if (viewCount < 1000000) {
+      return '${(viewCount / 1000).toStringAsFixed(1)}k views';
+    }
+    return '${(viewCount / 1000000).toStringAsFixed(1)}M views';
+  }
+
+  /// A copy with the fields a play or a bookmark changes.
+  LessonVideo copyWith({int? viewCount, bool? isSaved}) => LessonVideo(
+        id: id,
+        title: title,
+        description: description,
+        videoUrl: videoUrl,
+        thumbnailUrl: thumbnailUrl,
+        durationSeconds: durationSeconds,
+        accessType: accessType,
+        locked: locked,
+        viewCount: viewCount ?? this.viewCount,
+        isSaved: isSaved ?? this.isSaved,
+      );
 
   /// "10:10", or null when the server did not send a length.
   String? get lengthLabel {
@@ -242,6 +277,8 @@ class LessonVideo {
         accessType: (json['accessType'] ?? json['access_type'] ?? 'free')
             .toString(),
         locked: json['locked'] == true,
+        viewCount: _toInt(json['viewCount'] ?? json['view_count']),
+        isSaved: json['isSaved'] == true,
       );
 }
 

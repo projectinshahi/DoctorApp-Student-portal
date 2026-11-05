@@ -175,6 +175,57 @@ class SavedLesson {
 }
 
 /// Everything `GET /users/me/saved?type=…` returns in one call.
+/// A video the student bookmarked, with enough of its lesson to show where
+/// it came from — a part called "Part 2" means nothing on its own.
+class SavedVideo {
+  final int videoId;
+  final String title;
+  final String? thumbnailUrl;
+  final int durationSeconds;
+  final int viewCount;
+  final bool locked;
+  final String accessType;
+
+  final int lessonId;
+  final String lessonTitle;
+  final String? chapterTitle;
+
+  const SavedVideo({
+    required this.videoId,
+    required this.title,
+    this.thumbnailUrl,
+    this.durationSeconds = 0,
+    this.viewCount = 0,
+    this.locked = false,
+    this.accessType = 'free',
+    required this.lessonId,
+    this.lessonTitle = '',
+    this.chapterTitle,
+  });
+
+  factory SavedVideo.fromJson(Map<String, dynamic> json) {
+    final lesson = json['lesson'] is Map
+        ? Map<String, dynamic>.from(json['lesson'] as Map)
+        : const <String, dynamic>{};
+    final chapter = lesson['chapter'] is Map
+        ? Map<String, dynamic>.from(lesson['chapter'] as Map)
+        : const <String, dynamic>{};
+
+    return SavedVideo(
+      videoId: _toInt(json['id'] ?? json['videoId']),
+      title: (json['title'] ?? '').toString(),
+      thumbnailUrl: json['thumbnailUrl']?.toString(),
+      durationSeconds: _toInt(json['durationSeconds']),
+      viewCount: _toInt(json['viewCount']),
+      locked: json['locked'] == true,
+      accessType: (json['accessType'] ?? 'free').toString(),
+      lessonId: _toInt(lesson['id'] ?? json['lessonId']),
+      lessonTitle: (lesson['title'] ?? '').toString(),
+      chapterTitle: chapter['title']?.toString(),
+    );
+  }
+}
+
 class SavedBundle {
   /// Always the FULL set of counts, whatever `type` was asked for. The filter
   /// chips bind to this, never to a list's length — filtering to videos must
@@ -183,14 +234,17 @@ class SavedBundle {
 
   final List<SavedQuestion> questions;
   final List<SavedLesson> lessons;
+  final List<SavedVideo> videos;
 
   const SavedBundle({
     required this.counts,
     required this.questions,
     required this.lessons,
+    this.videos = const [],
   });
 
-  static const empty = SavedBundle(counts: {}, questions: [], lessons: []);
+  static const empty =
+      SavedBundle(counts: {}, questions: [], lessons: [], videos: []);
 
   factory SavedBundle.fromJson(Map<String, dynamic> json) {
     final rawCounts = json['counts'];
@@ -203,6 +257,12 @@ class SavedBundle {
           : const {},
       questions: SavedQuestionsResponse.fromJson(json).questions,
       lessons: SavedLessonsResponse.fromJson(json).lessons,
+      videos: json['videos'] is List
+          ? (json['videos'] as List)
+              .whereType<Map>()
+              .map((v) => SavedVideo.fromJson(Map<String, dynamic>.from(v)))
+              .toList()
+          : const [],
     );
   }
 

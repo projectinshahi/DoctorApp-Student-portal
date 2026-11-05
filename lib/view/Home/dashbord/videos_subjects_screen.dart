@@ -15,7 +15,6 @@ import 'package:provider/provider.dart';
 import '../../../core/utils/refresh_on_visible.dart';
 import '../../../models/selection_content_model.dart';
 import '../../../repository/selection_content_provider.dart';
-import '../../../widget/access_chip.dart';
 import '../../../widget/app_loading.dart';
 import '../../../widget/app_refresh.dart';
 import 'lesson_videos_screen.dart';
@@ -29,7 +28,9 @@ class VideosSubjectsScreen extends StatefulWidget {
   /// The lessons of a chapter that belong in the video section: videos and
   /// notes, never quizzes — those live in QBank.
   static List<StudentLessonModel> subjectsIn(StudentChapterModel chapter) =>
-      chapter.lessons.where((l) => l.isWatchable).toList();
+      chapter.lessons
+          .where((l) => l.isWatchable && l.videoParts.isNotEmpty)
+          .toList();
 
   /// How many videos a subject holds. One for a lesson the server still
   /// sends as a single video, which is what [videoParts] stands in.
@@ -260,16 +261,31 @@ class _SubjectCard extends StatelessWidget {
         ),
         child: Row(
           children: [
+            // The organ icon, which the admin uploads as the lesson's cover.
+            // Clipped to the disc rather than fitted into it: the artwork is
+            // square and the design's icon is round.
             Container(
-              width: 42.w,
-              height: 42.w,
+              width: 44.w,
+              height: 44.w,
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: _kPrimary.withValues(alpha: 0.12),
+                color: Colors.grey.shade100,
                 shape: BoxShape.circle,
               ),
-              child: Icon(Icons.play_circle_outline_rounded,
-                  size: 21.sp, color: _kPrimary),
+              clipBehavior: Clip.antiAlias,
+              child: subject.thumbnailUrl != null
+                  ? Image.network(
+                      subject.thumbnailUrl!,
+                      fit: BoxFit.cover,
+                      width: 44.w,
+                      height: 44.w,
+                      errorBuilder: (_, __, ___) => Icon(
+                          Icons.play_circle_outline_rounded,
+                          size: 21.sp,
+                          color: _kPrimary),
+                    )
+                  : Icon(Icons.play_circle_outline_rounded,
+                      size: 21.sp, color: _kPrimary),
             ),
             SizedBox(width: 13.w),
             Expanded(
@@ -287,27 +303,11 @@ class _SubjectCard extends StatelessWidget {
                         color: Colors.black87),
                   ),
                   SizedBox(height: 3.h),
-                  Row(
-                    children: [
-                      Text('$count ${count == 1 ? 'Video' : 'Videos'}',
-                          style: TextStyle(
-                              fontSize: 11.5.sp, color: Colors.grey.shade600)),
-                      SizedBox(width: 8.w),
-                      // A subject with a free part and paid ones is neither
-                      // Free nor Premium — it is a sample.
-                      if (subject.hasFreePreviewParts)
-                        Text(
-                          '${subject.openPartCount} free · '
-                          '${subject.lockedPartCount} premium',
-                          style: TextStyle(
-                              fontSize: 10.5.sp,
-                              fontWeight: FontWeight.w700,
-                              color: const Color(0xFF3F7D34)),
-                        )
-                      else
-                        AccessChip(accessType: subject.accessType),
-                    ],
-                  ),
+                  // Just the count. The design marks nothing else here —
+                  // what is open and what is not is on each row inside.
+                  Text('$count ${count == 1 ? 'Video' : 'Videos'}',
+                      style: TextStyle(
+                          fontSize: 11.5.sp, color: Colors.grey.shade600)),
                 ],
               ),
             ),

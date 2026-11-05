@@ -17,6 +17,8 @@ class SavedService {
   static String get _questionsUrl => '${ApiConstant.baseUrl}/users/me/saved-questions';
   static String get _lessonsUrl => '${ApiConstant.baseUrl}/users/me/saved-lessons';
 
+  static String get _videosUrl =>
+      '${ApiConstant.baseUrl}/users/me/saved-videos';
   static String get _allUrl => '${ApiConstant.baseUrl}/users/me/saved';
 
   /// Everything in one call, with the full `counts` set attached.
@@ -49,6 +51,25 @@ class SavedService {
 
   Future<int> unsaveLesson(int lessonId) async =>
       _count(await _send('DELETE', '$_lessonsUrl/$lessonId'));
+
+  Future<int> saveVideo(int videoId) async {
+    final json = await _send('POST', _videosUrl, body: {'videoId': videoId});
+    return _count(json);
+  }
+
+  Future<int> unsaveVideo(int videoId) async =>
+      _count(await _send('DELETE', '$_videosUrl/$videoId'));
+
+  /// One play, counted. The caller never waits on it and never fails for it:
+  /// a view that is not recorded costs a number, a blocked play costs the
+  /// lesson.
+  Future<int> recordView(int videoId) async {
+    final json = await _send('POST',
+        '${ApiConstant.baseUrl}/users/me/lesson-videos/$videoId/view');
+    final raw = json['viewCount'];
+    if (raw is num) return raw.toInt();
+    return int.tryParse('$raw') ?? -1;
+  }
 
   /// `count` is documented on every response. -1 means the server didn't send
   /// one this time — callers refetch rather than displaying a wrong number.

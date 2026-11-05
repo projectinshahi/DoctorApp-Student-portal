@@ -2,7 +2,7 @@ name: dr_app
 description: "Dr. SKM's Academy — medical licensing exam prep."
 publish_to: 'none'
 
-version: 1.4.1+26
+version: 1.5.0+27
 
 environment:
   sdk: ^3.11.4
