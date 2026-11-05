@@ -256,6 +256,12 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
     final wasSignedIn = previous == AuthStatus.authenticated;
     _lastStatus = status;
 
+    // Here, not only in build. The providers are cleared a few lines down
+    // and something reloads them immediately — and until this flag turns
+    // off, what they reload is the sample. That is how "Sample exam" was
+    // still the current course when the picker opened.
+    DemoMode.active = status == AuthStatus.unauthenticated;
+
     if (isFreshSignIn(previous, status)) {
       _startWelcome();
       // The preview's sample is still in these providers, and the first

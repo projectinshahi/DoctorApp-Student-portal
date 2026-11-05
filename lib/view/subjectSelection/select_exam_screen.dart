@@ -61,7 +61,10 @@ class _ExamSelectionScreenState extends State<ExamSelectionScreen> {
     // so they can see what they are moving away from.
     final profile = context.read<ProfileProvider>().profile;
     final course = profile?.selectedCourse;
-    if (course != null) {
+    // Negative ids belong to the preview's sample course, which is nobody's
+    // current course. A new student was being asked to confirm changing away
+    // from "Sample exam".
+    if (course != null && course.id > 0) {
       final type = profile!.selectedCourseType;
       _currentCourseId = course.id;
       _currentCourseTypeId = type?.id;
