@@ -16,7 +16,7 @@ import '../../repository/settings_provider.dart';
 import 'Qbank/bookmarks_screen.dart';
 import 'Qbank/qbank_tab.dart';
 import 'tests/tests_tab.dart';
-import 'dashbord/ai_video_tab.dart';
+import 'dashbord/videos_subjects_screen.dart';
 import 'continue_learning_row.dart';
 import 'notifications/notifications_screen.dart';
 import 'recall/recall_lists_screen.dart';
@@ -76,7 +76,7 @@ class _HomescreenState extends State<Homescreen> with RefreshOnVisible<Homescree
         break;
 
       case 3: // AI Videos
-        _pushScreen(const AiVideoTab());
+        _pushScreen(const VideosSubjectsScreen());
         break;
 
       case 4: // Rapid Recall

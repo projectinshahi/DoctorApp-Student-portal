@@ -31,10 +31,16 @@ class StudentLessonDetailScreen extends StatefulWidget {
   final StudentLessonModel lesson;
   final List<StudentLessonModel> relatedLessons;
 
+  /// Which part to open on. Null starts at the first one that plays, which
+  /// is what every other way in wants; the videos list passes the row that
+  /// was tapped.
+  final int? initialPartId;
+
   const StudentLessonDetailScreen({
     super.key,
     required this.lesson,
     this.relatedLessons = const [],
+    this.initialPartId,
   });
 
   @override
@@ -168,6 +174,16 @@ class _StudentLessonDetailScreenState extends State<StudentLessonDetailScreen> {
   /// has not shipped per-video access sends one, which is the lesson itself.
   LessonVideo? _part;
 
+  /// The part the caller asked for, if it is one this student can open.
+  LessonVideo? get _requestedPart {
+    final wanted = widget.initialPartId;
+    if (wanted == null) return null;
+    for (final part in _lesson.videoParts) {
+      if (part.id == wanted && part.isOpen) return part;
+    }
+    return null;
+  }
+
   /// Progress is one position per lesson, saved against the first part. The
   /// others start at zero and report nothing — a backend decision that has
   /// not been taken yet, and overwriting the lesson's position with part
@@ -177,9 +193,10 @@ class _StudentLessonDetailScreenState extends State<StudentLessonDetailScreen> {
       _part!.id == _lesson.videoParts.first.id;
 
   void _setupVideo() {
-    // Opens on the first part that plays, not blindly on part one: in a
-    // lesson whose sample is part two, part one has no url at all.
-    _part ??= _lesson.firstOpenPart;
+    // The part that was tapped, where a list sent them to one; otherwise the
+    // first that plays — in a lesson whose sample is part two, part one has
+    // no url at all.
+    _part ??= _requestedPart ?? _lesson.firstOpenPart;
     final url = _part?.videoUrl;
     if (url == null || url.isEmpty) return;
 
