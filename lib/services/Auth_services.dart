@@ -297,8 +297,44 @@ class LoginRefusedException implements Exception {
       code == 'ACCOUNT_BLOCKED' || code == 'ACCOUNT_DEACTIVATED';
 
   /// Email signup not finished: the app should ask for the code.
+  /// The exact code, for anything that needs certainty.
   bool get isEmailNotVerified => code == 'EMAIL_NOT_VERIFIED';
+
+  /// The account exists but has never been verified, however the server
+  /// chose to say so. Read from the code where it sends one and from its
+  /// words otherwise — sign-up and sign-in both end here and must agree.
+  bool get needsVerification => accountNeedsVerification(code, message);
+
+  /// The account exists and is ready to be logged into.
+  bool get alreadyRegistered => accountAlreadyRegistered(code, message);
 
   @override
   String toString() => message;
+}
+
+/// The account exists but has never been verified.
+///
+/// The two endings are very different — a code to type, or a password to
+/// remember — so the verdict is read from what the server said, never
+/// guessed.
+bool accountNeedsVerification(String? code, String message) {
+  final upper = (code ?? '').toUpperCase();
+  final lower = message.toLowerCase();
+  return upper.contains('VERIF') ||
+      upper.contains('PENDING') ||
+      upper.contains('OTP') ||
+      lower.contains('not verified') ||
+      lower.contains('verify');
+}
+
+/// The account exists and is ready to be logged into.
+bool accountAlreadyRegistered(String? code, String message) {
+  if (accountNeedsVerification(code, message)) return false;
+
+  final upper = (code ?? '').toUpperCase();
+  final lower = message.toLowerCase();
+  return upper.contains('EXIST') ||
+      upper.contains('DUPLICATE') ||
+      upper.contains('CONFLICT') ||
+      lower.contains('already');
 }

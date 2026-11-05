@@ -67,7 +67,7 @@ class _SignupScreenState extends State<SignupScreen> {
 
       // An account that exists but was never verified finishes the same way
       // it started: the code it was sent.
-      if (needsVerification(refused.code, refused.message)) {
+      if (refused.needsVerification) {
         await context.read<GoogleSignInIntergration>().resendOtp(email);
         if (!mounted) return;
         Navigator.push(
@@ -81,7 +81,7 @@ class _SignupScreenState extends State<SignupScreen> {
       // Sending them to the form they need, with the address they just
       // typed, beats leaving them on a sign-up page that will refuse them
       // every time they press Next.
-      if (alreadyRegistered(refused.code, refused.message)) {
+      if (refused.alreadyRegistered) {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
@@ -477,31 +477,4 @@ class _SignupScreenState extends State<SignupScreen> {
       ],
     );
   }
-}
-
-/// The account exists but has never been verified.
-///
-/// Read from the server's code where it sends one, and from its words
-/// otherwise — the app must not invent a verdict either way, and the two
-/// endings are very different: a code to type, or a password to remember.
-bool needsVerification(String? code, String message) {
-  final upper = (code ?? '').toUpperCase();
-  final lower = message.toLowerCase();
-  return upper.contains('VERIF') ||
-      upper.contains('PENDING') ||
-      upper.contains('OTP') ||
-      lower.contains('not verified') ||
-      lower.contains('verify');
-}
-
-/// The account exists and is ready to be logged into.
-bool alreadyRegistered(String? code, String message) {
-  if (needsVerification(code, message)) return false;
-
-  final upper = (code ?? '').toUpperCase();
-  final lower = message.toLowerCase();
-  return upper.contains('EXIST') ||
-      upper.contains('DUPLICATE') ||
-      upper.contains('CONFLICT') ||
-      lower.contains('already');
 }

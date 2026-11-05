@@ -78,7 +78,10 @@ class _SignInScreenState extends State<SignInScreen> {
     // itself, rather than falling through to the
     // generic failure snack bar below.
     final refused = viewModel.refusal;
-    if (refused != null && refused.isEmailNotVerified) {
+    // Not the exact code alone: a server that words it differently sent the
+    // student to a refusal dialog they could do nothing about, when what
+    // they needed was the code screen.
+    if (refused != null && refused.needsVerification) {
       // Signed up but never entered the code. A fresh one beats explaining
       // that the old one has probably expired.
       setState(() => _finishing = false);
