@@ -16,7 +16,7 @@ import '../../../repository/quiz_provider.dart';
 import '../../../repository/saved_provider.dart';
 import '../../../services/quiz_sounds.dart';
 import '../../subjectSelection/select_exam_screen.dart';
-import '../../../widget/pro_plan_dialog.dart';
+import '../../../widget/learning_plan_dialog.dart';
 
 const Color _kPrimary = Color(0xFF87986B);
 const Color _kBg = Color(0xFFEFF4E2);
@@ -1271,13 +1271,9 @@ class _FailureView extends StatelessWidget {
   Widget build(BuildContext context) {
     switch (failure.kind) {
       case QuizErrorKind.locked:
-        // Same paywall the video player shows — PRO badge, View Plan, Go back.
-        // Subscribing reloads the lesson so the questions appear straight away.
-        return ProPlanPaywall(
-          message: 'This quiz is available for pro users of this course. '
-              'Want to check Pro plans?',
-          onSubscribed: onRetry,
-        );
+        // The plan lapsed after the list was drawn: the same notice a
+        // padlocked row gives, in place of the questions.
+        return const PlanRequiredNotice(feature: 'This quiz');
 
       case QuizErrorKind.noCourseSelected:
         return _EmptyState(

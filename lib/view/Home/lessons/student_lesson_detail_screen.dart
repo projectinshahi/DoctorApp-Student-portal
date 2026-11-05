@@ -21,9 +21,8 @@ import '../../../services/lesson_progress_service.dart';
 import '../../../services/saved_service.dart';
 import '../../../core/demo/demo_content.dart';
 import '../../../widget/access_chip.dart';
-import '../../../widget/sign_in_required.dart';
 import '../../../widget/app_loading.dart';
-import '../../../widget/pro_plan_dialog.dart';
+import '../../../widget/learning_plan_dialog.dart';
 import '../Qbank/quiz_screen.dart';    // adjust path to wherever you place this file
 import '../lessons/comments_section.dart';
 import '../../../core/utils/capture_watch.dart';
@@ -149,26 +148,6 @@ class _StudentLessonDetailScreenState extends State<StudentLessonDetailScreen> {
       );
       _setupVideo();
     }
-  }
-
-  /// Called after a successful subscribe. The plans screen already awaits a
-  /// full SelectionContentProvider reload before it pops, so the unlocked
-  /// lesson — videoUrl and all — is already in the tree; the copy this screen
-  /// holds is the stale, stripped one. Swap it in instead of re-fetching.
-  void _reloadUnlockedLesson() {
-    if (!mounted) return;
-    final lessons = context.read<SelectionContentProvider>().content?.allLessons ??
-        const <StudentLessonModel>[];
-    final index = lessons.indexWhere((l) => l.id == _lesson.id);
-
-    // Still locked (or gone) means the plan they bought doesn't cover this
-    // lesson. Leave, so the list behind re-renders with the access that is
-    // now real rather than stranding them on a paywall they just paid past.
-    if (index == -1 || lessons[index].locked) {
-      Navigator.pop(context, true);
-      return;
-    }
-    _switchToLesson(lessons[index]);
   }
 
   /// The part on the player. A lesson is a list of them now; a server that
@@ -980,19 +959,10 @@ class _StudentLessonDetailScreenState extends State<StudentLessonDetailScreen> {
   }
 
   // ── Quiz lesson: same full-width card slot the video/notes use ──
-  /// What a padlocked part offers instead of playing.
-  ///
-  /// The same place a locked lesson sends them, reached from a row rather
-  /// than from a whole screen — the lesson is open, only this part is not.
-  Future<void> _openPaywallSheet() async {
-    if (DemoMode.active) {
-      await showSignInRequired(context, what: 'watch the premium parts');
-      return;
-    }
-
-    final subscribed = await openPlans(context);
-    if (subscribed && mounted) _reloadUnlockedLesson();
-  }
+  /// What a padlocked part offers instead of playing: the same notice as
+  /// every other premium item.
+  Future<void> _openPaywallSheet(String title) =>
+      showPlanRequiredDialog(context, lessonTitle: title);
 
   /// The lesson's parts, in order.
   ///
@@ -1034,7 +1004,7 @@ class _StudentLessonDetailScreenState extends State<StudentLessonDetailScreen> {
               onTap: () => part.isOpen
                   ? _playPart(part)
                   // No url to play, so this is the only honest answer.
-                  : _openPaywallSheet(),
+                  : _openPaywallSheet(part.title),
             ),
             SizedBox(height: 8.h),
           ],
@@ -1131,7 +1101,7 @@ class _StudentLessonDetailScreenState extends State<StudentLessonDetailScreen> {
     return Padding(
       padding: EdgeInsets.fromLTRB(16.w, 16.h, 16.w, 0),
       child: GestureDetector(
-        onTap: _openPaywallSheet,
+        onTap: () => _openPaywallSheet(_lesson.title),
         child: Container(
           padding: EdgeInsets.all(14.w),
           decoration: BoxDecoration(
@@ -1243,10 +1213,9 @@ class _StudentLessonDetailScreenState extends State<StudentLessonDetailScreen> {
   }
 
   /// The locked state, built the same way the quiz screen builds its own:
-  /// a plain app bar over a full-screen [ProPlanPaywall], not a dialog thrown
-  /// on top of a player that was never allowed to load. Subscribing reloads
-  /// the lesson in place, so the video starts here rather than sending them
-  /// back to the list to find it again.
+  /// a plain app bar over a full-screen [PlanRequiredNotice], not a dialog
+  /// thrown on top of a player that was never allowed to load. Reached when
+  /// the plan lapsed after the list was drawn.
   Widget _buildPaywallScreen() {
     return Scaffold(
       backgroundColor: kBg,
@@ -1267,11 +1236,7 @@ class _StudentLessonDetailScreenState extends State<StudentLessonDetailScreen> {
         ),
       ),
       body: SafeArea(
-        child: ProPlanPaywall(
-          message: 'This video is available for pro users of this course. '
-              'Want to check Pro plans?',
-          onSubscribed: _reloadUnlockedLesson,
-        ),
+        child: PlanRequiredNotice(feature: _lesson.title),
       ),
     );
   }
