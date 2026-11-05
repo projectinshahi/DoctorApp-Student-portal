@@ -198,17 +198,28 @@ class AuthService {
   Future<AuthResultModel> verifyOtp(String email, String code) =>
       _signInToBackend(ApiConstant.verifyOtp, {"email": email, "code": code});
 
+  /// Emails a code for [resetPassword]. A Google account has no password,
+  /// so this is also how it adds one.
+  Future<void> forgotPassword(String email) => _postQuietly(ApiConstant.forgotPassword, email);
+
+  /// The right code sets the new password and signs in, like a login.
+  Future<AuthResultModel> resetPassword(String email, String code, String password) =>
+      _signInToBackend(ApiConstant.resetPassword,
+          {"email": email, "code": code, "password": password});
+
   /// The server answers the same whether or not it sent one, and ignores a
   /// second request inside a minute, so there is nothing to report back.
-  Future<void> resendOtp(String email) async {
+  Future<void> resendOtp(String email) => _postQuietly(ApiConstant.resendOtp, email);
+
+  Future<void> _postQuietly(String url, String email) async {
     try {
       await http.post(
-        Uri.parse(ApiConstant.resendOtp),
+        Uri.parse(url),
         headers: {"Content-Type": "application/json"},
         body: jsonEncode({"email": email}),
       );
     } catch (e) {
-      if (kDebugMode) debugPrint('Resend OTP failed: $e');
+      if (kDebugMode) debugPrint('POST $url failed: $e');
     }
   }
 

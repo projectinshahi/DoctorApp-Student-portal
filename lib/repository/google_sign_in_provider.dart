@@ -30,6 +30,11 @@ class GoogleSignInIntergration extends ChangeNotifier {
 
   Future<void> resendOtp(String email) => _authService.resendOtp(email);
 
+  Future<void> forgotPassword(String email) => _authService.forgotPassword(email);
+
+  Future<bool> resetPassword(String email, String code, String password) =>
+      _signIn(() => _authService.resetPassword(email, code, password));
+
   /// Registration signs no one in, so all it reports is why it was refused,
   /// or null when the code is on its way.
   Future<LoginRefusedException?> registerWithEmail(

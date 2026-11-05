@@ -13,6 +13,7 @@ import '../../../core/theam /app_color.dart';
 import '../../../core/constant/app_size.dart';
 import '../../../repository/google_sign_in_provider.dart';
 import 'otp_screen.dart';
+import 'forgot_password_screen.dart';
 
 class SignInScreen extends StatefulWidget {
   /// Filled in when a sign-up was turned away because the account exists, so
@@ -329,11 +330,23 @@ class _SignInScreenState extends State<SignInScreen> {
                   ),
                   SizedBox(height: AppSize.gap.h),
               
-                  Center(child: Text("Forgot Password", style: TextStyle(
-                    fontWeight: FontWeight.w300,
-                    fontSize: 16.sp,
-                    letterSpacing: 0,
-                  ),),),
+                  Center(
+                    child: GestureDetector(
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => ForgotPasswordScreen(
+                            email: _emailController.text.trim(),
+                          ),
+                        ),
+                      ),
+                      child: Text("Forgot Password", style: TextStyle(
+                        fontWeight: FontWeight.w300,
+                        fontSize: 16.sp,
+                        letterSpacing: 0,
+                      )),
+                    ),
+                  ),
 
 
                   SizedBox(height: 80.h),
