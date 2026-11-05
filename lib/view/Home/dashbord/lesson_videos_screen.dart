@@ -16,7 +16,7 @@ import '../../../repository/selection_content_provider.dart';
 import '../../../widget/access_chip.dart';
 import '../../../widget/app_refresh.dart';
 import '../../../widget/sign_in_required.dart';
-import '../../../widget/pro_plan_dialog.dart';
+import '../../../widget/learning_plan_dialog.dart';
 import '../lessons/student_lesson_detail_screen.dart';
 
 const Color _kBg = Color(0xFFEFF4E2);
@@ -64,11 +64,13 @@ class _LessonVideosScreenState extends State<LessonVideosScreen> {
 
   Future<void> _open(StudentLessonModel lesson, LessonVideo part) async {
     if (!part.isOpen) {
-      // No url to play: the only honest answer is what it costs.
+      // No url to play: the only honest answer is what it costs. The same
+      // notice as a locked quiz, a locked paper and a locked deck — one
+      // sentence for the whole app, not one per screen.
       if (DemoMode.active) {
         await showSignInRequired(context, what: 'watch the premium videos');
       } else {
-        await openPlans(context);
+        await showPlanRequiredDialog(context, lessonTitle: part.title);
       }
       return;
     }
@@ -159,7 +161,6 @@ class _LessonVideosScreenState extends State<LessonVideosScreen> {
               for (final part in _shown(parts)) ...[
                 _VideoRow(
                   part: part,
-                  showsFreeChip: lesson.hasFreePreviewParts,
                   // Per video: bookmarking the second row used to fill every
                   // row, because it saved the lesson they all sit in.
                   saved: context.watch<SavedProvider>().isVideoSaved(part.id),
@@ -239,16 +240,12 @@ class _SearchField extends StatelessWidget {
 class _VideoRow extends StatelessWidget {
   final LessonVideo part;
   final bool saved;
-
-  /// Whether this subject mixes free and paid videos.
-  final bool showsFreeChip;
   final VoidCallback onBookmark;
   final VoidCallback onTap;
 
   const _VideoRow({
     required this.part,
     required this.saved,
-    this.showsFreeChip = false,
     required this.onBookmark,
     required this.onTap,
   });
@@ -301,13 +298,11 @@ class _VideoRow extends StatelessWidget {
                         Text(part.viewsLabel!,
                             style: TextStyle(
                                 fontSize: 11.sp, color: Colors.grey.shade600)),
-                      // Only on a free row, and only where being free is
-                      // news: in a subject where everything is free it says
-                      // nothing worth the space.
-                      if (!part.isPremium && showsFreeChip) ...[
-                        if (part.viewsLabel != null) SizedBox(width: 8.w),
-                        const AccessChip(accessType: 'free'),
-                      ],
+                      // Both tiers are labelled. A padlock says this
+                      // student cannot open it; only the chip says what it
+                      // would take, and a row with neither reads as broken.
+                      if (part.viewsLabel != null) SizedBox(width: 8.w),
+                      AccessChip(accessType: part.accessType),
                     ],
                   ),
                 ],
