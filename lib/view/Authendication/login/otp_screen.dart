@@ -10,13 +10,26 @@ import '../../../core/theam /app_color.dart';
 import '../../../repository/google_sign_in_provider.dart';
 import '../../../repository/refresh_api_provider.dart';
 import '../../../widget/app_loading_screen.dart';
+import '../../../widget/login_refused_dialog.dart';
 
-/// The 6-digit code emailed at signup. The right code verifies the account
-/// and signs the student straight in.
+/// The 6-digit code emailed at signup, or at every email login when
+/// [isLogin]. The right code signs the student straight in.
 class OtpScreen extends StatefulWidget {
   final String email;
 
-  const OtpScreen({super.key, required this.email});
+  /// The second step of an email login rather than of a sign-up.
+  final bool isLogin;
+
+  /// Login only. Resending a login code is the login call again, so it is
+  /// held here for that and never stored.
+  final String? password;
+
+  const OtpScreen({
+    super.key,
+    required this.email,
+    this.isLogin = false,
+    this.password,
+  });
 
   @override
   State<OtpScreen> createState() => _OtpScreenState();
@@ -57,7 +70,12 @@ class _OtpScreenState extends State<OtpScreen> {
   }
 
   Future<void> _resend() async {
-    await context.read<GoogleSignInIntergration>().resendOtp(widget.email);
+    final viewModel = context.read<GoogleSignInIntergration>();
+    if (widget.isLogin) {
+      await viewModel.loginWithEmail(widget.email, widget.password!);
+    } else {
+      await viewModel.resendOtp(widget.email);
+    }
     if (!mounted) return;
     _codeController.clear();
     setState(() => _error = null);
@@ -80,11 +98,27 @@ class _OtpScreenState extends State<OtpScreen> {
       _error = null;
     });
 
-    final success = await viewModel.verifyOtp(widget.email, code);
+    final success = widget.isLogin
+        ? await viewModel.verifyLoginOtp(widget.email, code)
+        : await viewModel.verifyOtp(widget.email, code);
     if (!mounted) return;
 
     final result = viewModel.authResult;
+    final refusal = viewModel.refusal;
+    if (!success &&
+        refusal != null &&
+        (refusal.isSessionActiveElsewhere || refusal.isAccountBlocked)) {
+      // Not about the code: the same sheet a refused login shows.
+      setState(() => _verifying = false);
+      await showLoginRefusedDialog(context, refusal);
+      return;
+    }
     if (!success || result == null) {
+      // A dead code needs a new one now, not in a minute.
+      if (refusal?.code == 'OTP_EXPIRED' || refusal?.code == 'OTP_LOCKED') {
+        _timer?.cancel();
+        _secondsLeft = 0;
+      }
       // Wrong, expired or locked: each message says what to do next, and
       // this screen is where they do it.
       setState(() {
@@ -133,7 +167,7 @@ class _OtpScreenState extends State<OtpScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Verify your email',
+                    widget.isLogin ? 'Enter your login code' : 'Verify your email',
                     style: TextStyle(
                       fontSize: 24.sp,
                       fontWeight: FontWeight.w600,
@@ -141,10 +175,39 @@ class _OtpScreenState extends State<OtpScreen> {
                     ),
                   ),
                   SizedBox(height: 8.h),
-                  Text(
-                    'Enter the 6-digit code we sent to\n${widget.email}',
+                  Text.rich(
+                    TextSpan(
+                      text: widget.isLogin
+                          ? 'We sent a 6-digit code to\n'
+                          : 'Enter the 6-digit code we sent to\n',
+                      children: [
+                        TextSpan(
+                          text: widget.email,
+                          style: TextStyle(
+                              fontWeight: widget.isLogin
+                                  ? FontWeight.w600
+                                  : FontWeight.normal),
+                        ),
+                      ],
+                    ),
                     style: TextStyle(fontSize: 15.sp, color: AppColor.Textcolor),
                   ),
+                  if (widget.isLogin)
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      style: TextButton.styleFrom(
+                          padding: EdgeInsets.zero,
+                          minimumSize: Size(0, 36.h),
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap),
+                      child: Text(
+                        'Not you? Change email',
+                        style: TextStyle(
+                          fontSize: 14.sp,
+                          color: AppColor.Textcolor,
+                          decoration: TextDecoration.underline,
+                        ),
+                      ),
+                    ),
                   SizedBox(height: 32.h),
 
                   Container(
@@ -209,7 +272,7 @@ class _OtpScreenState extends State<OtpScreen> {
                       ),
                       alignment: Alignment.center,
                       child: Text(
-                        'Verify',
+                        widget.isLogin ? 'Verify and log in' : 'Verify',
                         style: TextStyle(
                           color: AppColor.Buttontextcolor,
                           fontWeight: FontWeight.w500,
@@ -235,6 +298,16 @@ class _OtpScreenState extends State<OtpScreen> {
                       ),
                     ),
                   ),
+
+                  if (widget.isLogin) ...[
+                    SizedBox(height: 12.h),
+                    Text(
+                      "The code expires in 10 minutes. Check your spam folder "
+                      "if you don't see it.",
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 13.sp, color: Colors.grey),
+                    ),
+                  ],
                 ],
               ),
             ),

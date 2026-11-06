@@ -22,8 +22,29 @@ class GoogleSignInIntergration extends ChangeNotifier {
 
   Future<bool> signInWithApple() => _signIn(_authService.signInWithApple);
 
-  Future<bool> loginWithEmail(String email, String password) =>
-      _signIn(() => _authService.loginWithEmail(email, password));
+  /// Asks for the emailed login code. Null when it is on its way — or, from
+  /// a server without login codes, when it signed straight in, with the
+  /// session in [authResult]. Not through [_signIn]: usually nothing is
+  /// signed in yet, so no "Signing you in…".
+  Future<LoginRefusedException?> loginWithEmail(
+      String email, String password) async {
+    authResult = null;
+    refusal = null;
+    try {
+      authResult = await _authService.loginWithEmail(email, password);
+      return null;
+    } on LoginRefusedException catch (e) {
+      return e;
+    } catch (_) {
+      return const LoginRefusedException(
+        code: null,
+        message: 'Could not reach the server. Check your connection and try again.',
+      );
+    }
+  }
+
+  Future<bool> verifyLoginOtp(String email, String code) =>
+      _signIn(() => _authService.verifyLoginOtp(email, code));
 
   Future<bool> verifyOtp(String email, String code) =>
       _signIn(() => _authService.verifyOtp(email, code));

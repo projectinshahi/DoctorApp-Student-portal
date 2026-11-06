@@ -12,6 +12,7 @@ class ApiConstant {
   static const String register = '$baseUrl/auth/register';
   static const String login = '$baseUrl/auth/login';
   static const String verifyOtp = '$baseUrl/auth/verify-otp';
+  static const String loginVerifyOtp = '$baseUrl/auth/login/verify-otp';
   static const String resendOtp = '$baseUrl/auth/resend-otp';
   static const String forgotPassword = '$baseUrl/auth/forgot-password';
   static const String resetPassword = '$baseUrl/auth/reset-password';

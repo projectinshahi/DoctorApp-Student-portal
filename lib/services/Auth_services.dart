@@ -145,6 +145,14 @@ class AuthService {
   Future<AuthResultModel> _signInToBackend(
     String url,
     Map<String, dynamic> payload,
+  ) async =>
+      (await _postForSession(url, payload))!;
+
+  /// [_signInToBackend], except that a 200 asking for a login code is
+  /// answered with null instead of a session. Only the login step sends one.
+  Future<AuthResultModel?> _postForSession(
+    String url,
+    Map<String, dynamic> payload,
   ) async {
     final String deviceId = await DeviceIdHelper.getDeviceId();
 
@@ -162,8 +170,10 @@ class AuthService {
     if (kDebugMode) debugPrint('AUTH  POST [${response.statusCode}]  $url');
 
     if (response.statusCode == 200) {
-      final AuthResultModel authResult =
-      AuthResultModel.fromJson(jsonDecode(response.body));
+      final body = jsonDecode(response.body);
+      if (body is Map && body["otpRequired"] == true) return null;
+
+      final AuthResultModel authResult = AuthResultModel.fromJson(body);
 
       // Save Tokens
       await LocalStorage.saveAccessToken(authResult.accessToken);
@@ -191,8 +201,15 @@ class AuthService {
     }
   }
 
-  Future<AuthResultModel> loginWithEmail(String email, String password) =>
-      _signInToBackend(ApiConstant.login, {"email": email, "password": password});
+  /// Step one of an email login: the password is checked and a 6-digit code
+  /// emailed, answered with null; [verifyLoginOtp] finishes it. A server
+  /// without login codes signs straight in, and that session comes back.
+  Future<AuthResultModel?> loginWithEmail(String email, String password) =>
+      _postForSession(ApiConstant.login, {"email": email, "password": password});
+
+  /// Step two: the emailed code signs in. Resending is [loginWithEmail] again.
+  Future<AuthResultModel> verifyLoginOtp(String email, String code) =>
+      _signInToBackend(ApiConstant.loginVerifyOtp, {"email": email, "code": code});
 
   /// The right code verifies the account and signs in, like a login.
   Future<AuthResultModel> verifyOtp(String email, String code) =>

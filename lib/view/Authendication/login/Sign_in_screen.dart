@@ -12,6 +12,7 @@ import 'package:provider/provider.dart';
 import '../../../core/theam /app_color.dart';
 import '../../../core/constant/app_size.dart';
 import '../../../repository/google_sign_in_provider.dart';
+import '../../../View_model/auth_result_model.dart';
 import 'otp_screen.dart';
 import 'forgot_password_screen.dart';
 
@@ -38,6 +39,10 @@ class _SignInScreenState extends State<SignInScreen> {
   /// while work was still going on.
   bool _finishing = false;
 
+  /// Asking the server to email a login code. Only the Login button spins:
+  /// nothing is signed in yet, so no full-screen "Signing you in…".
+  bool _sendingCode = false;
+
   bool _obscurePassword = true;
 
   late final _emailController =
@@ -51,7 +56,8 @@ class _SignInScreenState extends State<SignInScreen> {
     super.dispose();
   }
 
-  void _loginWithEmail(GoogleSignInIntergration viewModel) {
+  /// The password is checked and a code emailed; the code screen signs in.
+  Future<void> _loginWithEmail(GoogleSignInIntergration viewModel) async {
     final email = _emailController.text.trim();
     final password = _passwordController.text;
     if (email.isEmpty || password.isEmpty) {
@@ -60,7 +66,42 @@ class _SignInScreenState extends State<SignInScreen> {
       );
       return;
     }
-    _signIn(viewModel, () => viewModel.loginWithEmail(email, password));
+
+    setState(() => _sendingCode = true);
+    final refused = await viewModel.loginWithEmail(email, password);
+    if (!mounted) return;
+    setState(() => _sendingCode = false);
+
+    if (refused != null && refused.needsVerification) {
+      // Signed up but never verified: the sign-up code, as before.
+      await viewModel.resendOtp(email);
+      if (!mounted) return;
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => OtpScreen(email: email)),
+      );
+      return;
+    }
+    if (refused != null) {
+      await showLoginRefusedDialog(context, refused);
+      return;
+    }
+
+    // A server without login codes signed straight in.
+    final session = viewModel.authResult;
+    if (session != null) {
+      setState(() => _finishing = true);
+      await _finish(session);
+      return;
+    }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) =>
+            OtpScreen(email: email, password: password, isLogin: true),
+      ),
+    );
   }
 
   /// Shared by the Google and Apple buttons: the server's reply, and so
@@ -109,20 +150,10 @@ class _SignInScreenState extends State<SignInScreen> {
       // home.
       final result = viewModel.authResult;
       if (result != null) {
-        await context
-            .read<AuthProvider>()
-            .adoptSession(result);
+        await _finish(result);
+      } else {
+        setState(() => _finishing = false);
       }
-      if (!mounted) return;
-      setState(() => _finishing = false);
-
-      // No "Welcome back" toast, and no navigation.
-      // The home screen already greets them by name,
-      // and AuthGate swaps its own root — to the
-      // course picker for a new account, to home
-      // otherwise. pushReplacement here removed
-      // AuthGate, and with it the session watcher.
-      Navigator.of(context).popUntil((r) => r.isFirst);
     } else {
       // Without this the button stays disabled after
       // a failed attempt and the student cannot try
@@ -136,6 +167,21 @@ class _SignInScreenState extends State<SignInScreen> {
     }
   }
 
+  Future<void> _finish(AuthResultModel result) async {
+    await context.read<AuthProvider>().adoptSession(result);
+    if (!mounted) return;
+    setState(() => _finishing = false);
+
+    // No "Welcome back" toast, and no navigation.
+    // The home screen already greets them by name,
+    // and AuthGate swaps its own root — to the
+    // course picker for a new account, to home
+    // otherwise. pushReplacement here removed
+    // AuthGate, and with it the session watcher.
+    Navigator.of(context).popUntil((r) => r.isFirst);
+  }
+
+  @override
   Widget build(BuildContext context) {
 
     final signingIn = _finishing ||
@@ -304,7 +350,7 @@ class _SignInScreenState extends State<SignInScreen> {
                         SizedBox(height: AppSize.gap.h),
                         Consumer<GoogleSignInIntergration>(
                           builder: (context, viewModel, child) => GestureDetector(
-                            onTap: (viewModel.isLoading || _finishing)
+                            onTap: (viewModel.isLoading || _finishing || _sendingCode)
                                 ? null
                                 : () => _loginWithEmail(viewModel),
                             child: Container(
@@ -315,7 +361,16 @@ class _SignInScreenState extends State<SignInScreen> {
                                 color: AppColor.buttoncolor,
                               ),
                               child: Center(
-                                child: Text(
+                                child: _sendingCode
+                                    ? SizedBox(
+                                        width: 22,
+                                        height: 22,
+                                        child: CircularProgressIndicator(
+                                          color: AppColor.Buttontextcolor,
+                                          strokeWidth: 2.5,
+                                        ),
+                                      )
+                                    : Text(
                                   "Login",
                                   style: TextStyle(
                                     color: AppColor.Buttontextcolor,
